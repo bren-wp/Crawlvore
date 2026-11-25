@@ -116,7 +116,7 @@ class Store:
         identity=norm(vals['title'])+'\x1f'+norm(vals['city'])
         old=c.execute('SELECT * FROM companies WHERE source=?',(source,)).fetchone() if source else None
         if not old and re.fullmatch(r'[0-9]{9}',vals['mbs']):
-            matches=c.execute('SELECT * FROM companies WHERE mbs IN (?,?) LIMIT 2',(vals['mbs'],vals['mbs'].lstrip('0') or '0')).fetchall()
+            matches=c.execute('SELECT * FROM companies WHERE mbs IN (?,?,?,?,?,?,?,?,?) LIMIT 2',tuple(vals['mbs'][i:] if not vals['mbs'][:i].strip('0') else vals['mbs'] for i in range(9))).fetchall()
             if len(matches)==1 and (not vals['oib'] or not matches[0]['oib'] or vals['oib']==matches[0]['oib']):
                 old=matches[0]
             elif len(matches)>1:

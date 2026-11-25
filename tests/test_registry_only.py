@@ -41,3 +41,13 @@ class RegistryOnlyTests(unittest.TestCase):
                 self.assertTrue(store.upsert(c,{'title':'Example','city':'Rijeka','address':'Street 2','mbs':'000000003'},provider='registry'))
             self.assertEqual(store.stats()['total'],2)
             self.assertEqual(store.detail(1)['email'],'test@example.com')
+
+    def test_bundled_dataset_idempotent(self):
+        path=Path(__file__).resolve().parents[1]/'tvrtk_output.csv'
+        with tempfile.TemporaryDirectory() as tmp:
+            store=Store(Path(tmp)/'db.sqlite')
+            with path.open(encoding='utf-8-sig',newline='') as stream:
+                self.assertEqual(store.import_csv(stream),{'read':26261,'added':26261})
+            with path.open(encoding='utf-8-sig',newline='') as stream:
+                self.assertEqual(store.import_csv(stream),{'read':26261,'added':0})
+            self.assertEqual(store.stats()['total'],26261)
