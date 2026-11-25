@@ -7,3 +7,5 @@ sudreg.private.json
 *.private.json
 build/
 dist/
+
+node_modules/

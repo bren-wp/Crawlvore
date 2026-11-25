@@ -54,7 +54,7 @@ def main():
             with tempfile.TemporaryDirectory() as td:
                 test_store=Store(Path(td)/'smoke.db'); test_store.seed(ROOT/'tvrtk_output.csv')
                 if test_store.stats()['total']!=26261: raise RuntimeError('Bundled data failed')
-            if not all((ROOT/'static'/f).is_file() for f in ('index.html','style.css','app.js','logo.svg')): raise RuntimeError('Missing assets')
+            if not all((ROOT/'static'/f).is_file() for f in ('index.html','style.css','app.js','locale.js','logo.svg')): raise RuntimeError('Missing assets')
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(headless=True,executable_path=None if getattr(sys,'frozen',False) else os.getenv('CRAWLVORA_TEST_CHROMIUM'))
                 try:
@@ -114,8 +114,12 @@ def main():
             params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
             filters={k:get(k) for k in ('q','city','contact','provider')}
             try:
-                if p.path=='/': return self.send_data((ROOT/'static/index.html').read_text().replace('__TOKEN__',TOKEN).encode(),'text/html; charset=utf-8')
-                if p.path in ('/app.js','/style.css','/logo.svg'):
+                if p.path=='/':
+                    with store.db() as db:
+                        preferred=db.execute("SELECT value FROM meta WHERE key='ui_language'").fetchone()
+                    lang='hr' if preferred and preferred[0]=='hr' else 'en'
+                    return self.send_data((ROOT/'static/index.html').read_text(encoding='utf-8').replace('__TOKEN__',TOKEN).replace('__LANGUAGE__',lang).encode(),'text/html; charset=utf-8')
+                if p.path in ('/app.js','/locale.js','/style.css','/logo.svg'):
                     return self.send_data((ROOT/'static'/p.path[1:]).read_bytes(),'text/javascript; charset=utf-8' if p.path.endswith('js') else ('image/svg+xml' if p.path.endswith('svg') else 'text/css; charset=utf-8'))
                 if p.path=='/api/registry/diff': return self.send_data(compare(registry,get('before'),get('after')))
                 if p.path=='/api/jobs': return self.send_data(queue.summary())
@@ -161,6 +165,12 @@ def main():
                 if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                 if self.path=='/api/import': return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if self.path=='/api/preferences/language':
+                    lang=data.get('language') if isinstance(data,dict) else None
+                    if lang not in ('en','hr'): raise ValueError('Invalid language.')
+                    with store.db() as db:
+                        db.execute("INSERT INTO meta(key,value) VALUES('ui_language',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(lang,))
+                    return self.send_data({'ok':True,'language':lang})
                 if self.path=='/api/jobs/add': return self.send_data(queue.enqueue(data.get('kind'),data.get('config',{})))
                 if self.path=='/api/jobs/cancel': return self.send_data(queue.cancel(data.get('id')))
                 if self.path=='/api/jobs/schedule':
