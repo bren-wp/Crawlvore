@@ -168,15 +168,28 @@ class Store:
     def import_json(self,raw):
         data=__import__('json').loads(raw)
         if not isinstance(data,list) or any(not isinstance(r,dict) or not isinstance(r.get('title'),str) or not r['title'].strip() for r in data): raise ValueError('JSON mora biti lista objekata s poljem title.')
-        with self.db() as c: added=sum(self.upsert(c,{k:v for k,v in r.items() if isinstance(v,(str,int,float))},provider='csv') for r in data)
+        with self.db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            added=sum(self.upsert(c,{k:v for k,v in r.items() if isinstance(v,(str,int,float))},provider='csv') for r in data)
         return {'read':len(data),'added':added}
     def export_json(self,**filters):
         where,args=self.where(**filters)
         with self.db() as c:
+            c.execute('BEGIN')
             rows=[dict(r) for r in c.execute('SELECT id,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry FROM companies'+where+' ORDER BY id',args)]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
-            origins={}
-            for r in c.execute('SELECT * FROM origins'): origins.setdefault(r['company_id'],[]).append({k:r[k] for k in ('provider','url','updated')})
-            for r in rows: r['sources']=origins.get(r['id'],[])
+            # Limit metadata reads to the selected IDs; fixed-size batches avoid SQLite variable limits.
+            by_id={r['id']:r for r in rows}
+            for r in rows:
+                r['sources']=[]
+                r['alternate_values']=[]
+            ids=list(by_id)
+            for start in range(0,len(ids),500):
+                batch=ids[start:start+500]
+                placeholders=','.join('?' for _ in batch)
+                for r in c.execute('SELECT company_id,provider,url,updated FROM origins WHERE company_id IN ('+placeholders+') ORDER BY company_id,provider,url',batch):  # nosec B608 -- placeholders only, bound integer IDs.
+                    by_id[r['company_id']]['sources'].append({k:r[k] for k in ('provider','url','updated')})
+                for r in c.execute('SELECT company_id,field,value,provider,observed_at FROM alternate_values WHERE company_id IN ('+placeholders+') ORDER BY company_id,field,provider,value',batch):  # nosec B608 -- placeholders only, bound integer IDs.
+                    by_id[r['company_id']]['alternate_values'].append({k:r[k] for k in ('field','value','provider','observed_at')})
         return __import__('json').dumps(rows,ensure_ascii=False,indent=2).encode()
     def import_csv(self,stream):
         with self.db() as c:
@@ -220,6 +233,7 @@ class Store:
         where,args=self.where(q,city,contact,provider)
         order={'title':'title COLLATE NOCASE ASC,id','title_desc':'title COLLATE NOCASE DESC,id','city':'city COLLATE NOCASE,title COLLATE NOCASE,id','new':'id DESC'}.get(sort,'id')
         with self.db() as c:
+            c.execute('BEGIN')
             total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             return {'total':total,'rows':[dict(r) for r in rows]}
@@ -227,8 +241,12 @@ class Store:
         with self.db() as c: return [r[0] for r in c.execute("SELECT DISTINCT city FROM companies WHERE city<>'' ORDER BY city COLLATE NOCASE")]
     def detail(self,i):
         with self.db() as c:
+            c.execute('BEGIN')
             r=c.execute('SELECT * FROM companies WHERE id=?',(i,)).fetchone()
-            return dict({k:r[k] for k in ['id','source',*COLS,'oib','email','industry']},sources=[dict(x) for x in c.execute('SELECT provider,url,updated FROM origins WHERE company_id=?',(i,))]) if r else None
+            if not r: return None
+            sources=[dict(x) for x in c.execute('SELECT provider,url,updated FROM origins WHERE company_id=? ORDER BY provider,url',(i,))]
+            alternatives=[dict(x) for x in c.execute('SELECT field,value,provider,observed_at FROM alternate_values WHERE company_id=? ORDER BY field,provider,value',(i,))]
+            return dict({k:r[k] for k in ['id','source',*COLS,'oib','email','industry']},sources=sources,alternate_values=alternatives)
     def export(self,**filters):
         where,args=self.where(**filters); out=io.StringIO(newline=''); w=csv.writer(out); w.writerow(FIELDS+['OIB','Email','Industry','Sources'])
         with self.db() as c:

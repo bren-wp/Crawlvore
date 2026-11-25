@@ -57,3 +57,20 @@ class DataSafetyTests(unittest.TestCase):
                 self.assertEqual(c.execute('SELECT phone FROM companies').fetchone()[0],'111')
                 self.assertEqual([tuple(r) for r in c.execute('SELECT field,value FROM alternate_values')],[('phone','222')])
             self.assertEqual(store.stats()['total'],1)
+
+    def test_alternatives_in_profile_and_filtered_json(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            store=Store(Path(tmp)/'db.sqlite')
+            with store.db() as c:
+                store.upsert(c,{'title':'Example','city':'Rijeka','phone':'111'})
+                store.upsert(c,{'title':'Example','city':'Rijeka','phone':'222'})
+                store.upsert(c,{'title':'Other','city':'Split','phone':'333'})
+            detail=store.detail(1)
+            self.assertEqual(detail['alternate_values'][0]['value'],'222')
+            self.assertEqual(detail['phone'],'111')
+            exported=json.loads(store.export_json(city='Rijeka'))
+            self.assertEqual(len(exported),1)
+            self.assertEqual(exported[0]['alternate_values'],detail['alternate_values'])
+            self.assertEqual(exported[0]['sources'],detail['sources'])
+            self.assertEqual(json.loads(store.export_json(city='Missing')),[])

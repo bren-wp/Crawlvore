@@ -55,9 +55,17 @@ def run():
                 page.locator('#schedule-save').click()
                 expect(page.locator('#schedule-state')).to_have_text('Disabled')
                 page.locator('[data-view="data"]').click()
-                page.locator('#file').set_input_files({'name':'qa.json','mimeType':'application/json','buffer':json.dumps([{'title':'Crawlvora QA Synthetic Company','city':'Synthetic'}]).encode()})
+                page.locator('#file').set_input_files({'name':'qa.json','mimeType':'application/json','buffer':json.dumps([{'title':'Crawlvora QA Synthetic Company','city':'Synthetic','phone':'111'},{'title':'Crawlvora QA Synthetic Company','city':'Synthetic','phone':'222'}]).encode()})
                 page.locator('#import-btn').click()
                 expect(page.locator('#file-name')).to_have_text('No file selected.')
+                page.locator('[data-view="directory"]').click()
+                page.locator('#search').fill('Crawlvora QA Synthetic Company')
+                expect(page.locator('#company-rows .textbtn')).to_have_count(1)
+                page.locator('#company-rows .textbtn').click()
+                page.locator('[data-profile-tab="sources"]').click()
+                expect(page.locator('.alternate-values')).to_contain_text('222')
+                page.locator('#close-detail').click()
+                page.locator('[data-view="data"]').click()
                 for selector,ext in [('#all-export','.csv'),('#json-export','.json'),('#xlsx-export','.xlsx')]:
                     with page.expect_download(timeout=60000) as download:
                         page.locator(selector).click()

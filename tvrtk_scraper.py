@@ -175,8 +175,11 @@ def run_workspace(args):
                 n=int(self.headers.get('Content-Length','0'))
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 raw=self.rfile.read(n)
-                if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
-                if self.path=='/api/import': return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
+                if self.path in ('/api/import-json','/api/import'):
+                    # A consistent backup precedes every user-initiated import; rejected imports never mutate the directory.
+                    verified_backup(database)
+                    if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
+                    return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
                 if self.path=='/api/ui-ready':
                     if args.worker:

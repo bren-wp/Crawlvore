@@ -1,6 +1,8 @@
 "use strict";
 const UI_LANGUAGE = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES = {
+  "Sačuvane alternativne vrijednosti": "Preserved alternative values",
+  "Nema alternativnih vrijednosti.": "No alternative values.",
   "RADNI PROSTOR": "WORKSPACE",
   "Pregled": "Overview",
   "Poslovni imenik": "Business Directory",
