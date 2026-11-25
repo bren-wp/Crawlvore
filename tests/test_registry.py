@@ -185,3 +185,16 @@ class RegistryAccessTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.access().apply(dict(self.data,persist='true',permission=True))
         self.assertIsNone(self.vault.record)
+
+
+    def test_temporarily_locked_vault_recovers_after_cooldown(self):
+        self.access().apply(dict(self.data,persist=True,permission=True))
+        reopened=self.access()
+        self.vault.unavailable=True
+        with patch('registry.time.monotonic',return_value=100.0):
+            self.assertFalse(reopened.status()['configured'])
+        self.vault.unavailable=False
+        with patch('registry.time.monotonic',return_value=110.0):
+            self.assertFalse(reopened.status()['configured'])
+        with patch('registry.time.monotonic',return_value=131.0):
+            self.assertEqual(reopened.status(),{'configured':True,'authorized':True})
