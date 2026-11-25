@@ -1,0 +1,55 @@
+name: English product screenshots
+on:
+  push:
+    branches: [initialize-crawlvora]
+    paths: ['.github/workflows/showcase.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: crawlvora-showcase
+  cancel-in-progress: false
+jobs:
+  capture:
+    if: github.ref == 'refs/heads/initialize-crawlvora'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: |
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
+          npm run typecheck
+          npm run build:frontend
+          python -m playwright install --with-deps chromium
+      - run: python tools/visual_check.py
+      - name: Verify English screenshot assets and update README
+        run: |
+          python - <<'PY'
+          import pathlib,re
+          readme=pathlib.Path('README.md')
+          text=readme.read_text(encoding='utf-8')
+          text=re.sub(r'branding/(?!en-)([a-z]+-(?:dark|light)-1440-fixture\.png)',r'branding/en-\1',text)
+          text=text.replace('These reference captures show the existing Croatian interface. English is now the default; new bilingual captures are verified by the visual workflow.','Screenshots are captured from the running application interface in English, with controlled sample data. Both themes and Croatian are also supported.')
+          paths=set(re.findall(r'branding/en-[a-z]+-(?:dark|light)-1440-fixture\.png',text))
+          assert len(paths)==9 and all(pathlib.Path(p).is_file() for p in paths),paths
+          assert len(list(pathlib.Path('branding').glob('en-*-fixture.png')))==32
+          readme.write_text(text,encoding='utf-8')
+          PY
+      - name: Commit verified screenshots to the same pull request
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin initialize-crawlvora
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git add README.md branding/en-*-fixture.png
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'docs: showcase verified English application screenshots'
+          git push origin HEAD:initialize-crawlvora
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: english-product-screens
+          path: branding/en-*-fixture.png

@@ -2,7 +2,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 import json, os, sys, tempfile
 root=Path(__file__).resolve().parents[1]; out=root/'branding'; out.mkdir(exist_ok=True); views=['overview','directory','collector','studio','registry','jobs','data']; errors=[]; results=[]
-html=(root/'static/index.html').read_text(); css=(root/'static/style.css').read_text(); js=(root/'static/app.js').read_text(); locale_js=(root/'static/locale.js').read_text(); html=html.replace('<link rel="stylesheet" href="/style.css">','').replace('<script defer src="/app.js"></script>','').replace('<script defer src="/locale.js"></script>','').replace('<link rel="icon" href="/logo.svg" type="image/svg+xml">','')
+html=(root/'static/index.html').read_text(encoding='utf-8'); css=(root/'static/style.css').read_text(encoding='utf-8'); js=(root/'static/app.js').read_text(encoding='utf-8'); locale_js=(root/'static/locale.js').read_text(encoding='utf-8'); html=html.replace('<link rel="stylesheet" href="/style.css">','').replace('<script defer src="/app.js"></script>','').replace('<script defer src="/locale.js"></script>','').replace('<link rel="icon" href="/logo.svg" type="image/svg+xml">','')
 sys.path.insert(0,str(root))
 from core import Store
 with tempfile.TemporaryDirectory() as tmp:
@@ -18,6 +18,8 @@ with sync_playwright() as p:
   page.set_content(html.replace('__LANGUAGE__',lang)); page.add_style_tag(content=css)
   page.evaluate('(data)=>{window.fetch=async (path)=>({ok:true,json:async()=>data[path.split("?")[0]]??{}})}',fixtures)
   page.add_script_tag(content=locale_js); page.add_script_tag(content=js)
+  page.locator('#preview-rows tr .textbtn').first.wait_for(timeout=10000)
+  assert page.locator('#preview-rows tr .textbtn').count()>0
   assert page.locator('html').get_attribute('lang')==lang
   assert page.locator('#overview h1').inner_text()==('Business overview' if lang=='en' else 'Pregled imenika')
   assert page.locator('[data-view="directory"]').inner_text().endswith('Business directory' if lang=='en' else 'Poslovni imenik')
@@ -28,7 +30,14 @@ with sync_playwright() as p:
     page.set_viewport_size({'width':width,'height':height})
     for view in views:
      page.evaluate('(v)=>go(v)',view); page.wait_for_timeout(120); assert page.locator('#'+view).is_visible()
-     if view=='registry': page.locator('#diff-run').click(); page.wait_for_timeout(100); assert page.locator('#diff-rows tr').count()==1
+     if view=='directory':
+      page.locator('#company-rows tr .textbtn').first.wait_for(timeout=10000)
+     if view=='registry':
+      page.locator('#reg-categories tr').first.wait_for(timeout=10000)
+      page.locator('#diff-run').click(); page.wait_for_timeout(100); assert page.locator('#diff-rows tr').count()==1
+     if view=='jobs':
+      page.locator('#job-rows tr').first.wait_for(timeout=10000)
+     assert not page.locator('#toast').is_visible(), page.locator('#toast').text_content()
      result=page.evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})'); results.append((lang,theme,width,view,result['scroll'])); assert result['scroll']<=width,(lang,theme,width,view,result)
      page.evaluate('window.scrollTo(0,0)'); page.screenshot(path=str(out/(f'{prefix}{view}-{theme}-{width}-fixture.png')),full_page=True)
     page.evaluate('(id)=>detail(id)',companies['rows'][0]['id']); page.wait_for_timeout(120); assert page.locator('#detail').is_visible()

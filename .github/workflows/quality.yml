@@ -23,6 +23,7 @@ jobs:
       - run: python tools/source_audit.py > source-audit.json
       - run: python -m vulture . --exclude tests,tools --min-confidence 90
       - run: python -m playwright install --with-deps chromium
+      - run: python tools/ui_e2e.py
       - run: python tools/visual_check.py
       - run: python tools/pixel_diff.py > pixel-diff.json
       - uses: actions/upload-artifact@v7
