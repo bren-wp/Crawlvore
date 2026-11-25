@@ -13,7 +13,7 @@ import io
 from core import Store, Collector
 from sources import NAMES
 from studio import excel
-from registry import Registry, credentials, start_registry
+from registry import Registry, RegistryAccess, start_registry
 import os
 import threading
 import tempfile
@@ -88,9 +88,10 @@ def run_workspace(args,selection,active):
     if active=='primary' and seed.exists(): store.seed(seed)
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
+    registry_access=RegistryAccess(ROOT,args.data_dir)
     if args.registry_sync:
-        if not 1 <= args.registry_limit <= 1000: ap.error('Invalid registry page size.')
-        start_registry(collector,registry,credentials(ROOT,args.data_dir),args.registry_limit)
+        if not 1 <= args.registry_limit <= 1000: raise ValueError('Invalid registry page size.')
+        start_registry(collector,registry,registry_access.credentials(),args.registry_limit)
         last=None
         try:
             while True:
@@ -104,15 +105,7 @@ def run_workspace(args,selection,active):
             return 130
     ui_ready=threading.Event()
     ui_ready_lock=threading.Lock()
-    session_credentials=None
-    credentials_lock=threading.Lock()
-    def registry_credentials():
-        with credentials_lock:
-            return session_credentials or credentials(ROOT,args.data_dir)
-    def registry_configured():
-        try: return all(registry_credentials())
-        except ValueError: return False
-    queue=Queue(store,collector,registry,registry_credentials); queue.start()
+    queue=Queue(store,collector,registry,registry_access.credentials); queue.start()
     protected.start()
     class Handler(BaseHTTPRequestHandler):
         def send_data(self,data,kind='application/json; charset=utf-8',status=200,extra=None):
@@ -164,7 +157,7 @@ def run_workspace(args,selection,active):
                         self.send_response(200); self.send_header('Content-Type',{'xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','xml':'application/xml','sql':'application/sql'}[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="sudreg-{snapshot}-{category}.{kind}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         with out.open('rb') as f: shutil.copyfileobj(f,self.wfile)
                     return
-                if p.path=='/api/registry': return self.send_data(dict(registry.summary(),configured=registry_configured()))
+                if p.path=='/api/registry': return self.send_data(dict(registry.summary(),**registry_access.status()))
                 if p.path in ('/api/registry/export','/api/registry/export-csv'):
                     import re
                     snapshot,category=get('snapshot'),get('category')
@@ -214,7 +207,6 @@ def run_workspace(args,selection,active):
             except (BrokenPipeError,ConnectionResetError): pass
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Interna pogreška.'},status=500)
         def do_POST(self):
-            nonlocal session_credentials
             if not self.authorized() or not self.session_authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 n=int(self.headers.get('Content-Length','0'))
@@ -293,12 +285,9 @@ def run_workspace(args,selection,active):
                         db.execute("INSERT INTO meta(key,value) VALUES('ui_language',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(lang,))
                     return self.send_data({'ok':True,'language':lang})
                 if self.path=='/api/registry/credentials':
-                    if not isinstance(data,dict): raise ValueError('Invalid credentials.')
-                    client_id,client_secret=(data.get(k) for k in ('client_id','client_secret'))
-                    if not all(isinstance(v,str) and 0<len(v.strip())<=512 and not any(ord(ch)<32 for ch in v) for v in (client_id,client_secret)):
-                        raise ValueError('Enter valid Client ID and Client Secret.')
-                    with credentials_lock: session_credentials=(client_id.strip(),client_secret.strip())
-                    return self.send_data({'ok':True,'configured':True})
+                    return self.send_data(dict(registry_access.apply(data),ok=True))
+                if self.path=='/api/registry/forget':
+                    return self.send_data(dict(registry_access.forget(),ok=True))
                 if self.path=='/api/jobs/add': return self.send_data(queue.enqueue(data.get('kind'),data.get('config',{})))
                 if self.path=='/api/jobs/cancel': return self.send_data(queue.cancel(data.get('id')))
                 if self.path=='/api/jobs/schedule':
@@ -306,7 +295,7 @@ def run_workspace(args,selection,active):
                     return self.send_data(queue.schedule(data.get('enabled'),int(data.get('hour',3))))
                 if self.path in ('/api/registry/start','/api/registry/check'):
                     if data.get('permission') is not True: raise ValueError('Potvrdite korištenje javnog API-ja.')
-                    queue.direct(lambda: start_registry(collector,registry,registry_credentials(),int(data.get('limit',500)),check=self.path.endswith('/check'))); return self.send_data({'ok':True})
+                    queue.direct(lambda: start_registry(collector,registry,registry_access.credentials(),int(data.get('limit',500)),check=self.path.endswith('/check'))); return self.send_data({'ok':True})
                 if self.path=='/api/stop': collector.stop(); return self.send_data({'ok':True})
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)
             except (ValueError,TypeError,UnicodeError) as e: self.send_data({'error':str(e)},status=400)
