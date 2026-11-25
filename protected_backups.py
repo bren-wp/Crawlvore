@@ -19,17 +19,12 @@ from encrypted_backup import encrypt_backup, decrypt_backup, key_for
 from data_safety import verified_backup, restore_workspace
 from workspace_integrity import inspect_database
 from native_vault import NativeVault, VaultUnavailable
+from backup_replica import file_digest as digest
 
 BACKUP_INTERVAL=6*3600
 VERIFY_INTERVAL=24*3600
 ARCHIVE_PATTERN=re.compile(r'protected-[a-f0-9]{32}\.cvbackup')
 GENESIS='0'*64
-
-def digest(path):
-    hasher=hashlib.sha256()
-    with path.open('rb') as stream:
-        while block:=stream.read(1024*1024): hasher.update(block)
-    return hasher.hexdigest()
 
 def mac(key,kind,value):
     payload=json.dumps([kind,value],ensure_ascii=True,separators=(',',':'),sort_keys=True).encode()

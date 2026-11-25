@@ -9,7 +9,7 @@ Every production GitHub Release must contain all six assets:
 - Crawlvora-source.zip: source from the exact release tag.
 - SHA256SUMS.txt: SHA-256 checksums for the other five assets.
 
-The production workflow requires an immutable version tag on main, matching version metadata, committed npm and Cargo locks, a successful quality/security workflow, native builds and smoke tests on Windows and Linux, and a completed four-hour endurance test. It refuses to publish an incomplete asset set. The native workflow is the only active desktop packaging pipeline; legacy scripts are retained for historical development only.
+The production workflow requires an immutable version tag on main, matching version metadata, committed npm and Cargo locks, a successful quality/security workflow, native builds and smoke tests on Windows and Linux, a successful million-record performance benchmark and a completed four-hour endurance test. It refuses to publish an incomplete asset set. The native workflow is the only active desktop packaging pipeline; legacy scripts are retained for historical development only.
 
 Before tagging, review the visual differences against the accepted brand reference, complete the live authorized registry integration checks, verify upgrade compatibility with the existing database, and review the Python, npm and Rust audit evidence. Credentials are local configuration, never a release asset. Signing certificates and notarization have not been configured; unsigned packages may trigger OS warnings.
 

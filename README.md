@@ -70,7 +70,7 @@ Third-party permissions, credentials and availability are required where applica
 - No separate Python, development tools, Chromium download or local-server launch is needed for the native distributions.
 - **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Preview releases are clearly identified as pre-release builds. Production releases require the complete acceptance checks.
 
-The official registry API is integrated in both desktop builds. Configure OAuth2 credentials privately in Settings for the current session or use the private local configuration for unattended refresh. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
+The official registry API is integrated in both desktop builds. Use your authorized OAuth2 credentials in Settings. Opt in to OS-protected storage for access across restarts, or keep credentials for the current session only. A fresh installation does not include shared credentials. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
 
 ---
 

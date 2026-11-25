@@ -31,7 +31,7 @@ with sync_playwright() as p:
   prefix='en-' if lang=='en' else ''
   for theme in ['dark','light']:
    page.evaluate('(t)=>document.documentElement.dataset.theme=t',theme)
-   for width,height in [(1440,900),(390,844)]:
+   for width,height in [(1440,900),(390,844),(360,300),(768,480),(1024,600),(1120,720),(1280,720),(1920,1080)]:
     page.set_viewport_size({'width':width,'height':height})
     for view in views:
      page.evaluate('(v)=>go(v)',view); page.wait_for_timeout(120); assert page.locator('#'+view).is_visible()
@@ -48,10 +48,12 @@ with sync_playwright() as p:
       page.locator('#settings-count').wait_for(timeout=10000)
      assert not page.locator('#toast').is_visible(), page.locator('#toast').text_content()
      result=page.evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})'); results.append((lang,theme,width,view,result['scroll'])); assert result['scroll']<=width,(lang,theme,width,view,result)
-     page.evaluate('window.scrollTo(0,0)'); page.screenshot(path=str(out/(f'{prefix}{view}-{theme}-{width}-fixture.png')),full_page=True)
+     page.evaluate('window.scrollTo(0,0)')
+     if width in (1440,390): page.screenshot(path=str(out/(f'{prefix}{view}-{theme}-{width}-fixture.png')),full_page=True)
     page.evaluate('(id)=>detail(id)',companies['rows'][0]['id']); page.wait_for_timeout(120); assert page.locator('#detail').is_visible()
-    box=page.locator('#detail').bounding_box(); assert box['width']<=width+1
-    page.screenshot(path=str(out/f'{prefix}detail-{theme}-{width}-fixture.png')); page.locator('[data-profile-tab="history"]').click(); assert page.locator('.history-block').is_visible() and not page.locator('.profile-property').first.is_visible(); page.locator('[data-profile-tab="sources"]').click(); assert page.locator('.profile-sources').is_visible() and not page.locator('.history-block').is_visible(); page.locator('#close-detail').click(); assert not page.locator('#detail').is_visible(); results.append((lang,theme,width,'detail',box['width']))
+    box=page.locator('#detail').bounding_box(); assert box['width']<=width+1 and box['height']<=height+1,(lang,theme,width,height,box)
+    if width in (1440,390): page.screenshot(path=str(out/f'{prefix}detail-{theme}-{width}-fixture.png'))
+    page.locator('[data-profile-tab="history"]').click(); assert page.locator('.history-block').is_visible() and not page.locator('.profile-property').first.is_visible(); page.locator('[data-profile-tab="sources"]').click(); assert page.locator('.profile-sources').is_visible() and not page.locator('.history-block').is_visible(); page.locator('#close-detail').click(); assert not page.locator('#detail').is_visible(); results.append((lang,theme,width,'detail',box['width']))
   page.close()
  b.close()
 print('errors',errors,'layout',results)

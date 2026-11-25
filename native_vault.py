@@ -13,8 +13,15 @@ class VaultUnavailable(RuntimeError):
     pass
 
 class NativeVault:
-    def __init__(self,workspace):
-        self.identity=hashlib.sha256(os.fsencode(os.path.normcase(str(Path(workspace).resolve())))).hexdigest()
+    def __init__(self,workspace,purpose='backup'):
+        if purpose not in ('backup','registry'):
+            raise ValueError('Unsupported vault purpose.')
+        identity=os.fsencode(os.path.normcase(str(Path(workspace).resolve())))
+        # Preserve existing backup vault identifiers exactly.
+        if purpose=='registry':
+            identity=b'Crawlvora registry credentials\x00'+identity
+        self.identity=hashlib.sha256(identity).hexdigest()
+        self.purpose=purpose
         self.backend='dpapi' if sys.platform=='win32' else 'secret-service' if sys.platform.startswith('linux') else 'unsupported'
 
     def windows_path(self):
@@ -55,7 +62,7 @@ class NativeVault:
         if not executable or not os.environ.get('DBUS_SESSION_BUS_ADDRESS'):
             raise VaultUnavailable('Linux Secret Service is unavailable.')
         args=[executable,action]
-        if action=='store': args+=['--label=Crawlvora protected backup catalog']
+        if action=='store': args+=['--label='+('Crawlvora registry access' if self.purpose=='registry' else 'Crawlvora protected backup catalog')]
         args+=['application','Crawlvora','workspace',self.identity]
         try:
             result=subprocess.run(args,input=value,capture_output=True,timeout=20,check=False)  # nosec B603 -- fixed executable/arguments; secret only via stdin.

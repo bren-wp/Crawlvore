@@ -9,7 +9,7 @@ interface BotStatus { status:string; kind?:string; page:number;last:number;proce
 interface SourceInfo { label:string;provider:string;n:number }
 interface RegistryRun { snapshot:string;complete:number|boolean }
 interface RegistryCategory { snapshot:string;category:string;rows:number;total:number|null;done:number|boolean }
-interface RegistrySummary { configured:boolean;runs:RegistryRun[];categories:RegistryCategory[] }
+interface RegistrySummary { configured:boolean;authorized:boolean;runs:RegistryRun[];categories:RegistryCategory[] }
 interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
 interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
@@ -59,6 +59,8 @@ interface InterfaceElements {
   "registry-client-id": HTMLInputElement;
   "registry-client-secret": HTMLInputElement;
   "registry-credentials-apply": HTMLButtonElement;
+  "registry-credentials-persist": HTMLInputElement;
+  "registry-credentials-forget": HTMLButtonElement;
   "analytics-metrics": HTMLElementTagNameMap["div"];
   "analytics-cities": HTMLElementTagNameMap["div"];
   "analytics-coverage": HTMLElementTagNameMap["div"];
@@ -190,6 +192,7 @@ $('theme').onclick=()=>{const t=document.documentElement.dataset.theme==='light'
 
 $('xlsx-export').onclick=()=>location.href='/api/export-xlsx';$('filtered-xlsx').onclick=()=>location.href='/api/export-xlsx?'+filters();
 let regSelection:RegistryCategory|null=null, regPage=1, regTotal=0;
+let previousRegistryAuthorization=false;
 let regRefreshBusy=false, regRowsSerial=0, regSearchTimer;
 async function registryRefresh(){
  if(regRefreshBusy)return; regRefreshBusy=true;
@@ -198,6 +201,7 @@ async function registryRefresh(){
  const active=['running','stopping'].includes(s.status), ours=['registry','registry-check'].includes(s.kind);
  $('reg-config').textContent=r.configured?translate('API konfiguriran'):translate('API nije konfiguriran');
  $('reg-config').dataset.state=r.configured?'ready':'warning';
+ if(!!r.authorized!==previousRegistryAuthorization){$('reg-permission').checked=!!r.authorized;previousRegistryAuthorization=!!r.authorized;}
  $('reg-start').disabled=!r.configured||active; $('reg-check').disabled=!r.configured||active; $('reg-stop').disabled=!ours||s.status!=='running';
  $('reg-status').textContent=active&&!ours?translate('Aktivan je drugi web bot'):ours?(({running:translate('Aktivno'),stopping:translate('Zaustavljanje'),completed:translate('Završeno'),failed:translate('Pogreška'),stopped:translate('Zaustavljeno')})[s.status]||s.status):translate('Spremno');
  $('reg-logs').textContent=ours?s.logs.slice(-12).join('\n')||translate('Čekanje na API…'):translate('Nema aktivnosti registra.');
@@ -220,17 +224,19 @@ $('reg-snapshot').onchange=()=>registryRefresh().catch(fail);
 $('reg-search').oninput=()=>{clearTimeout(regSearchTimer);regSearchTimer=setTimeout(()=>{regPage=1;registryRows().catch(fail)},250)};
 $('reg-check').onclick=()=>post('/api/registry/check',{permission:$('reg-permission').checked}).then(registryRefresh).catch(fail);
 $('reg-export-csv').onclick=()=>{if(regSelection)location.href='/api/registry/export-csv?'+new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category})};
-$('reg-start').onclick=()=>post('/api/registry/start',{limit:+$('reg-limit').value,permission:$('reg-permission').checked}).then(registryRefresh).catch(fail);$('reg-stop').onclick=()=>post('/api/stop',{}).then(registryRefresh).catch(fail);$('reg-reload').onclick=()=>registryRefresh().catch(fail);$('reg-prev').onclick=()=>{if(regPage>1){regPage--;registryRows().catch(fail)}};$('reg-next').onclick=()=>{if(regPage*50<regTotal){regPage++;registryRows().catch(fail)}};setInterval(()=>{if(current==='registry')registryRefresh().catch(()=>{})},2500);
+$('reg-start').onclick=()=>post('/api/registry/start',{limit:+$('reg-limit').value,permission:$('reg-permission').checked}).then(registryRefresh).catch(fail);$('reg-stop').onclick=()=>post('/api/stop',{}).then(registryRefresh).catch(fail);$('reg-reload').onclick=()=>registryRefresh().catch(fail);$('reg-prev').onclick=()=>{if(regPage>1){regPage--;registryRows().catch(fail)}};$('reg-next').onclick=()=>{if(regPage*50<regTotal){regPage++;registryRows().catch(fail)}};setInterval(()=>{if(current==='registry'&&!document.hidden)registryRefresh().catch(()=>{})},2500);
 
 $('reg-export').onclick=()=>{if(regSelection)location.href='/api/registry/export?'+new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category})};
 
 for(const format of ['xlsx','xml','sql'])$('reg-export-'+format).onclick=()=>{if(regSelection)location.href='/api/registry/export-'+format+'?'+new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category})};
 const jobLabels:Record<string,string>={retry_wait:translate('Čeka ponavljanje'),queued:translate('Na čekanju'),running:translate('Aktivno'),completed:translate('Završeno'),completed_with_errors:translate('S pogreškama'),failed:translate('Pogreška'),stopped:translate('Zaustavljeno'),interrupted:translate('Prekinuto'),cancelled:translate('Otkazano')};
-async function refreshJobs(init=false){const r=await api<JobSummary>('/api/jobs');if(init){$('schedule-enabled').checked=!!r.schedule.enabled;$('schedule-hour').value=String(r.schedule.hour);}$('schedule-state').textContent=r.schedule.enabled?translate('Aktivno'):translate('Isključeno');const m=$('job-metrics');m.replaceChildren();for(const state of ['queued','retry_wait','running','completed','failed']){const el=make('div');el.append(make('small',jobLabels[state],'muted'),make('strong',n(r.jobs.filter(x=>x.state===state).length)));m.append(el)}const b=$('job-rows');b.replaceChildren();for(const j of r.jobs){const tr=make('tr');for(const v of [j.id,providerNames[j.kind]||j.kind,jobLabels[j.state]||j.state,j.created,j.finished||'—',String(j.attempts||0)+(j.next_run?' · '+new Date(j.next_run*1000).toLocaleString(UI_LANGUAGE==='hr'?'hr-HR':'en-US'):'')])tr.append(make('td',String(v)));const td=make('td');if(['queued','retry_wait'].includes(j.state)){const cancel=make('button',translate('Otkaži'),'btn secondary small');cancel.onclick=()=>post('/api/jobs/cancel',{id:j.id}).then(()=>refreshJobs()).catch(fail);td.append(cancel)}tr.append(td);b.append(tr)}if(!r.jobs.length){const tr=make('tr');const td=make('td',translate('Nema spremljenih zadataka.'),'empty-state');td.colSpan=7;tr.append(td);b.append(tr)}}
+let jobsRefreshSequence=0, jobsRendered='';
+async function refreshJobs(init=false){const request=++jobsRefreshSequence;const r=await api<JobSummary>('/api/jobs');if(request!==jobsRefreshSequence)return;if(init){$('schedule-enabled').checked=!!r.schedule.enabled;$('schedule-hour').value=String(r.schedule.hour);}$('schedule-state').textContent=r.schedule.enabled?translate('Aktivno'):translate('Isključeno');const signature=JSON.stringify(r.jobs);if(signature===jobsRendered)return;jobsRendered=signature;const m=$('job-metrics');m.replaceChildren();for(const state of ['queued','retry_wait','running','completed','failed']){const el=make('div');el.append(make('small',jobLabels[state],'muted'),make('strong',n(r.jobs.filter(x=>x.state===state).length)));m.append(el)}const b=$('job-rows');b.replaceChildren();for(const j of r.jobs){const tr=make('tr');for(const v of [j.id,providerNames[j.kind]||j.kind,jobLabels[j.state]||j.state,j.created,j.finished||'—',String(j.attempts||0)+(j.next_run?' · '+new Date(j.next_run*1000).toLocaleString(UI_LANGUAGE==='hr'?'hr-HR':'en-US'):'')])tr.append(make('td',String(v)));const td=make('td');if(['queued','retry_wait'].includes(j.state)){const cancel=make('button',translate('Otkaži'),'btn secondary small');cancel.onclick=()=>post('/api/jobs/cancel',{id:j.id}).then(()=>refreshJobs()).catch(fail);td.append(cancel)}tr.append(td);b.append(tr)}if(!r.jobs.length){const tr=make('tr');const td=make('td',translate('Nema spremljenih zadataka.'),'empty-state');td.colSpan=7;tr.append(td);b.append(tr)}}
 $('jobs-refresh').onclick=()=>refreshJobs(true).catch(fail);
 $('schedule-save').onclick=()=>post('/api/jobs/schedule',{enabled:$('schedule-enabled').checked,hour:+$('schedule-hour').value,permission:$('schedule-permission').checked}).then(()=>{toast(translate('Raspored je spremljen.'));return refreshJobs(true)}).catch(fail);
 $('jobs-registry').onclick=()=>post('/api/jobs/add',{kind:'registry',config:{permission:$('schedule-permission').checked,limit:500}}).then(()=>refreshJobs()).catch(fail);
-setInterval(()=>{if(current==='jobs')refreshJobs().catch(()=>{})},3000);
+setInterval(()=>{if(current==='jobs'&&!document.hidden)refreshJobs().catch(()=>{})},3000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(current==='registry')registryRefresh().catch(()=>{});if(current==='jobs')refreshJobs().catch(()=>{});}});
 
 function updateDiffOptions(runs:RegistryRun[]){const ids=runs.filter(x=>x.complete).map(x=>String(x.snapshot));for(const [id,idx] of ([['diff-before',1],['diff-after',0]] as const)){const el=$(id),old=el.value;el.replaceChildren(...ids.map(v=>new Option(v,v)));el.value=ids.includes(old)?old:(ids[idx]||'');} $('diff-run').disabled=ids.length<2;}
 $('diff-run').onclick=async()=>{const b=$('diff-run');b.disabled=true;try{const p=new URLSearchParams({before:$('diff-before').value,after:$('diff-after').value});const r=await api<RegistryDiff>('/api/registry/diff?'+p);$('diff-rows').replaceChildren();for(const c of r.categories){const tr=make('tr');for(const v of [c.category,c.comparable?n(c.added):translate('Nije usporedivo'),c.comparable?n(c.removed):'—',c.comparable?n(c.affected_subjects):'—'])tr.append(make('td',v));$('diff-rows').append(tr)}$('diff-status').textContent=translate('Snimke ')+r.before+' → '+r.after+translate(' · izmjena retka prikazuje se kao uklanjanje i dodavanje.');}catch(e){fail(e)}finally{b.disabled=false}};
@@ -294,7 +300,8 @@ function setProfileTab(tab:string){
 }
 $('detail').querySelectorAll<HTMLButtonElement>('[data-profile-tab]').forEach(button=>button.addEventListener('click',()=>setProfileTab(button.dataset.profileTab||'details')));
 
-$('registry-credentials-apply').onclick=async()=>{const secret=$('registry-client-secret');try{await post('/api/registry/credentials',{client_id:$('registry-client-id').value,client_secret:secret.value});$('registry-client-id').value='';await refreshSettings();toast(translate('Pristupni podaci su primijenjeni.'));}catch(e){fail(e)}finally{secret.value=''}};
+$('registry-credentials-apply').onclick=async()=>{const secret=$('registry-client-secret');try{await post('/api/registry/credentials',{client_id:$('registry-client-id').value,client_secret:secret.value,persist:$('registry-credentials-persist').checked,permission:$('registry-credentials-persist').checked});$('registry-client-id').value='';$('registry-credentials-persist').checked=false;await refreshSettings();toast(translate('Pristupni podaci su primijenjeni.'));}catch(e){fail(e)}finally{secret.value=''}};
+$('registry-credentials-forget').onclick=async()=>{try{await post('/api/registry/forget',{});$('registry-credentials-persist').checked=false;$('reg-permission').checked=false;previousRegistryAuthorization=false;await refreshSettings();toast(translate('Spremljeni pristup je uklonjen.'));}catch(e){fail(e)}};
 
 $('file').onchange=()=>{const f=$('file').files[0];$('file-name').textContent=f?f.name:translate('Nije odabrana datoteka.');$('import-btn').disabled=!f};$('import-btn').onclick=async()=>{const f=$('file').files[0];if(!f)return;$('import-btn').disabled=true;try{const r=await api<{read:number;added:number}>(f.name.toLowerCase().endsWith('.json')?'/api/import-json':'/api/import',{method:'POST',headers:{'X-Local-Token':token},body:f});toast(translate('Učitano ')+n(r.read)+translate(' · novih ')+n(r.added));await cities();await providers();$('file').value='';$('file-name').textContent=translate('Nije odabrana datoteka.');}catch(e){fail(e);$('import-btn').disabled=false}};
 

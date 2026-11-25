@@ -47,8 +47,11 @@ jobs:
   endurance:
     needs: validate
     uses: ./.github/workflows/endurance.yml
+  million_records:
+    needs: validate
+    uses: ./.github/workflows/million-records.yml
   publish:
-    needs: [quality, native, endurance, vault, registry]
+    needs: [quality, native, endurance, vault, registry, million_records]
     runs-on: ubuntu-latest
     permissions:
       contents: write

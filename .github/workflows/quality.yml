@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt pip-audit bandit vulture pillow packaging
+      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt pip-audit bandit vulture pillow packaging
       - run: python -m pip check
       - run: python -m unittest discover -s tests -v
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
@@ -31,7 +31,7 @@ jobs:
       - name: Source and normalized clone audit
         run: |
           set -euo pipefail
-          python tools/source_audit.py | tee source-audit.json
+          python tools/source_audit.py --strict-deps | tee source-audit.json
           python tools/clone_review.py | tee clone-review.json
       - run: python -m vulture . --exclude tests,tools --min-confidence 90
       - run: python -m playwright install --with-deps chromium

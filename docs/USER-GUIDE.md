@@ -2,9 +2,17 @@
 
 The sole online collection source is the Croatian Court Registry public v3 API. Existing local company records, source provenance and job history are retained. Web scraper jobs from old versions are cancelled rather than executed. CSV/JSON import and directory/registry exports remain available.
 
+## Desktop window
+
+Crawlvora starts as a centered, resizable window, targeting 1120 × 720 logical pixels and limiting initial size to the available monitor work area with a margin. Compact layouts reflow as the window narrows; wide tables can scroll within their own container. Native maximize remains an explicit user action, not a startup default.
+
 ## Connection
 
-In Settings, enter Client ID and Client Secret and apply them for the running session. Use Court Registry → Test connection, then authorize synchronization. For persistence across restarts, use the existing private `sudreg.private.json` in the user's application data directory (or the two SUDREG environment variables). Never commit credentials to GitHub. The desktop packages integrate the API client, not a shared secret. The scheduled refresh requires valid credentials and a running app.
+In Settings → API access, enter your authorized Client ID and Client Secret. Select the secure storage consent checkbox and apply the credentials to retain the pair across restarts using the OS-protected vault (Windows DPAPI or Linux Secret Service). Without consent, the pair is session-only. A previously saved pair remains available after restart unless you explicitly remove saved access. The vault is isolated from the backup catalog and scoped to the current workspace. Linux requires an available, unlocked Secret Service. Secure storage failure is reported and never creates a plaintext file. The Court Registry permission checkbox is selected when saved consent is active; click Synchronize to authenticate and request real records. A configured status is not proof of successful OAuth or live access.
+
+Remove saved access to clear the stored registry pair and session override. This does not revoke credentials at the official provider or remove separately provisioned environment variables or private files; revoke those through their respective authorized management channels. Stop synchronization before removing access; the worker rejects removal while synchronization is active. Disable scheduled refresh and revoke provider credentials separately if required. A temporarily unavailable OS vault is retried after a bounded cooldown.
+
+Administrators may still privately provision both SUDREG environment variables or a private workspace configuration file. If either variable is set, the environment pair is used as a unit, never mixed with another source. Explicit session credentials override other sources for the session. On restart, environment credentials take precedence over the OS vault, then legacy private configuration. The arbitrary working directory is not searched. Never commit credentials or embed shared secrets in public packages. Fresh installations require an authorized pair, and the current implementation does not perform remote automated enrollment. Scheduled refresh requires valid credentials and a running app.
 
 ## Existing data
 
