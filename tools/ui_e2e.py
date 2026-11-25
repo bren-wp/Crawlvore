@@ -92,6 +92,22 @@ def run():
                 expect(page.locator('#recovery-status')).to_have_text('Recovered workspace created.',timeout=30000)
                 page.locator('#recovery-inspect').click()
                 expect(page.locator('#recovery-preview')).to_contain_text('Read-only preview')
+                page.locator('#backup-password').fill('synthetic backup passphrase for testing')
+                page.locator('#backup-confirm').fill('synthetic backup passphrase for testing')
+                with page.expect_download(timeout=60000) as encrypted:
+                    page.locator('#backup-encrypt').click()
+                assert encrypted.value.suggested_filename.endswith('.cvbackup')
+                with encrypted.value.path().open('rb') as stream:
+                    assert stream.read(9)==b'CVBACKUP1'
+                expect(page.locator('#backup-password')).to_have_value('')
+                expect(page.locator('#backup-confirm')).to_have_value('')
+                page.once('dialog',lambda dialog:dialog.accept())
+                page.locator('#workspace-activate').click()
+                expect(page.locator('#workspace-selected')).to_contain_text('recovery-')
+                expect(page.locator('#workspace-active')).to_contain_text('Original database')
+                page.once('dialog',lambda dialog:dialog.accept())
+                page.locator('#workspace-primary').click()
+                expect(page.locator('#workspace-selected')).to_contain_text('Original database')
                 def set_theme(selector, expected):
                     # Match the exact request; never mistake an earlier queued response for the latest write.
                     with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.request.post_data_json=={'theme':expected} and r.ok):
