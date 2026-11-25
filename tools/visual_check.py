@@ -11,6 +11,9 @@ fixtures={'/api/stats':stats,'/api/companies':companies,'/api/cities':['Zagreb',
 fixtures['/api/company/'+str(companies['rows'][0]['id'])]=detail
 fixtures['/api/history/'+str(companies['rows'][0]['id'])]=[]
 fixtures['/api/analytics']={'days':[]}
+fixtures['/api/recovery']={'backups':[],'recovered':[],'active':'primary','selected':'primary'}
+fixtures['/api/recovery/protected']={'configured':False,'unlocked':False,'status':'locked','archives':[],'orphans':[],'interval_hours':6,'vault':'not-enrolled','vault_backend':'secret-service','replica':'not-configured','replica_directory':''}
+fixtures['/api/recovery/integrity']={'running':False,'search':'ok','workspaces':[{'id':'primary','status':'ok'}]}
 fixtures['/api/registry/diff']={'before':'21','after':'22','categories':[{'category':'subjekti','comparable':True,'added':4,'removed':2,'affected_subjects':3}]}
 with sync_playwright() as p:
  b=p.chromium.launch(executable_path=os.getenv('CRAWLVORA_TEST_CHROMIUM') or None,headless=True)

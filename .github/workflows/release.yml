@@ -32,6 +32,15 @@ jobs:
   quality:
     needs: validate
     uses: ./.github/workflows/quality.yml
+    with:
+      strict_visual: true
+  vault:
+    needs: validate
+    uses: ./.github/workflows/vault-acceptance.yml
+  registry:
+    needs: validate
+    uses: ./.github/workflows/live-api.yml
+    secrets: inherit
   native:
     needs: validate
     uses: ./.github/workflows/native.yml
@@ -39,7 +48,7 @@ jobs:
     needs: validate
     uses: ./.github/workflows/endurance.yml
   publish:
-    needs: [quality, native, endurance]
+    needs: [quality, native, endurance, vault, registry]
     runs-on: ubuntu-latest
     permissions:
       contents: write

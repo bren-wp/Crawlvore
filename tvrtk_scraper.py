@@ -20,7 +20,14 @@ import tempfile
 import shutil
 from automation import Queue
 from snapshot_diff import compare
+from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
+from workspace_selection import WorkspaceSelection
+from backup_transfer import BackupTransfer
+from protected_backups import ProtectedBackups
+from workspace_integrity import WorkspaceIntegrity, inspect_database, check_search_index
+from cryptography.exceptions import InvalidTag
+from urllib.parse import unquote
 
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_hex(32)
@@ -29,6 +36,7 @@ def main():
     ap=argparse.ArgumentParser(description='Crawlvora — lokalni poslovni imenik')
     ap.add_argument('--port',type=int,default=0 if getattr(sys,'frozen',False) else 8765)
     ap.add_argument('--data-dir',type=Path,default=(Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'Crawlvora' if getattr(sys,'frozen',False) else ROOT/'data'))
+    ap.add_argument('--primary-workspace',action='store_true',help='Open the original workspace without changing the saved selection')
     ap.add_argument('--registry-sync',action='store_true')
     ap.add_argument('--registry-limit',type=int,default=500)
     ap.add_argument('--desktop',action='store_true')
@@ -57,10 +65,29 @@ def main():
             Workbook().close(); result={'ok':True,'records':26261,'browser':True}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
         args.self_test.write_text(json.dumps(result),encoding='utf-8'); return 0 if result['ok'] else 1
-    args.data_dir.mkdir(parents=True,exist_ok=True)
-    store=Store(args.data_dir/'companies.sqlite3'); collector=Collector(store); registry=Registry(store)
+    root=args.data_dir
+    with workspace_lock(root):
+        selection=WorkspaceSelection(root)
+        active='primary' if args.primary_workspace else selection.chosen()
+        args.data_dir=selection.resolve(active)
+        if active=='primary': return run_workspace(args,selection,active)
+        with workspace_lock(args.data_dir):
+            return run_workspace(args,selection,active)
+
+def run_workspace(args,selection,active):
+    database=args.data_dir/'companies.sqlite3'
+    # Fail closed before schema changes or seed imports if a backup cannot be verified.
+    if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
+    verified_backup(database)
+    store=Store(database); collector=Collector(store); registry=Registry(store)
+    recovery=RecoveryCenter(database,root=selection.root)
+    transfers=BackupTransfer(recovery)
+    protected=ProtectedBackups(database,recovery)
+    integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
-    if seed.exists(): store.seed(seed)
+    if active=='primary' and seed.exists(): store.seed(seed)
+    search_integrity=check_search_index(store,repair=True)
+    integrity.start()
     if args.registry_sync:
         if not 1 <= args.registry_limit <= 1000: ap.error('Invalid registry page size.')
         start_registry(collector,registry,credentials(ROOT,args.data_dir),args.registry_limit)
@@ -86,6 +113,7 @@ def main():
         try: return all(registry_credentials())
         except ValueError: return False
     queue=Queue(store,collector,registry,registry_credentials); queue.start()
+    protected.start()
     class Handler(BaseHTTPRequestHandler):
         def send_data(self,data,kind='application/json; charset=utf-8',status=200,extra=None):
             if not isinstance(data,bytes): data=json.dumps(data,ensure_ascii=False).encode()
@@ -147,6 +175,30 @@ def main():
                     return
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
+                if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
+                if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())
+                if p.path=='/api/recovery/protected-manifest':
+                    identifier=get('id')
+                    raw=protected.portable_manifest(identifier)
+                    return self.send_data(raw,kind='application/json',extra={'Content-Disposition':f'attachment; filename="{identifier}.manifest.json"'})
+                if p.path=='/api/recovery/protected-download':
+                    with protected.download(get('id')) as path:
+                        self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(path.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with path.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
+                if p.path=='/api/recovery/integrity': return self.send_data(dict(integrity.snapshot(),search=search_integrity))
+                if p.path=='/api/recovery/encrypted-download':
+                    with transfers.download(get('ticket')) as (path,name):
+                        self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(path.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{name}"'); self.send_header('Cache-Control','no-store'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with path.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
+                if p.path=='/api/recovery/inspect': return self.send_data(recovery.inspect(get('id')))
+                if p.path=='/api/recovery/download':
+                    path=recovery.backup_path(get('id'))
+                    with path.open('rb') as stream:
+                        self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(os.fstat(stream.fileno()).st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        shutil.copyfileobj(stream,self.wfile)
+                    return
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
@@ -166,11 +218,61 @@ def main():
             if not self.authorized() or not self.session_authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 n=int(self.headers.get('Content-Length','0'))
+                if self.path=='/api/recovery/encrypted-restore':
+                    password=unquote(self.headers.get('X-Backup-Passphrase',''),errors='strict')
+                    if not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
+                    self.connection.settimeout(120)
+                    try: identifier=transfers.restore(self.rfile,n,password)
+                    except InvalidTag: raise ValueError('Incorrect passphrase or damaged encrypted backup.') from None
+                    integrity.start()
+                    return self.send_data({'id':identifier})
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 raw=self.rfile.read(n)
-                if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
-                if self.path=='/api/import': return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
+                if self.path in ('/api/import-json','/api/import'):
+                    # A consistent backup precedes every user-initiated import; rejected imports never mutate the directory.
+                    protected.before_import()
+                    if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
+                    return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if self.path=='/api/recovery/encrypt':
+                    if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
+                    password=data.get('password')
+                    if not isinstance(password,str) or not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
+                    return self.send_data({'ticket':transfers.prepare(data.get('id'),password)})
+                if self.path=='/api/recovery/protected-unlock':
+                    return self.send_data(protected.unlock(data.get('password'),initialize=data.get('initialize') is True))
+                if self.path=='/api/recovery/protected-enroll':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm secure vault enrollment first.')
+                    return self.send_data(protected.enroll_vault())
+                if self.path=='/api/recovery/protected-replica':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm replica destination first.')
+                    return self.send_data(protected.configure_replica(data.get('directory')))
+                if self.path=='/api/recovery/protected-replicate': return self.send_data(protected.replicate())
+                if self.path=='/api/recovery/protected-restore-test': return self.send_data(protected.verify_restore(data.get('id')))
+                if self.path=='/api/recovery/protected-lock':
+                    protected.lock_session()
+                    return self.send_data(protected.snapshot())
+                if self.path=='/api/recovery/protected-create':
+                    return self.send_data({'id':protected.create()})
+                if self.path=='/api/recovery/protected-verify':
+                    return self.send_data(protected.verify())
+                if self.path=='/api/recovery/protected-restore':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')
+                    identifier=protected.restore(data.get('id'))
+                    integrity.start()
+                    return self.send_data({'id':identifier})
+                if self.path=='/api/recovery/integrity':
+                    integrity.start(full=True)
+                    return self.send_data({'ok':True})
+                if self.path=='/api/recovery/select':
+                    if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm workspace selection first.')
+                    return self.send_data({'selected':selection.choose(data.get('id'))})
+                if self.path=='/api/recovery/create': return self.send_data({'id':recovery.create()})
+                if self.path=='/api/recovery/restore':
+                    if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')
+                    identifier=recovery.restore(data.get('id'))
+                    integrity.start()
+                    return self.send_data({'id':identifier})
                 if self.path=='/api/ui-ready':
                     if args.worker:
                         with ui_ready_lock:
@@ -222,7 +324,7 @@ def main():
         threading.Thread(target=parent_watch,daemon=True).start()
         try: server.serve_forever()
         finally:
-            queue.close(); collector.stop(); server.server_close()
+            queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
@@ -233,10 +335,10 @@ def main():
             webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
             webview.start(gui='edgechromium')
         finally:
-            queue.close(); collector.stop(); server.shutdown(); server.server_close()
+            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
         return 0
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: queue.close(); collector.stop(); server.server_close()
+    finally: queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
 if __name__=='__main__': sys.exit(main())

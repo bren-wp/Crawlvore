@@ -16,3 +16,5 @@ Before tagging, review the visual differences against the accepted brand referen
 The first native release is not approved until all gates have actually passed and the visual and functional parity review is complete.
 
 The production API smoke test is available in `tools/live_registry_check.py` and the manually dispatched `live-api.yml` workflow. Configure the OAuth2 secrets privately in the `production-api` environment, approve the run, and verify its result before tagging. The smoke test reads only one company row, does not log record contents or credentials, and is not a complete production mirror test.
+
+An explicitly labeled prerelease candidate may be published from the data-safety-release branch only after quality and native packaging workflows succeed for the same commit. It contains all six assets and checksums, is never marked latest, and does not satisfy or bypass the production gates. Production release remains subject to the existing tag workflow and acceptance criteria.

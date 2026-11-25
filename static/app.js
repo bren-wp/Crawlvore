@@ -16,7 +16,7 @@ async function overview(){const [s,p]=await Promise.all([api('/api/stats'),api('
 async function cities(){const v=$('city').value;const cs=await api('/api/cities');$('city').replaceChildren(new Option(translate('Svi gradovi'),''));for(const c of cs)$('city').add(new Option(c,c));$('city').value=v;}
 async function directory(){const seq=++serial,p=filters();p.set('page',String(page));p.set('sort',$('sort').value);const d=await api('/api/companies?'+p);if(seq!==serial)return;total=d.total;const pages=Math.max(1,Math.ceil(total/25));if(page>pages){page=pages;return directory()}rows('company-rows',d.rows);$('result-count').textContent=n(total)+translate(' rezultata');$('page-label').textContent=translate('Stranica ')+n(page)+translate(' od ')+n(pages);$('prev').disabled=page<=1;$('next').disabled=page>=pages;}
 const detailFields={oib:'OIB',email:translate('Poslovni e-mail'),industry:translate('Djelatnost'),address:translate('Adresa'),postal:translate('Poštanski broj'),city:translate('Grad'),country:translate('Država'),phone:translate('Telefon'),fax:translate('Telefon / faks'),website:translate('Web stranica'),social:translate('Društvene mreže'),logo:'Logo URL',person:translate('Kontakt osoba'),year:translate('Godina osnivanja'),employees:translate('Broj zaposlenih'),account:translate('Broj računa'),mbs:'MBS',rating:translate('Ocjena'),description:translate('Opis'),products:translate('Proizvodi i usluge'),source:translate('Izvor')};
-async function detail(id){const r=await api('/api/company/'+id);$('detail-title').textContent=r.title;$('detail-sub').textContent=[r.city,r.country].filter(Boolean).join(' · ');const body=$('detail-body');body.replaceChildren();for(const [key,label] of Object.entries(detailFields)){const el=make('div',undefined,'detail-field profile-property');el.append(make('small',label,'muted'));const u=['website','social','logo','source'].includes(key)&&safeLink(r[key]);if(u){const a=make('a',u);a.href=u;a.target='_blank';a.rel='noopener noreferrer';el.append(a)}else el.append(make('div',r[key]||'—'));body.append(el)}const src=make('div',undefined,'detail-field profile-sources');src.append(make('h3',translate('Poveznice izvora')));if(!(r.sources||[]).length)src.append(make('p',translate('Nema povezanih izvora.'),'muted'));for(const x of r.sources||[]){src.append(make('div',(providerNames[x.provider]||x.provider)+' · '+x.updated));const u=safeLink(x.url);if(u){const a=make('a',u);a.href=u;a.target='_blank';a.rel='noopener noreferrer';src.append(a)}}body.append(src);const hist=make('div',undefined,'detail-field history-block');hist.append(make('h3',translate('Povijest promjena')));body.append(hist);setProfileTab('details');$('detail').showModal();try{const changes=await api('/api/history/'+id);if(!changes.length)hist.append(make('p',translate('Nema zabilježenih promjena od ove verzije.'),'muted'));for(const r of changes){const group=make('div',undefined,'history-event');group.append(make('strong',r.changed_at+' UTC · '+(providerNames[r.provider]||r.provider)));for(const [k,v] of Object.entries(r.changes))group.append(make('p',(detailFields[k]||k)+': '+(v.before||'—')+' → '+(v.after||'—')));hist.append(group)}}catch(e){hist.append(make('p',translate('Povijest nije dostupna.'),'muted'))}}
+async function detail(id){const r=await api('/api/company/'+id);$('detail-title').textContent=r.title;$('detail-sub').textContent=[r.city,r.country].filter(Boolean).join(' · ');const body=$('detail-body');body.replaceChildren();for(const [key,label] of Object.entries(detailFields)){const el=make('div',undefined,'detail-field profile-property');el.append(make('small',label,'muted'));const u=['website','social','logo','source'].includes(key)&&safeLink(r[key]);if(u){const a=make('a',u);a.href=u;a.target='_blank';a.rel='noopener noreferrer';el.append(a)}else el.append(make('div',r[key]||'—'));body.append(el)}const src=make('div',undefined,'detail-field profile-sources');src.append(make('h3',translate('Poveznice izvora')));if(!(r.sources||[]).length)src.append(make('p',translate('Nema povezanih izvora.'),'muted'));for(const x of r.sources||[]){src.append(make('div',(providerNames[x.provider]||x.provider)+' · '+x.updated));const u=safeLink(x.url);if(u){const a=make('a',u);a.href=u;a.target='_blank';a.rel='noopener noreferrer';src.append(a)}}const alt=make('div',undefined,'alternate-values');alt.append(make('h3',translate('Sačuvane alternativne vrijednosti')));if(!(r.alternate_values||[]).length)alt.append(make('p',translate('Nema alternativnih vrijednosti.'),'muted'));for(const v of r.alternate_values||[]){const item=make('div',undefined,'history-event');item.append(make('strong',detailFields[v.field]||v.field),make('p',v.value),make('small',(providerNames[v.provider]||v.provider)+' · '+v.observed_at+' UTC','muted'));alt.append(item)}src.append(alt);body.append(src);const hist=make('div',undefined,'detail-field history-block');hist.append(make('h3',translate('Povijest promjena')));body.append(hist);setProfileTab('details');$('detail').showModal();try{const changes=await api('/api/history/'+id);if(!changes.length)hist.append(make('p',translate('Nema zabilježenih promjena od ove verzije.'),'muted'));for(const r of changes){const group=make('div',undefined,'history-event');group.append(make('strong',r.changed_at+' UTC · '+(providerNames[r.provider]||r.provider)));for(const [k,v] of Object.entries(r.changes))group.append(make('p',(detailFields[k]||k)+': '+(v.before||'—')+' → '+(v.after||'—')));hist.append(group)}}catch(e){hist.append(make('p',translate('Povijest nije dostupna.'),'muted'))}}
 document.querySelectorAll('[data-view]').forEach(e=>e.addEventListener('click',()=>go(e.dataset.view)));document.querySelectorAll('[data-go]').forEach(e=>e.addEventListener('click',()=>go(e.dataset.go)));$('all-export').onclick=()=>download();$('filtered-export').onclick=()=>download(true);$('close-detail').onclick=()=>$('detail').close();$('prev').onclick=()=>{page--;directory().catch(fail)};$('next').onclick=()=>{page++;directory().catch(fail)};let debounce;$('search').oninput=()=>{clearTimeout(debounce);debounce=setTimeout(()=>{page=1;directory().catch(fail)},250)};for(const id of ['city','contact','sort','source-filter'])$(id).onchange=()=>{page=1;directory().catch(fail)};$('reset').onclick=()=>{for(const id of ['search','city','contact','source-filter'])$(id).value='';$('sort').value='title';page=1;directory().catch(fail)};
 const providerNames={tvrtke:'Tvrtke.hr',companywall:'CompanyWall.hr',registry:translate('Sudski registar'),company:'Company.hr',html:translate('Prilagođeni web'),json:translate('Prilagođeni API'),csv:translate('CSV / postojeći podaci')};
 async function providers(){const list=await api('/api/providers'),select=$('source-filter'),old=select.value;select.replaceChildren(new Option(translate('Svi izvori'),''));$('source-summary').replaceChildren();for(const p of list){select.append(new Option(p.label,p.provider));const r=make('div',undefined,'source-row');r.append(make('span',p.label),make('strong',n(p.n)));$('source-summary').append(r)}select.value=old;}
@@ -109,6 +109,7 @@ async function refreshSettings(){
     const [s,r]=await Promise.all([api('/api/stats'),api('/api/registry')]);
     $('settings-count').textContent=n(s.total);
     $('settings-api').textContent=translate(r.configured?'API konfiguriran':'API nije konfiguriran');
+    await refreshRecovery();
 }
 function syncQuickFilters(){
     document.querySelectorAll('[data-contact-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.contactFilter===$('contact').value)));
@@ -132,3 +133,179 @@ $('detail').querySelectorAll('[data-profile-tab]').forEach(button=>button.addEve
 $('registry-credentials-apply').onclick=async()=>{const secret=$('registry-client-secret');try{await post('/api/registry/credentials',{client_id:$('registry-client-id').value,client_secret:secret.value});$('registry-client-id').value='';await refreshSettings();toast(translate('Pristupni podaci su primijenjeni.'));}catch(e){fail(e)}finally{secret.value=''}};
 
 $('file').onchange=()=>{const f=$('file').files[0];$('file-name').textContent=f?f.name:translate('Nije odabrana datoteka.');$('import-btn').disabled=!f};$('import-btn').onclick=async()=>{const f=$('file').files[0];if(!f)return;$('import-btn').disabled=true;try{const r=await api(f.name.toLowerCase().endsWith('.json')?'/api/import-json':'/api/import',{method:'POST',headers:{'X-Local-Token':token},body:f});toast(translate('Učitano ')+n(r.read)+translate(' · novih ')+n(r.added));await cities();await providers();$('file').value='';$('file-name').textContent=translate('Nije odabrana datoteka.');}catch(e){fail(e);$('import-btn').disabled=false}};
+
+let recoveryList=[];
+let recoveryBusy=false;
+function syncRecovery(){
+    const backup=$('recovery-backup').value, item=recoveryList.find(x=>x.id===backup);
+    $('recovery-size').textContent=item?translate('Veličina kopije')+': '+n(item.bytes)+' B':'';
+    $('recovery-download').disabled=recoveryBusy||!backup;
+    $('backup-encrypt').disabled=recoveryBusy||!backup;
+    $('recovery-restore').disabled=recoveryBusy||!backup;
+    $('recovery-inspect').disabled=recoveryBusy||!$('recovery-space').value;
+    $('recovery-create').disabled=recoveryBusy;
+    $('recovery-refresh').disabled=recoveryBusy;
+    $('workspace-activate').disabled=recoveryBusy||!$('recovery-space').value;
+    $('workspace-primary').disabled=recoveryBusy;
+    $('encrypted-restore').disabled=recoveryBusy;
+    $('integrity-check').disabled=recoveryBusy;
+    syncProtected();
+}
+async function refreshRecovery(){
+    const r=await api('/api/recovery');
+    recoveryList=r.backups||[];
+    const label=id=>id==='primary'?translate('Originalna baza'):id;
+    $('workspace-active').textContent=translate('Aktivni radni prostor')+': '+label(r.active||'primary');
+    $('workspace-selected').textContent=translate('Odabir za sljedeće pokretanje')+': '+label(r.selected||'primary');
+    for(const [id,items,caption] of [['recovery-backup',recoveryList,'Odaberi kopiju'],['recovery-space',r.recovered||[],'Odaberi prostor']]){
+        const select=$(id),prev=select.value;
+        select.replaceChildren(new Option(translate(caption),''));
+        for(const item of items)select.add(new Option(item.id,item.id));
+        if(items.some(x=>x.id===prev))select.value=prev;
+    }
+    syncRecovery();
+    await refreshIntegrity();
+    await refreshProtected();
+}
+async function recoveryAction(action){
+    if(recoveryBusy)return;
+    recoveryBusy=true;syncRecovery();
+    try{await action()}catch(e){fail(e)}finally{recoveryBusy=false;syncRecovery()}
+}
+$('recovery-backup').onchange=syncRecovery;
+$('recovery-space').onchange=()=>{$('recovery-preview').replaceChildren();syncRecovery()};
+$('recovery-refresh').onclick=()=>recoveryAction(refreshRecovery);
+$('recovery-create').onclick=()=>recoveryAction(async()=>{
+    const r=await post('/api/recovery/create',{});
+    await refreshRecovery();$('recovery-backup').value=r.id;
+    $('recovery-status').textContent=translate('Kopija je izrađena.');
+});
+$('recovery-download').onclick=()=>{location.href='/api/recovery/download?'+new URLSearchParams({id:$('recovery-backup').value})};
+$('recovery-restore').onclick=()=>{
+    const id=$('recovery-backup').value;
+    if(!id||!confirm(translate('Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.')))return;
+    void recoveryAction(async()=>{
+        const r=await post('/api/recovery/restore',{id,confirmed:true});
+        await refreshRecovery();$('recovery-space').value=r.id;
+        $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
+        $('recovery-preview').replaceChildren();
+    });
+};
+$('recovery-inspect').onclick=()=>recoveryAction(async()=>{
+    const id=$('recovery-space').value;
+    const r=await api('/api/recovery/inspect?'+new URLSearchParams({id}));
+    if($('recovery-space').value!==id)return;
+    const preview=$('recovery-preview');preview.replaceChildren(make('strong',translate('Pregled samo za čitanje')+' · '+n(r.total)));
+    for(const row of r.rows)preview.append(make('p',row.title+' · '+row.city,'muted'));
+});
+
+function selectWorkspace(id){
+    if(!id||!confirm(translate('Promijeniti radni prostor pri sljedećem pokretanju? Sve baze ostaju sačuvane.')))return;
+    void recoveryAction(async()=>{await post('/api/recovery/select',{id,confirmed:true});await refreshRecovery();$('recovery-status').textContent=translate('Odabir je spremljen. Zatvorite i ponovno pokrenite aplikaciju.');});
+}
+$('workspace-activate').onclick=()=>selectWorkspace($('recovery-space').value);
+$('workspace-primary').onclick=()=>selectWorkspace('primary');
+
+$('backup-encrypt').onclick=()=>recoveryAction(async()=>{
+    const password=$('backup-password').value, id=$('recovery-backup').value;
+    if(password.length<16||password!==$('backup-confirm').value)throw Error(translate('Lozinke se moraju podudarati i imati najmanje 16 znakova.'));
+    $('backup-password').value='';$('backup-confirm').value='';
+    const r=await post('/api/recovery/encrypt',{id,password});
+    const a=document.createElement('a');a.href='/api/recovery/encrypted-download?'+new URLSearchParams({ticket:r.ticket});a.download=id.replace(/\.sqlite3$/,'')+'.cvbackup';document.body.append(a);a.click();a.remove();
+    $('recovery-status').textContent=translate('Šifrirana kopija pripremljena je za preuzimanje.');
+});
+
+let integrityTimer;
+async function refreshIntegrity(){
+    clearTimeout(integrityTimer);
+    const r=await api('/api/recovery/integrity');
+    const target=$('integrity-results');target.replaceChildren();
+    const label=status=>translate(({ok:'Provjereno',rebuilt:'Obnovljeno',failed:'Neispravno',unavailable:'Nedostupno'})[status]||'Nedostupno');
+    target.append(make('p',translate('Indeks pretraživanja')+': '+label(r.search)));
+    if(r.running){target.append(make('p',translate('Provjera u tijeku')));integrityTimer=setTimeout(()=>{if(current==='settings')refreshIntegrity().catch(fail)},1500);}
+    for(const item of r.workspaces)target.append(make('p',(item.id==='primary'?translate('Originalna baza'):item.id)+': '+label(item.status)));
+}
+$('integrity-check').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/integrity',{});await refreshIntegrity()});
+$('encrypted-restore').onclick=()=>recoveryAction(async()=>{
+    const file=$('encrypted-file').files?.[0],password=$('encrypted-password').value;
+    if(!file||password.length<16)throw Error(translate('Odaberite šifriranu kopiju i unesite lozinku.'));
+    if(!confirm(translate('Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.')))return;
+    $('encrypted-password').value='';
+    const r=await api('/api/recovery/encrypted-restore',{method:'POST',headers:{'X-Local-Token':token,'X-Backup-Passphrase':encodeURIComponent(password),'Content-Type':'application/octet-stream'},body:file});
+    $('encrypted-file').value='';await refreshRecovery();$('recovery-space').value=r.id;
+    $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
+});
+
+let protectedState={configured:false,unlocked:false,status:'locked',archives:[],orphans:[]};
+function syncProtected(){
+    const unlocked=protectedState.unlocked;
+    const selected=protectedState.archives.find(x=>x.archive===$('protected-archive').value);
+    $('protected-confirm-label').hidden=protectedState.configured;
+    $('protected-unlock').disabled=recoveryBusy||unlocked;
+    $('protected-lock').disabled=recoveryBusy||!unlocked;
+    $('protected-create').disabled=recoveryBusy||!unlocked;
+    $('protected-verify').disabled=recoveryBusy||!unlocked;
+    $('protected-download').disabled=recoveryBusy||!unlocked||selected?.status!=='ok';
+    $('protected-restore').disabled=$('protected-download').disabled;
+    $('protected-manifest').disabled=$('protected-download').disabled;
+    $('protected-restore-test').disabled=$('protected-download').disabled;
+    $('vault-enroll').disabled=recoveryBusy||!unlocked||protectedState.vault==='enabled';
+    $('replica-configure').disabled=recoveryBusy||!unlocked||protectedState.vault!=='enabled';
+    $('replica-copy').disabled=$('replica-configure').disabled||!protectedState.replica_directory;
+}
+async function refreshProtected(){
+    protectedState=await api('/api/recovery/protected');
+    const currentId=$('protected-archive').value;
+    $('protected-archive').replaceChildren(new Option(translate('Odaberi kopiju'),''));
+    for(const item of protectedState.archives){
+        const status=translate(item.status==='ok'?'Provjereno':item.status==='failed'?'Neispravno':'Nedostupno');
+        $('protected-archive').add(new Option(new Date(item.created*1000).toLocaleString()+' · '+n(item.bytes)+' B · '+status,item.archive));
+    }
+    if(protectedState.archives.some(x=>x.archive===currentId))$('protected-archive').value=currentId;
+    $('protected-status').textContent=translate(!protectedState.configured?'Katalog nije postavljen.':!protectedState.unlocked?'Katalog je zaključan.':protectedState.status==='verified'?'Katalog je provjeren.':'Katalog zahtijeva provjeru.');
+    $('protected-orphans').textContent=protectedState.orphans.length?translate('Nepotvrđeni arhivi (sačuvani)')+': '+protectedState.orphans.join(', '):'';
+    $('vault-status').textContent=translate('Sigurna pohrana ključa')+': '+translate(protectedState.vault==='enabled'?'Omogućeno':protectedState.vault==='attention'?'Zahtijeva provjeru':'Nije postavljeno')+' · '+(protectedState.vault_backend||'—');
+    $('replica-directory').value=protectedState.replica_directory||'';
+    $('replica-status').textContent=translate('Neovisna kopija')+': '+translate(protectedState.replica==='verified'?'Provjereno':protectedState.replica==='attention'?'Zahtijeva provjeru':protectedState.replica==='pending'?'Čeka kopiranje':'Nije postavljeno');
+    syncProtected();
+}
+$('protected-archive').onchange=syncProtected;
+$('protected-unlock').onclick=()=>recoveryAction(async()=>{
+    const password=$('protected-password').value,initialize=!protectedState.configured;
+    if(password.length<16||(initialize&&password!==$('protected-confirm').value))throw Error(translate('Lozinke se moraju podudarati i imati najmanje 16 znakova.'));
+    if(initialize&&!confirm(translate('Izraditi novi zaštićeni katalog?')))return;
+    $('protected-password').value='';$('protected-confirm').value='';
+    await post('/api/recovery/protected-unlock',{password,initialize});
+    await refreshProtected();
+});
+$('protected-lock').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/protected-lock',{});await refreshProtected()});
+$('protected-create').onclick=()=>recoveryAction(async()=>{
+    const r=await post('/api/recovery/protected-create',{});
+    await refreshProtected();$('protected-archive').value=r.id;
+    $('recovery-status').textContent=translate('Šifrirana kopija je izrađena.');
+});
+$('protected-verify').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/protected-verify',{});await refreshProtected()});
+$('protected-download').onclick=()=>{const a=document.createElement('a');a.href='/api/recovery/protected-download?'+new URLSearchParams({id:$('protected-archive').value});a.download=$('protected-archive').value;document.body.append(a);a.click();a.remove()};
+$('protected-restore').onclick=()=>recoveryAction(async()=>{
+    if(!confirm(translate('Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.')))return;
+    const r=await post('/api/recovery/protected-restore',{id:$('protected-archive').value,confirmed:true});
+    await refreshRecovery();$('recovery-space').value=r.id;
+    $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
+});
+
+$('vault-enroll').onclick=()=>recoveryAction(async()=>{
+    if(!confirm(translate('Pohraniti pristupnu frazu u sigurnu pohranu operacijskog sustava?')))return;
+    await post('/api/recovery/protected-enroll',{confirmed:true});await refreshProtected();
+});
+$('replica-configure').onclick=()=>recoveryAction(async()=>{
+    const directory=$('replica-directory').value.trim();
+    if(!directory||!confirm(translate('Spremiti ovo odredište za automatsku replikaciju?')))return;
+    await post('/api/recovery/protected-replica',{directory,confirmed:true});await refreshProtected();
+});
+$('replica-copy').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/protected-replicate',{});await refreshProtected()});
+$('protected-restore-test').onclick=()=>recoveryAction(async()=>{
+    const r=await post('/api/recovery/protected-restore-test',{id:$('protected-archive').value});
+    $('recovery-status').textContent=translate('Test oporavka uspješan')+' · '+translate('Zapisa')+': '+n(r.records);
+});
+
+$('protected-manifest').onclick=()=>{const a=document.createElement('a'),id=$('protected-archive').value;a.href='/api/recovery/protected-manifest?'+new URLSearchParams({id});a.download=id+'.manifest.json';document.body.append(a);a.click();a.remove()};

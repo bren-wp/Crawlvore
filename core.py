@@ -78,6 +78,7 @@ class Store:
             c.execute('CREATE TABLE IF NOT EXISTS companies (id INTEGER PRIMARY KEY, identity TEXT UNIQUE NOT NULL, source TEXT UNIQUE, '+','.join(k+" TEXT NOT NULL DEFAULT ''" for k in COLS)+', search_text TEXT NOT NULL DEFAULT \'\')')
             c.execute('CREATE INDEX IF NOT EXISTS idx_city ON companies(city)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_title ON companies(title COLLATE NOCASE)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_city_title ON companies(city,title COLLATE NOCASE,id)')
             c.execute('CREATE TABLE IF NOT EXISTS completed (job TEXT, url TEXT, PRIMARY KEY(job,url))')
             c.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
             existing={r[1] for r in c.execute('PRAGMA table_info(companies)')}
@@ -88,7 +89,32 @@ class Store:
             c.execute("CREATE TABLE IF NOT EXISTS origins (company_id INTEGER NOT NULL, provider TEXT NOT NULL, url TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,provider,url), FOREIGN KEY(company_id) REFERENCES companies(id))")
             c.execute('CREATE TABLE IF NOT EXISTS company_history(id INTEGER PRIMARY KEY,company_id INTEGER NOT NULL,provider TEXT NOT NULL,changed_at TEXT DEFAULT CURRENT_TIMESTAMP,changes TEXT NOT NULL)')
             c.execute('CREATE INDEX IF NOT EXISTS history_company ON company_history(company_id,id DESC)')
+            c.execute('CREATE INDEX IF NOT EXISTS history_changed_at ON company_history(changed_at)')
+            c.execute('CREATE TABLE IF NOT EXISTS alternate_values(company_id INTEGER NOT NULL, field TEXT NOT NULL, value TEXT NOT NULL, provider TEXT NOT NULL, observed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,field,value,provider), FOREIGN KEY(company_id) REFERENCES companies(id))')
             c.execute('CREATE INDEX IF NOT EXISTS origin_provider ON origins(provider,company_id)')
+            # The derived index and its maintenance triggers commit together.
+            c.execute('SAVEPOINT search_index')
+            try:
+                c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS company_fts USING fts5(search_text, content='companies', content_rowid='id', tokenize='unicode61')")
+                c.execute("""CREATE TRIGGER IF NOT EXISTS company_fts_insert AFTER INSERT ON companies BEGIN
+                    INSERT INTO company_fts(rowid,search_text) VALUES(new.id,new.search_text); END""")
+                c.execute("""CREATE TRIGGER IF NOT EXISTS company_fts_delete AFTER DELETE ON companies BEGIN
+                    INSERT INTO company_fts(company_fts,rowid,search_text) VALUES('delete',old.id,old.search_text); END""")
+                c.execute("""CREATE TRIGGER IF NOT EXISTS company_fts_update AFTER UPDATE OF search_text ON companies WHEN old.search_text<>new.search_text BEGIN
+                    INSERT INTO company_fts(company_fts,rowid,search_text) VALUES('delete',old.id,old.search_text);
+                    INSERT INTO company_fts(rowid,search_text) VALUES(new.id,new.search_text); END""")
+                if not c.execute("SELECT 1 FROM meta WHERE key='fts_v1'").fetchone():
+                    c.execute("INSERT INTO company_fts(company_fts) VALUES('rebuild')")
+                    c.execute("INSERT INTO meta VALUES('fts_v1','1')")
+                self.fts_available=True
+            except sqlite3.OperationalError as error:
+                c.execute('ROLLBACK TO search_index')
+                if 'no such module: fts5' not in str(error).lower(): raise
+                # An existing FTS database must not be opened for writes by an incompatible runtime.
+                if c.execute("SELECT 1 FROM meta WHERE key='fts_v1'").fetchone(): raise
+                self.fts_available=False
+            finally:
+                c.execute('RELEASE search_index')
             if not c.execute("SELECT 1 FROM meta WHERE key='origins_v2'").fetchone():
                 c.execute("INSERT OR IGNORE INTO origins(company_id,provider,url) SELECT id,CASE WHEN source IS NULL THEN 'csv' ELSE 'tvrtke' END,coalesce(source,'') FROM companies")
                 c.execute("INSERT INTO meta VALUES ('origins_v2','1')")
@@ -97,6 +123,7 @@ class Store:
         c=sqlite3.connect(self.path,timeout=20)
         c.row_factory=sqlite3.Row
         c.execute("PRAGMA foreign_keys=ON")
+        c.execute("PRAGMA synchronous=FULL")
         try:
             with c: yield c
         finally: c.close()
@@ -144,11 +171,15 @@ class Store:
         if old and vals['mbs'] and old['mbs'] and vals['mbs'].zfill(9)!=old['mbs'].zfill(9):
             raise ValueError('Conflicting MBS; existing records preserved.')
         if old:
+            # Preserve differing incoming values even when the directory prefers an existing contact.
+            for key,value in vals.items():
+                if value and old[key] and value!=old[key]:
+                    c.execute('INSERT OR IGNORE INTO alternate_values(company_id,field,value,provider) VALUES (?,?,?,?)',(old['id'],key,value,provider or ('tvrtke' if source else 'csv')))
             official={'title','mbs','oib','city','country','address'}
             vals={k:(vals[k] or old[k]) if provider=='registry' and k in official else (old[k] or vals[k]) for k in cols}
             changes={k:{'before':old[k],'after':v} for k,v in vals.items() if old[k]!=v}
             if changes: c.execute('INSERT INTO company_history(company_id,provider,changes) VALUES (?,?,?)',(old['id'],provider or ('tvrtke' if source else 'csv'),json.dumps(changes,ensure_ascii=False)))
-            c.execute('UPDATE companies SET title=?,logo=?,website=?,social=?,address=?,postal=?,city=?,country=?,phone=?,fax=?,person=?,year=?,employees=?,account=?,mbs=?,rating=?,description=?,products=?,oib=?,email=?,industry=?,source=?,search_text=? WHERE id=?',(*vals.values(),old['source'] or source,norm(' '.join(vals.values())),old['id']))
+            if changes or (source and not old['source']): c.execute('UPDATE companies SET title=?,logo=?,website=?,social=?,address=?,postal=?,city=?,country=?,phone=?,fax=?,person=?,year=?,employees=?,account=?,mbs=?,rating=?,description=?,products=?,oib=?,email=?,industry=?,source=?,search_text=? WHERE id=?',(*vals.values(),old['source'] or source,norm(' '.join(vals.values())),old['id']))
             i=old['id']
         else:
             i=c.execute('INSERT INTO companies(identity,source,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry,search_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(identity,source,*vals.values(),norm(' '.join(vals.values())))).lastrowid
@@ -161,30 +192,47 @@ class Store:
     def import_json(self,raw):
         data=__import__('json').loads(raw)
         if not isinstance(data,list) or any(not isinstance(r,dict) or not isinstance(r.get('title'),str) or not r['title'].strip() for r in data): raise ValueError('JSON mora biti lista objekata s poljem title.')
-        with self.db() as c: added=sum(self.upsert(c,{k:v for k,v in r.items() if isinstance(v,(str,int,float))},provider='csv') for r in data)
+        with self.db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            added=sum(self.upsert(c,{k:v for k,v in r.items() if isinstance(v,(str,int,float))},provider='csv') for r in data)
         return {'read':len(data),'added':added}
     def export_json(self,**filters):
         where,args=self.where(**filters)
         with self.db() as c:
+            c.execute('BEGIN')
             rows=[dict(r) for r in c.execute('SELECT id,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry FROM companies'+where+' ORDER BY id',args)]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
-            origins={}
-            for r in c.execute('SELECT * FROM origins'): origins.setdefault(r['company_id'],[]).append({k:r[k] for k in ('provider','url','updated')})
-            for r in rows: r['sources']=origins.get(r['id'],[])
+            # Limit metadata reads to the selected IDs; fixed-size batches avoid SQLite variable limits.
+            by_id={r['id']:r for r in rows}
+            for r in rows:
+                r['sources']=[]
+                r['alternate_values']=[]
+            ids=list(by_id)
+            for start in range(0,len(ids),500):
+                batch=ids[start:start+500]
+                placeholders=','.join('?' for _ in batch)
+                for r in c.execute('SELECT company_id,provider,url,updated FROM origins WHERE company_id IN ('+placeholders+') ORDER BY company_id,provider,url',batch):  # nosec B608 -- placeholders only, bound integer IDs.
+                    by_id[r['company_id']]['sources'].append({k:r[k] for k in ('provider','url','updated')})
+                for r in c.execute('SELECT company_id,field,value,provider,observed_at FROM alternate_values WHERE company_id IN ('+placeholders+') ORDER BY company_id,field,provider,value',batch):  # nosec B608 -- placeholders only, bound integer IDs.
+                    by_id[r['company_id']]['alternate_values'].append({k:r[k] for k in ('field','value','provider','observed_at')})
         return __import__('json').dumps(rows,ensure_ascii=False,indent=2).encode()
     def import_csv(self,stream):
+        with self.db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            return self._import_csv(c,stream)
+    def _import_csv(self,c,stream):
         reader=csv.DictReader(stream)
         if not reader.fieldnames or not set(FIELDS).issubset(reader.fieldnames): raise ValueError('CSV ne sadrži očekivanih 18 stupaca.')
         count=added=0
-        with self.db() as c:
-            for row in reader:
-                if None in row or any(row.get(k) is None for k in FIELDS): raise ValueError(f'Neispravan CSV redak {reader.line_num}.')
-                count+=1; added+=self.upsert(c,dict(zip(COLS,(row[k] for k in FIELDS)),oib=row.get('OIB',''),email=row.get('Email',''),industry=row.get('Industry','')))
+        for row in reader:
+            if None in row or any(row.get(k) is None for k in FIELDS): raise ValueError(f'Neispravan CSV redak {reader.line_num}.')
+            count+=1; added+=self.upsert(c,dict(zip(COLS,(row[k] for k in FIELDS)),oib=row.get('OIB',''),email=row.get('Email',''),industry=row.get('Industry','')))
         return {'read':count,'added':added}
     def seed(self,path):
         with self.db() as c:
+            c.execute('BEGIN IMMEDIATE')
             if c.execute("SELECT 1 FROM meta WHERE key='seeded'").fetchone(): return
-        with open(path,encoding='utf-8-sig',newline='') as f: self.import_csv(f)
-        with self.db() as c: c.execute("INSERT OR IGNORE INTO meta VALUES ('seeded','1')")
+            with open(path,encoding='utf-8-sig',newline='') as f: self._import_csv(c,f)
+            c.execute("INSERT INTO meta VALUES ('seeded','1')")
     def analytics(self):
         # Local observations, not inferred business growth or fabricated register events.
         with self.db() as c:
@@ -192,13 +240,30 @@ class Store:
         return {'days':days}
     def stats(self):
         with self.db() as c:
+            c.execute('BEGIN')
             r=c.execute("SELECT count(*) total,count(DISTINCT NULLIF(city,'')) cities,count(NULLIF(phone,'')) phones,count(NULLIF(website,'')) websites FROM companies").fetchone()
             cities=[dict(x) for x in c.execute("SELECT city,count(*) n FROM companies WHERE city<>'' GROUP BY city ORDER BY n DESC,city LIMIT 6")]
             return dict(r,top_cities=cities)
     def where(self,q='',city='',contact='',provider=''):
         # SQL fragments below are fixed literals; user input is only bound as parameters.
         clauses=[]; args=[]
-        if q: clauses.append('instr(search_text,?)>0'); args.append(norm(q))
+        # Explicit identifier prefixes use existing indexes; ordinary text semantics stay unchanged.
+        text=norm(q)
+        if text.startswith('oib:') and re.fullmatch(r'[0-9]{11}',text[4:].strip()):
+            clauses.append('oib=?'); args.append(text[4:].strip())
+        elif text.startswith('mbs:') and re.fullmatch(r'[0-9]{1,9}',text[4:].strip()):
+            mbs=text[4:].strip().zfill(9)
+            clauses.append('mbs IN (?,?,?,?,?,?,?,?,?)')
+            args.extend(mbs[i:] if not mbs[:i].strip('0') else mbs for i in range(9))
+        elif text.startswith('fts:'):
+            phrase=text[4:].strip()
+            if not phrase or len(phrase)>200 or '\x00' in phrase: raise ValueError('Invalid full-text query.')
+            if self.fts_available:
+                clauses.append('id IN (SELECT rowid FROM company_fts WHERE company_fts MATCH ?)')
+                args.append('"'+phrase.replace('"','""')+'"')
+            else:
+                clauses.append('instr(search_text,?)>0'); args.append(phrase)
+        elif q: clauses.append('instr(search_text,?)>0'); args.append(text)
         if city: clauses.append('city=?'); args.append(city)
         if provider: clauses.append('EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider=?)'); args.append(provider)
         if contact=='phone': clauses.append("phone<>''")
@@ -209,6 +274,7 @@ class Store:
         where,args=self.where(q,city,contact,provider)
         order={'title':'title COLLATE NOCASE ASC,id','title_desc':'title COLLATE NOCASE DESC,id','city':'city COLLATE NOCASE,title COLLATE NOCASE,id','new':'id DESC'}.get(sort,'id')
         with self.db() as c:
+            c.execute('BEGIN')
             total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             return {'total':total,'rows':[dict(r) for r in rows]}
@@ -216,8 +282,12 @@ class Store:
         with self.db() as c: return [r[0] for r in c.execute("SELECT DISTINCT city FROM companies WHERE city<>'' ORDER BY city COLLATE NOCASE")]
     def detail(self,i):
         with self.db() as c:
+            c.execute('BEGIN')
             r=c.execute('SELECT * FROM companies WHERE id=?',(i,)).fetchone()
-            return dict({k:r[k] for k in ['id','source',*COLS,'oib','email','industry']},sources=[dict(x) for x in c.execute('SELECT provider,url,updated FROM origins WHERE company_id=?',(i,))]) if r else None
+            if not r: return None
+            sources=[dict(x) for x in c.execute('SELECT provider,url,updated FROM origins WHERE company_id=? ORDER BY provider,url',(i,))]
+            alternatives=[dict(x) for x in c.execute('SELECT field,value,provider,observed_at FROM alternate_values WHERE company_id=? ORDER BY field,provider,value',(i,))]
+            return dict({k:r[k] for k in ['id','source',*COLS,'oib','email','industry']},sources=sources,alternate_values=alternatives)
     def export(self,**filters):
         where,args=self.where(**filters); out=io.StringIO(newline=''); w=csv.writer(out); w.writerow(FIELDS+['OIB','Email','Industry','Sources'])
         with self.db() as c:

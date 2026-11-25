@@ -1,14 +1,14 @@
 name: Import approved design references
 on:
   push:
-    branches: [registry-only-desktop]
+    branches: [data-safety-release]
     paths: ['Crawlvora-Design-References-10.zip']
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   import:
-    if: github.ref == 'refs/heads/registry-only-desktop'
+    if: github.ref == 'refs/heads/data-safety-release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -21,4 +21,4 @@ jobs:
           git add branding/references
           git rm Crawlvora-Design-References-10.zip
           git commit -m 'design: import ten approved Crawlvora reference PNGs'
-          git push origin HEAD:registry-only-desktop
+          git push origin HEAD:data-safety-release

@@ -75,3 +75,9 @@ dialog{width:min(700px,calc(100% - 24px));padding:20px;border-color:color-mix(in
 @media(max-width:600px){#detail-body .profile-property{grid-column:1/-1}.profile-tabs .btn{font-size:11px;padding:7px 9px}}
 
 #settings label{margin-top:12px}#settings .actions{margin-top:10px}#registry-client-secret{font-family:inherit}
+
+.alternate-values{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}.alternate-values .history-event{overflow-wrap:anywhere}.alternate-values small{display:block;margin-top:4px}
+
+.recovery-panel label{margin-top:12px}.recovery-panel .actions{flex-wrap:wrap}.recovery-panel select{min-width:0;width:100%;max-width:100%}.recovery-panel #recovery-preview{max-height:180px;overflow:auto;overflow-wrap:anywhere}.recovery-panel #recovery-preview p{margin-top:5px}.recovery-panel #recovery-status{margin-top:8px}
+
+.protected-panel{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}.protected-panel summary{cursor:pointer;font-weight:600;color:var(--text)}.protected-panel summary+ p{margin-top:9px}.protected-panel #protected-orphans{overflow-wrap:anywhere}
