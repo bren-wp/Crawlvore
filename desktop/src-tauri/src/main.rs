@@ -11,19 +11,26 @@ use std::{
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Url};
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
 
-struct Worker(Child);
+#[cfg(all(feature = "portable", not(windows)))]
+compile_error!("The embedded portable worker is built for Windows only.");
+
+struct Worker {
+    child: Child,
+    #[cfg(all(feature = "portable", windows))]
+    _extraction: tempfile::TempDir,
+}
 
 impl Drop for Worker {
     fn drop(&mut self) {
         // EOF on the inherited pipe requests orderly shutdown, including the job queue.
-        drop(self.0.stdin.take());
+        drop(self.child.stdin.take());
         let deadline = Instant::now() + Duration::from_secs(10);
         while Instant::now() < deadline {
-            if matches!(self.0.try_wait(), Ok(Some(_))) { return; }
+            if matches!(self.child.try_wait(), Ok(Some(_))) { return; }
             thread::sleep(Duration::from_millis(100));
         }
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 
@@ -42,6 +49,7 @@ fn ready_url(line: &str) -> Result<Url, io::Error> {
     Ok(url)
 }
 
+#[cfg(not(feature = "portable"))]
 fn worker_path() -> io::Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let dir = exe.parent().ok_or_else(|| invalid("Missing executable directory"))?;
@@ -50,7 +58,20 @@ fn worker_path() -> io::Result<PathBuf> {
 }
 
 fn spawn_worker(data: &Path) -> Result<(Worker, Url), io::Error> {
+    #[cfg(not(feature = "portable"))]
     let binary = worker_path()?;
+    #[cfg(all(feature = "portable", windows))]
+    let (binary, extraction) = {
+        use std::io::Write;
+        // A unique, exclusively created directory: never execute a reused extracted binary.
+        let directory = tempfile::Builder::new().prefix("crawlvora-worker-").tempdir()?;
+        let path = directory.path().join("CrawlvoraWorker.exe");
+        let mut file = std::fs::OpenOptions::new().create_new(true).write(true).open(&path)?;
+        file.write_all(include_bytes!(env!("CRAWLVORA_EMBEDDED_WORKER")))?;
+        file.sync_all()?;
+        drop(file);
+        (path, directory)
+    };
     if !binary.is_file() { return Err(invalid("Crawlvora worker is missing. Reinstall the application.")); }
     std::fs::create_dir_all(data)?;
     let mut command = Command::new(binary);
@@ -61,8 +82,12 @@ fn spawn_worker(data: &Path) -> Result<(Worker, Url), io::Error> {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let mut worker = Worker(command.spawn()?);
-    let stdout = worker.0.stdout.take().ok_or_else(|| invalid("Missing worker pipe"))?;
+    let mut worker = Worker {
+        child: command.spawn()?,
+        #[cfg(all(feature = "portable", windows))]
+        _extraction: extraction,
+    };
+    let stdout = worker.child.stdout.take().ok_or_else(|| invalid("Missing worker pipe"))?;
     let (tx, rx) = mpsc::sync_channel(1);
     thread::spawn(move || {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {

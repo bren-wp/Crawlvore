@@ -1,5 +1,5 @@
 name: Quality and security
-on: [push, pull_request, workflow_dispatch]
+on: [push, pull_request, workflow_dispatch, workflow_call]
 permissions:
   contents: read
 jobs:
@@ -13,7 +13,8 @@ jobs:
       - run: python -m pip install -r requirements.txt pip-audit bandit vulture pillow packaging
       - run: python -m pip check
       - run: python -m unittest discover -s tests -v
-      - run: npm install --ignore-scripts --no-audit
+      - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
+      - run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npm run build:frontend
       - run: node --check static/app.js && node --check static/locale.js
@@ -29,6 +30,7 @@ jobs:
         with:
           name: quality-evidence
           path: |
+            package-lock.json
             source-audit.json
             pixel-diff.json
             branding/*fixture.png

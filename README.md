@@ -33,7 +33,7 @@ Crawlvora is a local-first business data intelligence workspace for collecting a
 
 ## Screenshots
 
-Actual application UI rendered with controlled sample data. The current interface is Croatian.
+Actual application UI rendered with controlled sample data. These reference captures show the existing Croatian interface. English is now the default; new bilingual captures are verified by the visual workflow.
 
 | Business directory | Web bot |
 |---|---|
@@ -61,7 +61,7 @@ Third-party permissions, credentials and availability are required where applica
 
 - **Windows:** Run `START-WINDOWS.bat` with Python installed.
 - **Linux:** Run `bash start-linux.sh`.
-- **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Portable and installer binaries are not advertised as available until verified.
+- **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Native portable, installer and Linux packages are published only after the complete release gates pass.
 
 For registry access, configure your own OAuth2 credentials privately. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
 

@@ -16,3 +16,7 @@ Keep the existing Python extraction, OAuth2 registry synchronization, SQLite sch
 Dependency updates must pass tests and vulnerability checks before release. Pin resolved transitive versions with platform-specific lock files once the CI resolves and validates them. Never include private OAuth credentials in release artifacts.
 
 References: https://tauri.app/release/ ; https://github.com/tauri-apps/tauri/releases ; https://www.typescriptlang.org/download/
+
+## Implemented migration stage
+
+The Rust host now supervises a packaged Python worker on a dynamically assigned authenticated loopback origin. The existing scraper, registry and database remain in the worker. TypeScript provides the English-first locale catalog and a persisted Croatian preference. The Windows native packaging workflow builds a standalone embedded-worker portable executable and an Inno installer; Linux packaging creates a tar archive. New-window requests are denied in the native host pending a reviewed system-browser link handler. Native compile, package verification, full TypeScript UI migration and production parity remain release gates.
