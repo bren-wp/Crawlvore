@@ -384,7 +384,24 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "Nepotvrđeni arhivi (sačuvani)": "Uncataloged archives (preserved)",
   "Izraditi novi zaštićeni katalog?": "Create a new protected catalog?",
   "Katalog je otključan.": "Catalog unlocked.",
-  "Šifrirana kopija je izrađena.": "Encrypted backup created."
+  "Šifrirana kopija je izrađena.": "Encrypted backup created.",
+  "Testiraj vraćanje arhiva": "Test archive restore",
+  "Omogući sigurnu pohranu ključa": "Enable secure key storage",
+  "Pohrana ključa u sustavu omogućuje ponovno otključavanje nakon pokretanja. Pristupnu frazu čuvajte i neovisno.": "OS key storage enables unlocking after restart. Keep an independent copy of the passphrase.",
+  "Odredište neovisne kopije": "Independent backup destination",
+  "Unesite apsolutnu putanju postojeće mape na zasebnom fizičkom disku. Provjerava se drugi datotečni sustav, ne fizički uređaj.": "Enter the absolute path of an existing folder on a separate physical disk. The app checks the filesystem, not the physical device.",
+  "Spremi odredište": "Save destination",
+  "Repliciraj sada": "Replicate now",
+  "Sigurna pohrana ključa": "Secure key storage",
+  "Nije postavljeno": "Not configured",
+  "Omogućeno": "Enabled",
+  "Zahtijeva provjeru": "Requires attention",
+  "Neovisna kopija": "Independent copy",
+  "Čeka kopiranje": "Pending replication",
+  "Pohraniti pristupnu frazu u sigurnu pohranu operacijskog sustava?": "Store the passphrase in the operating system's secure vault?",
+  "Spremiti ovo odredište za automatsku replikaciju?": "Save this destination for automatic replication?",
+  "Test oporavka uspješan": "Recovery test passed",
+  "Zapisa": "Records"
 };
 function translate(value: string): string {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;
