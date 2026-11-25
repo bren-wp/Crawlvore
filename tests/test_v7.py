@@ -5,7 +5,7 @@ from core import Store, Collector
 from registry import Registry
 from automation import Queue
 from snapshot_diff import compare
-from studio import inspect_html
+from detection import inspect_html
 from network import public_addresses, PublicHTTPSConnection, public_session
 from urllib3.exceptions import NewConnectionError
 from test_registry import Fake

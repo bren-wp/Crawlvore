@@ -7,7 +7,7 @@ from core import Store,Collector
 from registry import Registry
 from registry_export import export
 from automation import Queue
-from studio import inspect_html
+from detection import inspect_html
 from test_registry import Fake
 
 class V6(unittest.TestCase):
