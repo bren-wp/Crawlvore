@@ -131,7 +131,7 @@ fn main() {
             let (worker, url, ui_ready) = spawn_worker(&data, primary)?;
             let port = url.port();
             *app.state::<Mutex<Option<Worker>>>().lock().map_err(|_| invalid("Worker state unavailable"))? = Some(worker);
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("Crawlvora")
                 .inner_size(1120.0, 720.0)
                 .min_inner_size(360.0, 300.0)
@@ -153,6 +153,9 @@ fn main() {
                 })
                 .build()?;
             if smoke {
+                if window.is_fullscreen()? || window.is_maximized()? {
+                    return Err(invalid("Desktop must launch in a normal window").into());
+                }
                 let handle = app.handle().clone();
                 thread::spawn(move || {
                     let result = ui_ready.recv_timeout(Duration::from_secs(90));
