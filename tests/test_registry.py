@@ -1,8 +1,9 @@
 import json, os, tempfile, unittest
 from unittest.mock import patch
+from native_vault import VaultUnavailable
 from pathlib import Path
 from core import Store, Collector
-from registry import Registry, catalog, rows_of, normalized_id, credentials, configured
+from registry import Registry, catalog, rows_of, normalized_id, credentials, configured, RegistryAccess
 
 def spec():
     def p(n): return {'in':'query','name':n,'required':False}
@@ -115,3 +116,72 @@ class CredentialSourceTests(unittest.TestCase):
         self.write_pair(self.root,'root-id','root-secret')
         self.write_pair(self.data,'workspace-id','workspace-secret')
         self.assertEqual(credentials(self.root,self.data),('workspace-id','workspace-secret'))
+
+
+class MemoryRegistryVault:
+    def __init__(self):
+        self.record=None
+        self.unavailable=False
+
+    def load(self):
+        if self.unavailable:
+            raise VaultUnavailable('Unavailable')
+        return self.record
+
+    def save(self,value):
+        if self.unavailable:
+            raise VaultUnavailable('Unavailable')
+        self.record=dict(value)
+
+
+class RegistryAccessTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name)
+        self.vault=MemoryRegistryVault()
+        environment=patch.dict(os.environ,{},clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.data={'client_id':'synthetic-id','client_secret':'synthetic-value'}
+
+    def access(self):
+        return RegistryAccess(self.root,self.root,self.vault)
+
+    def test_session_credentials_are_not_persisted(self):
+        self.assertTrue(self.access().apply(self.data)['configured'])
+        self.assertIsNone(self.vault.record)
+        self.assertFalse(self.access().status()['configured'])
+
+    def test_persistent_access_requires_explicit_permission(self):
+        with self.assertRaises(ValueError):
+            self.access().apply(dict(self.data,persist=True))
+        self.assertIsNone(self.vault.record)
+
+    def test_persist_restart_and_remove(self):
+        self.access().apply(dict(self.data,persist=True,permission=True))
+        reopened=self.access()
+        self.assertEqual(reopened.credentials(),('synthetic-id','synthetic-value'))
+        self.assertEqual(reopened.status(),{'configured':True,'authorized':True})
+        reopened.forget()
+        self.assertEqual(self.vault.record,{'authorized':False})
+        self.assertFalse(self.access().status()['configured'])
+
+    def test_unavailable_vault_does_not_save_plaintext_or_apply_session(self):
+        self.vault.unavailable=True
+        access=self.access()
+        with self.assertRaises(ValueError):
+            access.apply(dict(self.data,persist=True,permission=True))
+        self.assertFalse(access.status()['configured'])
+        self.assertFalse((self.root/'sudreg.private.json').exists())
+
+    def test_partial_environment_never_uses_saved_secret(self):
+        self.access().apply(dict(self.data,persist=True,permission=True))
+        with patch.dict(os.environ,{'SUDREG_CLIENT_ID':'external-id'}):
+            self.assertEqual(self.access().credentials(),('external-id',''))
+            self.assertFalse(self.access().status()['authorized'])
+
+    def test_invalid_persistence_type_rejected(self):
+        with self.assertRaises(ValueError):
+            self.access().apply(dict(self.data,persist='true',permission=True))
+        self.assertIsNone(self.vault.record)
