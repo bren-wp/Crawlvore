@@ -16,7 +16,6 @@
 
 Crawlvora is a local-first business data intelligence workspace for collecting authorized web and API data, organizing company records and exporting structured information. From visual extraction to registry synchronization, everything is designed around a single searchable workspace.
 
-![Crawlvora dashboard](branding/en-overview-dark-1440-fixture.png)
 
 ## Features
 
@@ -33,17 +32,11 @@ Crawlvora is a local-first business data intelligence workspace for collecting a
 
 ## Screenshots
 
-Actual application UI rendered with controlled sample data. Screenshots are captured from the running application interface in English, with controlled sample data. Both themes and Croatian are also supported.
+Crawlvora's redesigned desktop workspace includes a business overview, directory, visual extraction studio, registry, scheduler, import/export, analytics and settings.
 
-| Business directory | Web bot |
-|---|---|
-| ![Business directory](branding/en-directory-dark-1440-fixture.png) | ![Web bot](branding/en-collector-dark-1440-fixture.png) |
-| **Scraper Studio** | **Court Registry** |
-| ![Scraper Studio](branding/en-studio-dark-1440-fixture.png) | ![Court Registry](branding/en-registry-dark-1440-fixture.png) |
-| **Tasks & scheduling** | **Data management** |
-| ![Tasks](branding/en-jobs-dark-1440-fixture.png) | ![Data management](branding/en-data-dark-1440-fixture.png) |
-| **Company profile** | **Light theme** |
-| ![Company profile](branding/en-detail-dark-1440-fixture.png) | ![Light theme](branding/en-overview-light-1440-fixture.png) |
+<!-- PRODUCT_SCREENSHOTS_START -->
+New product captures will be added after the redesigned interface passes its rendering checks.
+<!-- PRODUCT_SCREENSHOTS_END -->
 
 ## Data sources
 

@@ -143,6 +143,7 @@ def main():
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
                 if p.path=='/api/projects': return self.send_data(projects.list())
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
+                if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
                 if p.path=='/api/export-json': return self.send_data(store.export_json(**filters),'application/json; charset=utf-8',extra={'Content-Disposition':'attachment; filename="crawlvora_export.json"'})

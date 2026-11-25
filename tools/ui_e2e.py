@@ -78,6 +78,14 @@ def run():
                     result=download.value
                     assert result.suggested_filename.endswith(ext)
                     assert result.path().stat().st_size>0
+                page.locator('[data-view="analytics"]').click()
+                expect(page.locator('#analytics-metrics .metric')).to_have_count(4)
+                page.locator('[data-view="settings"]').click()
+                expect(page.locator('#settings-api')).to_have_text('API not configured')
+                page.locator('#settings-light').click()
+                expect(page.locator('html')).to_have_attribute('data-theme','light')
+                page.locator('#settings-dark').click()
+                expect(page.locator('html')).to_have_attribute('data-theme','dark')
                 page.locator('#theme').click()
                 expect(page.locator('html')).to_have_attribute('data-theme','light')
                 page.locator('#language').click()

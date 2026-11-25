@@ -1,18 +1,37 @@
-"""Compare captured screenshots to a fixed reference directory, no automatic rebasing."""
-import argparse, json
+"""Report against the new approved design reference set, never historical UI screenshots."""
+import argparse
+import json
 from pathlib import Path
 from PIL import Image, ImageChops
 
 def compare(reference,actual):
+    lock=json.loads((reference.parent/'reference-lock.json').read_text(encoding='utf-8'))
     results=[]
-    for path in sorted(reference.glob('*fixture.png')):
-        other=actual/path.name
-        if not other.is_file(): results.append({'file':path.name,'identical':False,'missing':True}); continue
-        with Image.open(path) as aa, Image.open(other) as bb:
-            a,b=aa.convert('RGB'),bb.convert('RGB')
-            if a.size!=b.size: results.append({'file':path.name,'reference':a.size,'actual':b.size,'identical':False}); continue
-            d=ImageChops.difference(a,b); count=sum(p!=(0,0,0) for p in d.getdata()); results.append({'file':path.name,'size':a.size,'changed_pixels':count,'changed_percent':round(100*count/(a.width*a.height),5),'identical':count==0})
-    if not results: raise ValueError('Reference directory contains no fixture screenshots')
+    for entry in sorted(lock['files']):
+        path=reference/Path(entry).name
+        capture=actual/('en-'+path.stem+'-dark-1440-fixture.png')
+        row={'screen':path.stem,'identical':False}
+        if not path.is_file() or not capture.is_file():
+            row.update(missing_reference=not path.is_file(),missing_capture=not capture.is_file())
+        else:
+            with Image.open(path) as aa,Image.open(capture) as bb:
+                a,b=aa.convert('RGB'),bb.convert('RGB')
+                if a.size!=b.size:
+                    row.update(reference_size=a.size,actual_size=b.size,reason='Native chrome, fixture data or canvas dimensions differ; exact pixel comparison is not yet valid.')
+                else:
+                    difference=ImageChops.difference(a,b)
+                    count=sum(pixel!=(0,0,0) for pixel in difference.getdata())
+                    row.update(size=a.size,changed_pixels=count,changed_percent=round(100*count/(a.width*a.height),5),identical=count==0)
+        results.append(row)
     return results
+
 if __name__=='__main__':
-    root=Path(__file__).resolve().parents[1]; p=argparse.ArgumentParser(); p.add_argument('--reference',type=Path,default=root/'verification/v7-reference'); p.add_argument('--actual',type=Path,default=root/'branding'); p.add_argument('--strict',action='store_true'); args=p.parse_args(); rows=compare(args.reference,args.actual); print(json.dumps(rows,indent=2)); raise SystemExit(1 if args.strict and not all(x['identical'] for x in rows) else 0)
+    root=Path(__file__).resolve().parents[1]
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--reference',type=Path,default=root/'branding/references')
+    parser.add_argument('--actual',type=Path,default=root/'branding')
+    parser.add_argument('--strict',action='store_true')
+    args=parser.parse_args()
+    rows=compare(args.reference,args.actual)
+    print(json.dumps(rows,indent=2))
+    raise SystemExit(1 if args.strict and not all(row['identical'] for row in rows) else 0)

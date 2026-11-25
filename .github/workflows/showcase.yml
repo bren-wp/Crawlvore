@@ -28,14 +28,19 @@ jobs:
       - name: Verify English screenshot assets and update README
         run: |
           python - <<'PY'
-          import pathlib,re
+          import pathlib
+          names=['overview','directory','collector','studio','registry','jobs','data','analytics','settings','detail']
+          labels=['Overview','Business Directory','Web Bot','Scraper Studio','Court Registry','Tasks & Schedule','Import & Export','Analytics & Reports','Settings','Company Profile']
+          rows=['| '+labels[i]+' | '+labels[i+1]+' |\n|---|---|\n| !['+labels[i]+'](branding/en-'+names[i]+'-dark-1440-fixture.png) | !['+labels[i+1]+'](branding/en-'+names[i+1]+'-dark-1440-fixture.png) |' for i in range(0,len(names),2)]
+          assert len(list(pathlib.Path('branding').glob('en-*-fixture.png')))==40
+          for name in names:
+              assert pathlib.Path('branding/en-'+name+'-dark-1440-fixture.png').is_file()
           readme=pathlib.Path('README.md')
           text=readme.read_text(encoding='utf-8')
-          text=re.sub(r'branding/(?!en-)([a-z]+-(?:dark|light)-1440-fixture\.png)',r'branding/en-\1',text)
-          text=text.replace('These reference captures show the existing Croatian interface. English is now the default; new bilingual captures are verified by the visual workflow.','Screenshots are captured from the running application interface in English, with controlled sample data. Both themes and Croatian are also supported.')
-          paths=set(re.findall(r'branding/en-[a-z]+-(?:dark|light)-1440-fixture\.png',text))
-          assert len(paths)==9 and all(pathlib.Path(p).is_file() for p in paths),paths
-          assert len(list(pathlib.Path('branding').glob('en-*-fixture.png')))==32
+          start='<!-- PRODUCT_SCREENSHOTS_START -->'
+          end='<!-- PRODUCT_SCREENSHOTS_END -->'
+          body='Actual application interface rendered in English with controlled sample data.\n\n'+'\n\n'.join(rows)
+          text=text.split(start)[0]+start+'\n'+body+'\n'+end+text.split(end)[1]
           readme.write_text(text,encoding='utf-8')
           PY
       - name: Commit verified screenshots to the same pull request

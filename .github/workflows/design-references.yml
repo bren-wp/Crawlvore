@@ -1,0 +1,24 @@
+name: Import approved design references
+on:
+  push:
+    branches: [initialize-crawlvora]
+    paths: ['Crawlvora-Design-References-10.zip']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    if: github.ref == 'refs/heads/initialize-crawlvora'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify and import ten approved reference images
+        run: python tools/import_design_references.py Crawlvora-Design-References-10.zip
+      - name: Commit originals and remove transport archive
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add branding/references
+          git rm Crawlvora-Design-References-10.zip
+          git commit -m 'design: import ten approved Crawlvora reference PNGs'
+          git push origin HEAD:initialize-crawlvora

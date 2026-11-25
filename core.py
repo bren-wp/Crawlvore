@@ -168,6 +168,11 @@ class Store:
             if c.execute("SELECT 1 FROM meta WHERE key='seeded'").fetchone(): return
         with open(path,encoding='utf-8-sig',newline='') as f: self.import_csv(f)
         with self.db() as c: c.execute("INSERT OR IGNORE INTO meta VALUES ('seeded','1')")
+    def analytics(self):
+        # Local observations, not inferred business growth or fabricated register events.
+        with self.db() as c:
+            days=[dict(r) for r in c.execute("SELECT substr(changed_at,1,10) AS day, count(*) AS n FROM company_history WHERE changed_at >= datetime('now','-30 days') GROUP BY day ORDER BY day")]
+        return {'days':days}
     def stats(self):
         with self.db() as c:
             r=c.execute("SELECT count(*) total,count(DISTINCT NULLIF(city,'')) cities,count(NULLIF(phone,'')) phones,count(NULLIF(website,'')) websites FROM companies").fetchone()

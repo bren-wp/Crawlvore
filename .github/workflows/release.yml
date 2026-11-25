@@ -21,6 +21,7 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$(tr -d '\r\n' < VERSION)"
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           git ls-files --error-unmatch package-lock.json desktop/src-tauri/Cargo.lock
+          python tools/import_design_references.py --verify
           python - <<'PY'
           import json, pathlib, tomllib
           version=pathlib.Path('VERSION').read_text().strip()

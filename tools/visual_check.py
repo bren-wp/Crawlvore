@@ -1,7 +1,7 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 import json, os, sys, tempfile
-root=Path(__file__).resolve().parents[1]; out=root/'branding'; out.mkdir(exist_ok=True); views=['overview','directory','collector','studio','registry','jobs','data']; errors=[]; results=[]
+root=Path(__file__).resolve().parents[1]; out=root/'branding'; out.mkdir(exist_ok=True); views=['overview','directory','collector','studio','registry','jobs','data','analytics','settings']; errors=[]; results=[]
 html=(root/'static/index.html').read_text(encoding='utf-8'); css=(root/'static/style.css').read_text(encoding='utf-8'); js=(root/'static/app.js').read_text(encoding='utf-8'); locale_js=(root/'static/locale.js').read_text(encoding='utf-8'); html=html.replace('<link rel="stylesheet" href="/style.css">','').replace('<script defer src="/app.js"></script>','').replace('<script defer src="/locale.js"></script>','').replace('<link rel="icon" href="/logo.svg" type="image/svg+xml">','')
 sys.path.insert(0,str(root))
 from core import Store
@@ -10,6 +10,7 @@ with tempfile.TemporaryDirectory() as tmp:
 fixtures={'/api/stats':stats,'/api/companies':companies,'/api/cities':['Zagreb','Rijeka'],'/api/providers':[],'/api/projects':[],'/api/registry':{'runs':[{'snapshot':'22','complete':1},{'snapshot':'21','complete':1}],'categories':[],'configured':False},'/api/jobs':{'jobs':[],'schedule':{'enabled':0,'hour':3}},'/api/status':{'status':'idle','page':0,'last':0,'processed':0,'added':0,'skipped':0,'errors':0,'logs':[]}}
 fixtures['/api/company/'+str(companies['rows'][0]['id'])]=detail
 fixtures['/api/history/'+str(companies['rows'][0]['id'])]=[]
+fixtures['/api/analytics']={'days':[]}
 fixtures['/api/registry/diff']={'before':'21','after':'22','categories':[{'category':'subjekti','comparable':True,'added':4,'removed':2,'affected_subjects':3}]}
 with sync_playwright() as p:
  b=p.chromium.launch(executable_path=os.getenv('CRAWLVORA_TEST_CHROMIUM') or None,headless=True)
@@ -21,8 +22,8 @@ with sync_playwright() as p:
   page.locator('#preview-rows tr .textbtn').first.wait_for(timeout=10000)
   assert page.locator('#preview-rows tr .textbtn').count()>0
   assert page.locator('html').get_attribute('lang')==lang
-  assert page.locator('#overview h1').inner_text()==('Business overview' if lang=='en' else 'Pregled imenika')
-  assert page.locator('[data-view="directory"]').inner_text().endswith('Business directory' if lang=='en' else 'Poslovni imenik')
+  assert page.locator('#overview h1').inner_text()==('Overview' if lang=='en' else 'Pregled imenika')
+  assert page.locator('[data-view="directory"]').inner_text().endswith('Business Directory' if lang=='en' else 'Poslovni imenik')
   prefix='en-' if lang=='en' else ''
   for theme in ['dark','light']:
    page.evaluate('(t)=>document.documentElement.dataset.theme=t',theme)
@@ -37,6 +38,10 @@ with sync_playwright() as p:
       page.locator('#diff-run').click(); page.wait_for_timeout(100); assert page.locator('#diff-rows tr').count()==1
      if view=='jobs':
       page.locator('#job-rows tr').first.wait_for(timeout=10000)
+     if view=='analytics':
+      page.locator('#analytics-metrics .metric').first.wait_for(timeout=10000)
+     if view=='settings':
+      page.locator('#settings-count').wait_for(timeout=10000)
      assert not page.locator('#toast').is_visible(), page.locator('#toast').text_content()
      result=page.evaluate('({width:innerWidth,scroll:document.documentElement.scrollWidth})'); results.append((lang,theme,width,view,result['scroll'])); assert result['scroll']<=width,(lang,theme,width,view,result)
      page.evaluate('window.scrollTo(0,0)'); page.screenshot(path=str(out/(f'{prefix}{view}-{theme}-{width}-fixture.png')),full_page=True)
