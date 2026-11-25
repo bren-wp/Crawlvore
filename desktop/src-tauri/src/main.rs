@@ -133,8 +133,14 @@ fn main() {
             *app.state::<Mutex<Option<Worker>>>().lock().map_err(|_| invalid("Worker state unavailable"))? = Some(worker);
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("Crawlvora")
-                .inner_size(1440.0, 900.0)
-                .min_inner_size(900.0, 620.0)
+                .inner_size(1120.0, 720.0)
+                .min_inner_size(360.0, 300.0)
+                .resizable(true)
+                .maximized(false)
+                .fullscreen(false)
+                .decorations(true)
+                .prevent_overflow_with_margin(tauri::LogicalSize::new(96.0, 96.0))
+                .center()
                 .on_navigation(move |url| url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.port() == port)
                 .on_new_window(move |url, _| {
                     if !smoke && allowed_external_url(&url) {
