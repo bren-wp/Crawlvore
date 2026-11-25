@@ -14,6 +14,7 @@ interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
 interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
 interface InterfaceElements {
+  "protected-manifest":HTMLButtonElement;
   "protected-restore-test":HTMLButtonElement;
   "vault-status":HTMLElement;
   "vault-enroll":HTMLButtonElement;
@@ -410,6 +411,7 @@ function syncProtected(){
     $('protected-verify').disabled=recoveryBusy||!unlocked;
     $('protected-download').disabled=recoveryBusy||!unlocked||selected?.status!=='ok';
     $('protected-restore').disabled=$('protected-download').disabled;
+    $('protected-manifest').disabled=$('protected-download').disabled;
     $('protected-restore-test').disabled=$('protected-download').disabled;
     $('vault-enroll').disabled=recoveryBusy||!unlocked||protectedState.vault==='enabled';
     $('replica-configure').disabled=recoveryBusy||!unlocked||protectedState.vault!=='enabled';
@@ -469,3 +471,5 @@ $('protected-restore-test').onclick=()=>recoveryAction(async()=>{
     const r=await post<{verified:boolean;records:number}>('/api/recovery/protected-restore-test',{id:$('protected-archive').value});
     $('recovery-status').textContent=translate('Test oporavka uspješan')+' · '+translate('Zapisa')+': '+n(r.records);
 });
+
+$('protected-manifest').onclick=()=>{const a=document.createElement('a'),id=$('protected-archive').value;a.href='/api/recovery/protected-manifest?'+new URLSearchParams({id});a.download=id+'.manifest.json';document.body.append(a);a.click();a.remove()};

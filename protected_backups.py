@@ -362,6 +362,7 @@ class ProtectedBackups:
 
     def replicate(self):
         from backup_replica import destination_for, copy_verified, catalog_snapshot
+        from portable_recovery import manifest_bytes
         with self.lock:
             if self.key is None or self.anchor is None or not self.anchor.get('replica'):
                 raise ValueError('Configure a separate backup volume first.')
@@ -376,13 +377,16 @@ class ProtectedBackups:
                     c.execute('BEGIN')
                     rows,head=self.validated_rows(c)
                     self.verify_anchor(rows,head)
+                    salt=c.execute('SELECT salt FROM catalog_meta WHERE id=1').fetchone()[0]
                 for item in rows:
-                    source=self.verified_archive(item['archive'])
+                    source=self.archive_path(item['archive'])
+                    if source.stat().st_size!=item['bytes']: raise ValueError('Protected archive length mismatch.')
+                    if not hmac.compare_digest(digest(source),item['sha256']): raise ValueError('Protected archive integrity check failed.')
                     copy_verified(source,folder/item['archive'],item['sha256'])
                 catalog_snapshot(self.catalog,folder/('catalog-'+head+'.sqlite3'))
                 # Manifest names include the authenticated head so older checkpoints survive.
                 for item in rows:
-                    raw=self.portable_manifest(item['archive'])
+                    raw=manifest_bytes(self.key,salt,item,len(rows),head)
                     with tempfile.TemporaryDirectory(dir=self.root) as tmp:
                         source=Path(tmp)/'manifest.json'
                         source.write_bytes(raw)

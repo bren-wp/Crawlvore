@@ -130,6 +130,13 @@ def run():
                     page.locator('#protected-download').click()
                 with protected_download.value.path().open('rb') as stream:
                     assert stream.read(9)==b'CVBACKUP1'
+                with page.expect_download(timeout=60000) as manifest:
+                    page.locator('#protected-manifest').click()
+                payload=json.loads(manifest.value.path().read_text())
+                assert payload['manifest']['archive']==protected_download.value.suggested_filename
+                assert len(payload['signature'])==64
+                page.locator('#protected-restore-test').click()
+                expect(page.locator('#recovery-status')).to_contain_text('Recovery test passed',timeout=60000)
                 old_count=page.locator('#recovery-space option').count()
                 page.once('dialog',lambda dialog:dialog.accept())
                 page.locator('#protected-restore').click()

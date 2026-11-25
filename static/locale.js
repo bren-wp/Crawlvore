@@ -385,6 +385,7 @@ const UI_MESSAGES = {
   "Izraditi novi zaštićeni katalog?": "Create a new protected catalog?",
   "Katalog je otključan.": "Catalog unlocked.",
   "Šifrirana kopija je izrađena.": "Encrypted backup created.",
+  "Preuzmi recovery manifest": "Download recovery manifest",
   "Testiraj vraćanje arhiva": "Test archive restore",
   "Omogući sigurnu pohranu ključa": "Enable secure key storage",
   "Pohrana ključa u sustavu omogućuje ponovno otključavanje nakon pokretanja. Pristupnu frazu čuvajte i neovisno.": "OS key storage enables unlocking after restart. Keep an independent copy of the passphrase.",

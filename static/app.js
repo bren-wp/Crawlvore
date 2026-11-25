@@ -247,6 +247,7 @@ function syncProtected(){
     $('protected-verify').disabled=recoveryBusy||!unlocked;
     $('protected-download').disabled=recoveryBusy||!unlocked||selected?.status!=='ok';
     $('protected-restore').disabled=$('protected-download').disabled;
+    $('protected-manifest').disabled=$('protected-download').disabled;
     $('protected-restore-test').disabled=$('protected-download').disabled;
     $('vault-enroll').disabled=recoveryBusy||!unlocked||protectedState.vault==='enabled';
     $('replica-configure').disabled=recoveryBusy||!unlocked||protectedState.vault!=='enabled';
@@ -306,3 +307,5 @@ $('protected-restore-test').onclick=()=>recoveryAction(async()=>{
     const r=await post('/api/recovery/protected-restore-test',{id:$('protected-archive').value});
     $('recovery-status').textContent=translate('Test oporavka uspješan')+' · '+translate('Zapisa')+': '+n(r.records);
 });
+
+$('protected-manifest').onclick=()=>{const a=document.createElement('a'),id=$('protected-archive').value;a.href='/api/recovery/protected-manifest?'+new URLSearchParams({id});a.download=id+'.manifest.json';document.body.append(a);a.click();a.remove()};

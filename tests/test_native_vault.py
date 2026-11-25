@@ -113,3 +113,13 @@ class NativeVaultTests(unittest.TestCase):
                 self.assertEqual(reopened.snapshot()['archives'][-1]['archive'],name)
                 self.assertTrue(reopened.verify_restore(name)['verified'])
             finally: reopened.close()
+
+    @unittest.skipUnless(sys.platform.startswith('linux') and os.environ.get('CRAWLVORA_SECRET_SERVICE_TEST')=='1','Real Linux Secret Service session required')
+    def test_real_secret_service_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault=NativeVault(Path(tmp)/'workspace')
+            record={'password':'synthetic Secret Service passphrase','committed':{'count':0,'head':'0'*64},'pending':None}
+            vault.save(record)
+            self.assertEqual(vault.load()['password'],record['password'])
+            other=NativeVault(Path(tmp)/'other-workspace')
+            self.assertIsNone(other.load())

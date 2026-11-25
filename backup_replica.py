@@ -13,6 +13,8 @@ def destination_for(source,directory):
     if not target.is_absolute() or target.is_symlink() or not target.is_dir(): raise ValueError('Select an existing separate backup volume.')
     target=target.resolve(strict=True)
     if target.stat().st_dev==Path(source).stat().st_dev: raise ValueError('Backup destination must be on a different filesystem.')
+    a,b=linux_disk(source),linux_disk(target)
+    if a is not None and a==b: raise ValueError('Backup destination is on the same physical block device.')
     return target
 
 def file_digest(path):
@@ -62,3 +64,16 @@ def catalog_snapshot(source,target):
         publish(pending,target)
     finally:
         if pending.exists(): pending.unlink()
+
+def linux_disk(path):
+    """Resolve direct Linux block devices/partitions only; complex storage is unknown."""
+    import sys
+    if not sys.platform.startswith('linux'): return None
+    device=Path(path).stat().st_dev
+    try:
+        node=(Path('/sys/dev/block')/f'{os.major(device)}:{os.minor(device)}').resolve(strict=True)
+        if (node/'partition').is_file(): node=node.parent
+        if 'virtual' in node.parts or (node/'slaves').is_dir() and any((node/'slaves').iterdir()): return None
+        if not (node/'device').exists(): return None
+        return str(node)
+    except OSError: return None
