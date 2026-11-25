@@ -29,7 +29,6 @@ class Projects:
         with self.store.db() as c: c.execute('DELETE FROM projects WHERE id=?',(int(i),))
         return {'ok':True}
 
-from detection import inspect_html  # public Studio entry point
 
 def excel(store,**filters):
     from openpyxl import Workbook

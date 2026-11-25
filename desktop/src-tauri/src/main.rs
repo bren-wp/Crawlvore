@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Url};
-use tauri::webview::{NewWindowResponse, PageLoadEvent};
+use tauri::webview::NewWindowResponse;
 
 #[cfg(all(feature = "portable", not(windows)))]
 compile_error!("The embedded portable worker is built for Windows only.");
@@ -57,7 +57,7 @@ fn worker_path() -> io::Result<PathBuf> {
     Ok(dir.join("worker").join(name))
 }
 
-fn spawn_worker(data: &Path) -> Result<(Worker, Url), io::Error> {
+fn spawn_worker(data: &Path) -> Result<(Worker, Url, mpsc::Receiver<String>), io::Error> {
     #[cfg(not(feature = "portable"))]
     let binary = worker_path()?;
     #[cfg(all(feature = "portable", windows))]
@@ -88,17 +88,17 @@ fn spawn_worker(data: &Path) -> Result<(Worker, Url), io::Error> {
         _extraction: extraction,
     };
     let stdout = worker.child.stdout.take().ok_or_else(|| invalid("Missing worker pipe"))?;
-    let (tx, rx) = mpsc::sync_channel(1);
+    let (tx, rx) = mpsc::sync_channel(2);
     thread::spawn(move || {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-            if line.starts_with("CRAWLVORA_READY ") {
+            if line.starts_with("CRAWLVORA_READY ") || line == "CRAWLVORA_UI_READY" {
                 let _ = tx.try_send(line);
             }
         }
     });
     let line = rx.recv_timeout(Duration::from_secs(120)).map_err(|_| invalid("Worker startup timed out"))?;
     let url = ready_url(&line)?;
-    Ok((worker, url))
+    Ok((worker, url, rx))
 }
 
 // Only ordinary public-domain HTTP(S) links may leave the local webview.
@@ -126,7 +126,7 @@ fn main() {
             } else {
                 app.path().local_data_dir()?.join("Crawlvora")
             };
-            let (worker, url) = spawn_worker(&data)?;
+            let (worker, url, ui_ready) = spawn_worker(&data)?;
             let port = url.port();
             *app.state::<Mutex<Option<Worker>>>().lock().map_err(|_| invalid("Worker state unavailable"))? = Some(worker);
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
@@ -143,12 +143,15 @@ fn main() {
                     }
                     NewWindowResponse::Deny
                 })
-                .on_page_load(move |window, payload| {
-                    if smoke && payload.event() == PageLoadEvent::Finished && payload.url().path() == "/" {
-                        window.app_handle().exit(0);
-                    }
-                })
                 .build()?;
+            if smoke {
+                let handle = app.handle().clone();
+                thread::spawn(move || {
+                    let result = ui_ready.recv_timeout(Duration::from_secs(90));
+                    let ok = matches!(result.as_deref(), Ok("CRAWLVORA_UI_READY"));
+                    handle.exit(if ok { 0 } else { 1 });
+                });
+            }
             Ok(())
         })
         .build(tauri::generate_context!());

@@ -3,7 +3,8 @@ from pathlib import Path
 from unittest.mock import patch
 from openpyxl import load_workbook
 from core import Store, Collector
-from studio import Projects,inspect_html,excel
+from studio import Projects,excel
+from detection import inspect_html
 from sources import run_external
 HTML='<main><article class="company"><h2>Alpha</h2><span class="city">Rijeka</span></article><article class="company"><h2>Beta</h2><span class="city">Zagreb</span></article></main>'
 class StudioTests(unittest.TestCase):

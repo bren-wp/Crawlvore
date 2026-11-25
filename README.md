@@ -4,7 +4,7 @@
 
 # Crawlvora
 
-**Discover business data. Automate collection. Turn information into insight.**
+**Discover Croatian business data. Keep your registry in sync.**
 
 [![Windows](https://img.shields.io/badge/Windows-Desktop-52D6B0?style=flat-square&logo=windows&logoColor=white)](https://github.com/bren-wp/Crawlvore/releases)
 [![Linux](https://img.shields.io/badge/Linux-Supported-111B2A?style=flat-square&logo=linux&logoColor=white)](#get-started)
@@ -14,25 +14,23 @@
 
 </div>
 
-Crawlvora is a local-first business data intelligence workspace for collecting authorized web and API data, organizing company records and exporting structured information. From visual extraction to registry synchronization, everything is designed around a single searchable workspace.
+Crawlvora is a local-first business data intelligence workspace for the Croatian Court Registry. Synchronize official public records, enrich your existing directory with authorized data and export structured information.
 
 
 ## Features
 
 | | |
 |---|---|
-| 🔎 **Intelligent discovery** | Recognize repeating HTML structures and suggest business fields, then confirm the extracted sample. |
-| 🌐 **Web automation** | Collect authorized static pages with HTTP or render JavaScript pages with Playwright. |
 | 🏢 **Business directory** | Search, filter and organize company records, with source provenance and locally observed changes. |
 | 🏛️ **Court Registry** | Connect to the Croatian public registry API, synchronize consistent snapshots and compare completed snapshots. |
-| 🗓️ **Tasks and scheduling** | Save projects, queue collection jobs and schedule weekday registry updates while the application runs. |
+| 🗓️ **Tasks and scheduling** | Queue registry synchronization jobs and schedule weekday registry updates while the application runs. |
 | 📊 **Flexible exports** | Export directory data to CSV, JSON or Excel; registry categories also support XML, JSONL and SQLite SQL. |
 | 🔒 **Local-first workspace** | Keep your database on your device. Access restrictions are respected and credentials stay outside public distribution. |
 | 🎨 **A unified workspace** | Obsidian and mint visual identity, light and dark themes, responsive layouts. |
 
 ## Screenshots
 
-Crawlvora's redesigned desktop workspace includes a business overview, directory, visual extraction studio, registry, scheduler, import/export, analytics and settings.
+Crawlvora's redesigned desktop workspace includes a business overview, directory, registry, scheduler, import/export, analytics and settings.
 
 <!-- PRODUCT_SCREENSHOTS_START -->
 Actual application interface rendered in English with controlled sample data.
@@ -40,10 +38,6 @@ Actual application interface rendered in English with controlled sample data.
 | Overview | Business Directory |
 |---|---|
 | ![Overview](branding/en-overview-dark-1440-fixture.png) | ![Business Directory](branding/en-directory-dark-1440-fixture.png) |
-
-| Web Bot | Scraper Studio |
-|---|---|
-| ![Web Bot](branding/en-collector-dark-1440-fixture.png) | ![Scraper Studio](branding/en-studio-dark-1440-fixture.png) |
 
 | Court Registry | Tasks & Schedule |
 |---|---|
@@ -62,21 +56,19 @@ Actual application interface rendered in English with controlled sample data.
 
 | Source | Connection |
 |---|---|
-| Tvrtke.hr | Dedicated permission-aware web adapter |
 | Croatian Court Registry | Public OAuth2 REST API |
-| CompanyWall.hr / Company.hr | Configurable authorized API connections |
-| Other permitted websites | HTML extraction or Playwright |
 | Existing datasets | CSV and JSON import |
 
 Third-party permissions, credentials and availability are required where applicable. No paid API access is included.
 
 ## Get started
 
-- **Windows:** Run `START-WINDOWS.bat` with Python installed.
-- **Linux:** Run `bash start-linux.sh`.
+- **Windows 10/11 x64:** Open `Portable.exe` directly (Microsoft WebView2 Runtime required), or run `Setup.exe` to install Crawlvora and provision WebView2 if missing.
+- **Linux x86_64 (Ubuntu 24.04 baseline):** Install the `.deb` package using your package manager, then open Crawlvora from the application menu. Alternatively extract the tar archive and launch `Crawlvora` with the system runtime dependencies installed.
+- No separate Python, development tools, Chromium download or local-server launch is needed for the native distributions.
 - **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Native portable, installer and Linux packages are published only after the complete release gates pass.
 
-For registry access, configure your own OAuth2 credentials privately. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
+The official registry API is integrated in both desktop builds. Configure OAuth2 credentials privately in Settings for the current session or use the private local configuration for unattended refresh. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
 
 ---
 

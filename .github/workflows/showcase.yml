@@ -1,7 +1,7 @@
 name: English product screenshots
 on:
   push:
-    branches: [initialize-crawlvora]
+    branches: [registry-only-desktop]
     paths: ['.github/workflows/showcase.yml', 'static/**', 'frontend/**', 'tools/visual_check.py']
   workflow_dispatch:
 permissions:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   capture:
-    if: github.ref == 'refs/heads/initialize-crawlvora'
+    if: github.ref == 'refs/heads/registry-only-desktop'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -29,10 +29,10 @@ jobs:
         run: |
           python - <<'PY'
           import pathlib
-          names=['overview','directory','collector','studio','registry','jobs','data','analytics','settings','detail']
-          labels=['Overview','Business Directory','Web Bot','Scraper Studio','Court Registry','Tasks & Schedule','Import & Export','Analytics & Reports','Settings','Company Profile']
+          names=['overview','directory','registry','jobs','data','analytics','settings','detail']
+          labels=['Overview','Business Directory','Court Registry','Tasks & Schedule','Import & Export','Analytics & Reports','Settings','Company Profile']
           rows=['| '+labels[i]+' | '+labels[i+1]+' |\n|---|---|\n| !['+labels[i]+'](branding/en-'+names[i]+'-dark-1440-fixture.png) | !['+labels[i+1]+'](branding/en-'+names[i+1]+'-dark-1440-fixture.png) |' for i in range(0,len(names),2)]
-          assert len(list(pathlib.Path('branding').glob('en-*-fixture.png')))==40
+          assert len(list(pathlib.Path('branding').glob('en-*-fixture.png')))==32
           for name in names:
               assert pathlib.Path('branding/en-'+name+'-dark-1440-fixture.png').is_file()
           readme=pathlib.Path('README.md')
@@ -47,12 +47,12 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin initialize-crawlvora
+          git fetch origin registry-only-desktop
           test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
           git add README.md branding/en-*-fixture.png
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'docs: showcase verified English application screenshots'
-          git push origin HEAD:initialize-crawlvora
+          git push origin HEAD:registry-only-desktop
       - uses: actions/upload-artifact@v7
         if: always()
         with:

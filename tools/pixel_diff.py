@@ -9,6 +9,7 @@ def compare(reference,actual):
     results=[]
     for entry in sorted(lock['files']):
         path=reference/Path(entry).name
+        if path.stem in ('collector','studio'): continue  # retired by registry-only product scope
         capture=actual/('en-'+path.stem+'-dark-1440-fixture.png')
         row={'screen':path.stem,'identical':False}
         if not path.is_file() or not capture.is_file():

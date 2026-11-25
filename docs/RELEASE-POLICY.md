@@ -1,17 +1,18 @@
 # Production release policy
 
-Every production GitHub Release must contain all five assets:
+Every production GitHub Release must contain all six assets:
 
-- Portable.exe: standalone Windows Tauri executable with an embedded scraper worker.
+- Portable.exe: standalone Windows Tauri executable with an embedded registry worker.
 - Setup.exe: Windows installer with a native Tauri host and packaged worker.
-- Crawlvora-Linux-x86_64.tar.gz: tested native Linux distribution (Ubuntu 24.04 baseline; system WebKitGTK and Chromium runtime libraries are required).
+- Crawlvora-Linux-x86_64.tar.gz: tested native Linux distribution (Ubuntu 24.04 baseline; system WebKitGTK runtime libraries are required).
+- Crawlvora-Linux-amd64.deb: installable desktop package with system dependencies and application-menu entry.
 - Crawlvora-source.zip: source from the exact release tag.
-- SHA256SUMS.txt: SHA-256 checksums for the other four assets.
+- SHA256SUMS.txt: SHA-256 checksums for the other five assets.
 
-The production workflow requires an immutable version tag on main, matching version metadata, committed npm and Cargo locks, a successful quality/security workflow, native builds and smoke tests on Windows and Linux, and a completed four-hour endurance test. It refuses to publish an incomplete asset set. The legacy Windows workflow remains available during migration but does not publish releases.
+The production workflow requires an immutable version tag on main, matching version metadata, committed npm and Cargo locks, a successful quality/security workflow, native builds and smoke tests on Windows and Linux, and a completed four-hour endurance test. It refuses to publish an incomplete asset set. The native workflow is the only active desktop packaging pipeline; legacy scripts are retained for historical development only.
 
-Before tagging, review the visual differences against the accepted brand reference, complete the live authorized registry/website integration checks, verify upgrade compatibility with the existing database, and review the Python, npm and Rust audit evidence. Credentials are local configuration, never a release asset. Signing certificates and notarization have not been configured; unsigned packages may trigger OS warnings.
+Before tagging, review the visual differences against the accepted brand reference, complete the live authorized registry integration checks, verify upgrade compatibility with the existing database, and review the Python, npm and Rust audit evidence. Credentials are local configuration, never a release asset. Signing certificates and notarization have not been configured; unsigned packages may trigger OS warnings.
 
 The first native release is not approved until all gates have actually passed and the visual and functional parity review is complete.
 
-The production API smoke test is available in `tools/live_registry_check.py` and the manually dispatched `live-api.yml` workflow. Configure the OAuth2 secrets privately in the `production-api` environment, approve the run, and verify its result before tagging. The smoke test reads only one company row, does not log record contents or credentials, and is not a complete production mirror test. CompanyWall requires its own separately authorized connection and mapping.
+The production API smoke test is available in `tools/live_registry_check.py` and the manually dispatched `live-api.yml` workflow. Configure the OAuth2 secrets privately in the `production-api` environment, approve the run, and verify its result before tagging. The smoke test reads only one company row, does not log record contents or credentials, and is not a complete production mirror test.
