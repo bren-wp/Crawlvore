@@ -51,3 +51,25 @@ dialog{width:min(700px,calc(100% - 24px));padding:20px;border-color:color-mix(in
 @media(max-width:1100px){.sidebar{width:205px}main{margin-left:205px}.view{padding:14px 20px 0}.topbar{padding:0 20px}.studio-layout{grid-template-columns:1fr 1fr}.studio-fields{grid-column:1/-1}.studio-fields .mapping-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-grid{grid-template-columns:1fr 1fr}.filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:760px){.sidebar{position:static;width:100%;padding:12px}.sidebar nav{display:flex;flex-wrap:wrap}.sidebar>.nav{width:auto;display:inline-flex}.brand{padding:0 0 8px;font-size:19px}.nav{width:auto;padding:7px;font-size:12px}.sidebottom{display:flex;flex-wrap:wrap;gap:4px}.secondary-nav{display:flex;flex-wrap:wrap;margin:0;padding:0;border:0}.local{display:none}main{margin-left:0}.view{padding:14px 12px 0}.topbar{padding:0 12px}.heading{min-height:auto}.heading h1{font-size:27px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-grid,.studio-layout,.analytics-grid{grid-template-columns:1fr}.studio-fields{grid-column:auto}.studio-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.studio-fields .mapping-grid{grid-template-columns:1fr}.settings-panel{align-items:flex-start;flex-direction:column}.panel{padding:13px}.table-wrap{margin:0 -13px}.result-bar{flex-wrap:wrap}.btn{white-space:normal}.project-strip{grid-template-columns:1fr 1fr}}
 @media(max-width:540px){.filters,.project-strip{grid-template-columns:1fr!important}.metrics{gap:8px}.metric{padding:11px}.metric strong{font-size:26px}.studio-elements{grid-template-columns:1fr}.topbar .status{display:none}}
+
+/* Reference refinement following inspection of the first rendered redesign. */
+.nav{font-weight:500}.nav.active{font-weight:650}.brand{letter-spacing:-.8px}
+.view::after{content:"";position:absolute;z-index:-1;top:0;right:0;width:57%;height:110px;pointer-events:none;background:linear-gradient(161deg,transparent 0 45%,color-mix(in srgb,var(--accent) 55%,transparent) 46%,color-mix(in srgb,var(--accent) 14%,transparent) 49%,transparent 64%);clip-path:polygon(0 100%,45% 42%,70% 0,100% 0,100% 100%)}
+.heading p{line-height:1.4}.chart-item .chart-label{line-height:1.25}
+#overview .chart{gap:5px}#overview .chart-label{margin-bottom:3px}#overview .overview-grid>.panel{min-height:0}
+#overview .preview td{height:39px;padding-top:5px;padding-bottom:5px}
+#overview .preview td strong{font-size:11px;line-height:1.2}#overview .preview td small{font-size:10px;line-height:1.1}
+#overview .preview .panel-head{margin-bottom:9px}
+#overview .metric-icon{float:none;display:flex;align-items:center;justify-content:center;width:22px;height:22px}
+#overview .metric{display:grid;grid-template-columns:22px 1fr;column-gap:8px;align-content:center;align-items:center}
+#overview .metric strong{grid-column:1/-1;margin:7px 0 0}#overview .metric p{margin:0}
+#overview .coverage-item{margin:12px 0}#overview .coverage .hint{margin-bottom:0}
+.profile-tabs{display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:10px 0}
+.profile-tabs [aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+#detail-body .profile-property{grid-column:auto}
+#detail-body .profile-sources,#detail-body .history-block{grid-column:1/-1;padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);margin-top:10px}
+#detail-body .profile-sources h3,#detail-body .history-block h3{font-size:15px;margin:0 0 8px}
+#detail[data-profile-tab="history"] .profile-property,#detail[data-profile-tab="history"] .profile-sources,#detail[data-profile-tab="sources"] .profile-property,#detail[data-profile-tab="sources"] .history-block{display:none}
+#detail[data-profile-tab="sources"] .profile-sources,#detail[data-profile-tab="history"] .history-block{margin-bottom:8px}
+@media(min-width:1101px){#overview .overview-grid .chart .track{height:7px}#overview .preview{margin-bottom:0}#overview .overview-grid{margin-bottom:12px}#overview .preview .table-wrap{max-height:300px}#overview .preview th{padding-top:7px;padding-bottom:7px}#overview .preview td:first-child{padding-left:17px}#overview .metrics .metric{min-height:89px}#studio .studio-layout .panel{max-height:540px;overflow:auto}#studio .studio-layout .studio-fields .mapping-grid{max-height:325px}}
+@media(max-width:600px){#detail-body .profile-property{grid-column:1/-1}.profile-tabs .btn{font-size:11px;padding:7px 9px}}

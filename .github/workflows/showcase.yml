@@ -2,7 +2,7 @@ name: English product screenshots
 on:
   push:
     branches: [initialize-crawlvora]
-    paths: ['.github/workflows/showcase.yml']
+    paths: ['.github/workflows/showcase.yml', 'static/**', 'frontend/**', 'tools/visual_check.py']
   workflow_dispatch:
 permissions:
   contents: write

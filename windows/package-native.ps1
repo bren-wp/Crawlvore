@@ -19,16 +19,19 @@ function Test-NativeWindow($exe) {
     if (!$p.WaitForExit(240000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Native smoke timed out' }
     if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
 }
-$smoke = Join-Path $env:TEMP ('crawlvora-native-installer-' + [guid]::NewGuid().ToString())
+$base = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
+$smoke = Join-Path $base ('cv-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+$log = Join-Path (Resolve-Path release-assets).Path 'native-install.log'
 New-Item -ItemType Directory -Path $smoke | Out-Null
 try {
     # No adjacent worker: tests the actual standalone embedded executable.
     Test-NativeWindow (Resolve-Path release-assets/Portable.exe).Path
     $install = Join-Path $smoke 'installed'
-    $p = Start-Process -FilePath (Resolve-Path release-assets/Setup.exe).Path -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $install + '"')) -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw 'Native installer failed' }
+    $p = Start-Process -FilePath (Resolve-Path release-assets/Setup.exe).Path -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $install + '"'),('/LOG="' + $log + '"')) -Wait -PassThru
+    if ($p.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log -Tail 100 }; throw "Native installer failed (exit $($p.ExitCode))" }
     Test-NativeWindow (Join-Path $install 'Crawlvora.exe')
     $p = Start-Process -FilePath (Join-Path $install 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
     if ($p.ExitCode -ne 0) { throw 'Native uninstall failed' }
 } finally { Remove-Item $smoke -Recurse -Force -ErrorAction SilentlyContinue }
+if (Test-Path $log) { Remove-Item $log -Force }
 Get-FileHash release-assets/Portable.exe,release-assets/Setup.exe -Algorithm SHA256

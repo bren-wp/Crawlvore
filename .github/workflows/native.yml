@@ -92,6 +92,12 @@ jobs:
           cargo +stable install cargo-audit --locked
           cargo audit
       - uses: actions/upload-artifact@v7
+        if: failure() && runner.os == 'Windows'
+        with:
+          name: Windows-installer-diagnostics
+          path: release-assets/native-install.log
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
         with:
           name: Crawlvora-native-${{ runner.os }}
           path: release-assets/
