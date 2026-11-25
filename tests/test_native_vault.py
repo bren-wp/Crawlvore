@@ -123,3 +123,35 @@ class NativeVaultTests(unittest.TestCase):
             self.assertEqual(vault.load()['password'],record['password'])
             other=NativeVault(Path(tmp)/'other-workspace')
             self.assertIsNone(other.load())
+
+
+    def test_registry_namespace_preserves_existing_backup_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace=Path(tmp)/'workspace'
+            backup=NativeVault(workspace)
+            registry=NativeVault(workspace,purpose='registry')
+            legacy=hashlib.sha256(os.fsencode(os.path.normcase(str(workspace.resolve())))).hexdigest()
+            self.assertEqual(backup.identity,legacy)
+            self.assertNotEqual(backup.identity,registry.identity)
+
+    def registry_vault_roundtrip(self,workspace):
+        backup=NativeVault(workspace)
+        registry=NativeVault(workspace,purpose='registry')
+        backup.save({'password':'synthetic backup value'})
+        registry.save({'client_id':'synthetic-id','client_secret':'synthetic-value','authorized':True})
+        reopened=NativeVault(workspace,purpose='registry')
+        self.assertEqual(reopened.load()['client_secret'],'synthetic-value')
+        self.assertEqual(backup.load()['password'],'synthetic backup value')
+        reopened.save({'authorized':False})
+        self.assertNotIn('client_secret',registry.load())
+        self.assertEqual(backup.load()['password'],'synthetic backup value')
+
+    @unittest.skipUnless(sys.platform=='win32','Windows DPAPI integration')
+    def test_real_dpapi_registry_namespace(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ,{'LOCALAPPDATA':tmp}):
+            self.registry_vault_roundtrip(Path(tmp)/'workspace')
+
+    @unittest.skipUnless(sys.platform.startswith('linux') and os.environ.get('CRAWLVORA_SECRET_SERVICE_TEST')=='1','Real Linux Secret Service session required')
+    def test_real_secret_service_registry_namespace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.registry_vault_roundtrip(Path(tmp)/'workspace')
