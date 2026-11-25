@@ -4,7 +4,7 @@ The sole online collection source is the Croatian Court Registry public v3 API. 
 
 ## Connection
 
-In Settings, enter Client ID and Client Secret and apply them for the running session. Use Court Registry → Test connection, then authorize synchronization. For persistence across restarts, use the existing private `sudreg.private.json` in the user's application data directory (or the two SUDREG environment variables). Never commit credentials to GitHub. The desktop packages integrate the API client, not a shared secret. The scheduled refresh requires valid credentials and a running app.
+In Settings, enter Client ID and Client Secret and apply them for the running session. Use Court Registry → Test connection, then authorize synchronization. For persistence across restarts, use the existing private `sudreg.private.json` in the user's application data directory (or set both `SUDREG_CLIENT_ID` and `SUDREG_CLIENT_SECRET` environment variables together). If either environment variable is explicitly set, the application uses the environment pair only; missing or empty values are not filled from a configuration file. The arbitrary working directory is no longer searched for credentials. Move any existing working-directory-only configuration to the private application data directory. Never commit credentials to GitHub. The desktop packages integrate the API client, not a shared secret. The scheduled refresh requires valid credentials and a running app.
 
 ## Existing data
 
