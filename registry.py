@@ -12,15 +12,25 @@ SPEC_URL=BASE+'/dokumentacija/open_api'
 NAME=re.compile(r'^[a-z][a-z0-9_]*$')
 
 def credentials(root, data_dir):
-    for p in (Path(data_dir)/'sudreg.private.json', Path(root)/'sudreg.private.json', Path(sys.executable).parent/'sudreg.private.json' if getattr(sys,'frozen',False) else Path(root)/'sudreg.private.json', Path.cwd()/'sudreg.private.json'):
-        if p.is_file():
-            try:
-                d=json.loads(p.read_text(encoding='utf-8-sig'))
-                if not isinstance(d,dict): raise ValueError()
-            except (OSError,ValueError): raise ValueError('Privatna konfiguracija nije valjana.') from None
-            break
-    else: d={}
-    return tuple(v.strip() if isinstance(v,str) else '' for v in (os.getenv('SUDREG_CLIENT_ID',d.get('client_id','')),os.getenv('SUDREG_CLIENT_SECRET',d.get('client_secret',''))))
+    # Treat each credential source as an indivisible pair. An explicitly supplied
+    # environment configuration must never silently borrow a secret from a file.
+    keys=('SUDREG_CLIENT_ID','SUDREG_CLIENT_SECRET')
+    if any(k in os.environ for k in keys):
+        return tuple(os.environ.get(k,'').strip() for k in keys)
+    paths=[Path(data_dir)/'sudreg.private.json', Path(root)/'sudreg.private.json']
+    if getattr(sys,'frozen',False):
+        paths.append(Path(sys.executable).parent/'sudreg.private.json')
+    for p in dict.fromkeys(paths):
+        if not p.is_file():
+            continue
+        try:
+            d=json.loads(p.read_text(encoding='utf-8-sig'))
+            if not isinstance(d,dict):
+                raise ValueError()
+        except (OSError,ValueError):
+            raise ValueError('Privatna konfiguracija nije valjana.') from None
+        return tuple(v.strip() if isinstance(v,str) else '' for v in (d.get('client_id',''),d.get('client_secret','')))
+    return ('','')
 
 def configured(root,data_dir):
     try: return all(credentials(root,data_dir))
