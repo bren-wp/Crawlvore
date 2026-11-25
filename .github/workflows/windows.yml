@@ -1,0 +1,30 @@
+name: Windows package
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+      - name: Build and test
+        shell: pwsh
+        run: ./windows/build.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Crawlvora-Windows
+          path: |
+            dist/Portable.exe
+            dist/Setup.exe
+          if-no-files-found: error
