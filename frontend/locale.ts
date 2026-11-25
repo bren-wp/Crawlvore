@@ -314,7 +314,10 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "⇄ Uvoz i izvoz": "⇄ Import / Export",
   "Detalji": "Details",
   "Poveznice izvora": "Source Links",
-  "Nema povezanih izvora.": "No source links recorded."
+  "Nema povezanih izvora.": "No source links recorded.",
+  "Pristupni podaci uneseni ovdje vrijede samo do zatvaranja aplikacije.": "Credentials entered here are available until the application closes.",
+  "Primijeni pristupne podatke": "Apply credentials",
+  "Pristupni podaci su primijenjeni.": "Credentials applied."
 };
 function translate(value: string): string {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;

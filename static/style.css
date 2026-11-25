@@ -73,3 +73,5 @@ dialog{width:min(700px,calc(100% - 24px));padding:20px;border-color:color-mix(in
 #detail[data-profile-tab="sources"] .profile-sources,#detail[data-profile-tab="history"] .history-block{margin-bottom:8px}
 @media(min-width:1101px){#overview .overview-grid .chart .track{height:7px}#overview .preview{margin-bottom:0}#overview .overview-grid{margin-bottom:12px}#overview .preview .table-wrap{max-height:300px}#overview .preview th{padding-top:7px;padding-bottom:7px}#overview .preview td:first-child{padding-left:17px}#overview .metrics .metric{min-height:89px}#studio .studio-layout .panel{max-height:540px;overflow:auto}#studio .studio-layout .studio-fields .mapping-grid{max-height:325px}}
 @media(max-width:600px){#detail-body .profile-property{grid-column:1/-1}.profile-tabs .btn{font-size:11px;padding:7px 9px}}
+
+#settings label{margin-top:12px}#settings .actions{margin-top:10px}#registry-client-secret{font-family:inherit}
