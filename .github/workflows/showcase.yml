@@ -1,0 +1,60 @@
+name: English product screenshots
+on:
+  push:
+    branches: [initialize-crawlvora]
+    paths: ['.github/workflows/showcase.yml', 'static/**', 'frontend/**', 'tools/visual_check.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: crawlvora-showcase
+  cancel-in-progress: false
+jobs:
+  capture:
+    if: github.ref == 'refs/heads/initialize-crawlvora'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: |
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
+          npm run typecheck
+          npm run build:frontend
+          python -m playwright install --with-deps chromium
+      - run: python tools/visual_check.py
+      - name: Verify English screenshot assets and update README
+        run: |
+          python - <<'PY'
+          import pathlib
+          names=['overview','directory','collector','studio','registry','jobs','data','analytics','settings','detail']
+          labels=['Overview','Business Directory','Web Bot','Scraper Studio','Court Registry','Tasks & Schedule','Import & Export','Analytics & Reports','Settings','Company Profile']
+          rows=['| '+labels[i]+' | '+labels[i+1]+' |\n|---|---|\n| !['+labels[i]+'](branding/en-'+names[i]+'-dark-1440-fixture.png) | !['+labels[i+1]+'](branding/en-'+names[i+1]+'-dark-1440-fixture.png) |' for i in range(0,len(names),2)]
+          assert len(list(pathlib.Path('branding').glob('en-*-fixture.png')))==40
+          for name in names:
+              assert pathlib.Path('branding/en-'+name+'-dark-1440-fixture.png').is_file()
+          readme=pathlib.Path('README.md')
+          text=readme.read_text(encoding='utf-8')
+          start='<!-- PRODUCT_SCREENSHOTS_START -->'
+          end='<!-- PRODUCT_SCREENSHOTS_END -->'
+          body='Actual application interface rendered in English with controlled sample data.\n\n'+'\n\n'.join(rows)
+          text=text.split(start)[0]+start+'\n'+body+'\n'+end+text.split(end)[1]
+          readme.write_text(text,encoding='utf-8')
+          PY
+      - name: Commit verified screenshots to the same pull request
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin initialize-crawlvora
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git add README.md branding/en-*-fixture.png
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'docs: showcase verified English application screenshots'
+          git push origin HEAD:initialize-crawlvora
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: english-product-screens
+          path: branding/en-*-fixture.png

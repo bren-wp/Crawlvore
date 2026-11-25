@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "brand": "Crawlvora",
+  "archive": "Crawlvora-Design-References-10.zip",
+  "archive_sha256": "7f4b4aee943de9442a0dcfb1c1b2ef272eae5831a3927d5999059abe904c0bf0",
+  "files": {
+    "branding/references/overview.png": "c6b01ad8ac4749514dbbd3f10d20ea2e2d339cc7c40c85fadf58cfead7f77f98",
+    "branding/references/directory.png": "c616499facd291da7e31126ce369394671d9a4785b811b55c6ec86315c989521",
+    "branding/references/collector.png": "636723a76817da656a8eaf3fc326d94bac5a3d536fc631e7a0cbc70f4240cae5",
+    "branding/references/studio.png": "54b1a57fee71391322d0d080e7523d21badf75285b0b6a6feeeaa5f3614d37a0",
+    "branding/references/registry.png": "c952ccfaa1e3d9b9f17dfc9b1e655ebd8d7d0629535e6caa19501f0e53c91503",
+    "branding/references/jobs.png": "abbcd42f2b6a29507e9d0c0c256f31eec20ae1303d1df52554cf4c5339a54877",
+    "branding/references/data.png": "4489669cf2ebd97e7416277ad1983f7009e2e545c2dc3f516ef55c48803f337e",
+    "branding/references/detail.png": "8f254756db9bb624aae5b238c449fc956f09478931f0fe4c3c7ee5f6f9f82f3a",
+    "branding/references/analytics.png": "c8df439a5154113a76f1d231a743f14078a77af398ec694612dca147706b620e",
+    "branding/references/settings.png": "64876162918ba4f6d172ade16fea2d03ea8e588d02690e675225c6ea540b756d"
+  }
+}

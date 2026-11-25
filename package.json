@@ -1,0 +1,12 @@
+{
+  "name": "crawlvora-frontend",
+  "version": "8.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.app.json --noEmit",
+    "build:frontend": "tsc -p tsconfig.app.json"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

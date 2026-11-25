@@ -1,0 +1,38 @@
+{
+  "functions_scanned": 117,
+  "unused_import_candidates": [
+    {
+      "file": "studio.py",
+      "line": 32,
+      "name": "inspect_html"
+    }
+  ],
+  "normalized_ast_clone_candidates": [],
+  "high_risk_call_patterns": [],
+  "installed_dependency_closure": {
+    "beautifulsoup4": "4.14.3",
+    "certifi": "2026.5.20",
+    "charset-normalizer": "3.4.7",
+    "et-xmlfile": "2.0.0",
+    "greenlet": "3.5.1",
+    "idna": "3.17",
+    "openpyxl": "3.1.5",
+    "playwright": "1.57.0",
+    "pyee": "13.0.1",
+    "requests": "2.32.5",
+    "soupsieve": "2.8.4",
+    "typing-extensions": "4.16.0",
+    "urllib3": "2.7.0"
+  },
+  "dependency_resolution_issues": [
+    {
+      "requirement": "pywebview<7,>=5.4",
+      "issue": "not installed in this environment"
+    },
+    {
+      "requirement": "pyinstaller<7,>=6.12",
+      "issue": "not installed in this environment"
+    }
+  ],
+  "scope": "top-level runtime Python modules; lexical imports and normalized whole-function AST only; no CVE lookup or semantic equivalence proof"
+}

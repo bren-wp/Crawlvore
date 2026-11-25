@@ -1,0 +1,32 @@
+{
+  "requested_seconds": 12,
+  "elapsed_seconds": 12.133,
+  "operations": {
+    "write": 10490,
+    "stats": 631,
+    "search": 656,
+    "export": 454
+  },
+  "latencies": {
+    "write": {
+      "mean_ms": 1.142,
+      "max_ms": 11.926
+    },
+    "stats": {
+      "mean_ms": 19.018,
+      "max_ms": 32.908
+    },
+    "search": {
+      "mean_ms": 18.294,
+      "max_ms": 30.081
+    },
+    "export": {
+      "mean_ms": 26.486,
+      "max_ms": 43.092
+    }
+  },
+  "initial_records": 26261,
+  "final_records": 26361,
+  "integrity": "ok",
+  "foreign_key_violations": 0
+}

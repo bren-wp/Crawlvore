@@ -1,0 +1,37 @@
+name: Quality and security
+on: [push, pull_request, workflow_dispatch, workflow_call]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pip-audit bandit vulture pillow packaging
+      - run: python -m pip check
+      - run: python -m unittest discover -s tests -v
+      - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
+      - run: npm audit --audit-level=moderate
+      - run: npm run typecheck
+      - run: npm run build:frontend
+      - run: node --check static/app.js && node --check static/locale.js
+      - run: python -m pip_audit --strict
+      - run: python -m bandit -r . -x ./tests,./tools -ll
+      - run: python tools/source_audit.py > source-audit.json
+      - run: python -m vulture . --exclude tests,tools --min-confidence 90
+      - run: python -m playwright install --with-deps chromium
+      - run: python tools/ui_e2e.py
+      - run: python tools/visual_check.py
+      - run: python tools/pixel_diff.py > pixel-diff.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: quality-evidence
+          path: |
+            package-lock.json
+            source-audit.json
+            pixel-diff.json
+            branding/*fixture.png

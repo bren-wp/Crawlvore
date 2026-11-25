@@ -1,0 +1,22 @@
+{
+  "productName": "Crawlvora",
+  "version": "8.1.0",
+  "identifier": "com.brendigo.crawlvora",
+  "build": {
+    "frontendDist": "../bootstrap"
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": false,
+    "security": {
+      "capabilities": []
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/icon.png",
+      "../../windows/Crawlvora.ico"
+    ]
+  }
+}

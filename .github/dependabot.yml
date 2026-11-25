@@ -1,0 +1,42 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python-runtime:
+        patterns: ["*"]
+    open-pull-requests-limit: 1
+  - package-ecosystem: pip
+    directory: /windows
+    schedule:
+      interval: weekly
+    groups:
+      windows-build:
+        patterns: ["*"]
+    open-pull-requests-limit: 1
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      workflows:
+        patterns: ["*"]
+    open-pull-requests-limit: 1
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      frontend:
+        patterns: ["*"]
+    open-pull-requests-limit: 1
+  - package-ecosystem: cargo
+    directory: /desktop/src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      desktop:
+        patterns: ["*"]
+    open-pull-requests-limit: 1

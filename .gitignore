@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+*.sqlite3*
+sudreg.private.json
+*.private.json
+build/
+dist/
+
+node_modules/
