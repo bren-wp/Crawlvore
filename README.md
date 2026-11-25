@@ -35,7 +35,27 @@ Crawlvora is a local-first business data intelligence workspace for collecting a
 Crawlvora's redesigned desktop workspace includes a business overview, directory, visual extraction studio, registry, scheduler, import/export, analytics and settings.
 
 <!-- PRODUCT_SCREENSHOTS_START -->
-New product captures will be added after the redesigned interface passes its rendering checks.
+Actual application interface rendered in English with controlled sample data.
+
+| Overview | Business Directory |
+|---|---|
+| ![Overview](branding/en-overview-dark-1440-fixture.png) | ![Business Directory](branding/en-directory-dark-1440-fixture.png) |
+
+| Web Bot | Scraper Studio |
+|---|---|
+| ![Web Bot](branding/en-collector-dark-1440-fixture.png) | ![Scraper Studio](branding/en-studio-dark-1440-fixture.png) |
+
+| Court Registry | Tasks & Schedule |
+|---|---|
+| ![Court Registry](branding/en-registry-dark-1440-fixture.png) | ![Tasks & Schedule](branding/en-jobs-dark-1440-fixture.png) |
+
+| Import & Export | Analytics & Reports |
+|---|---|
+| ![Import & Export](branding/en-data-dark-1440-fixture.png) | ![Analytics & Reports](branding/en-analytics-dark-1440-fixture.png) |
+
+| Settings | Company Profile |
+|---|---|
+| ![Settings](branding/en-settings-dark-1440-fixture.png) | ![Company Profile](branding/en-detail-dark-1440-fixture.png) |
 <!-- PRODUCT_SCREENSHOTS_END -->
 
 ## Data sources
