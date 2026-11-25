@@ -4,9 +4,9 @@ on:
   workflow_call:
     secrets:
       SUDREG_CLIENT_ID:
-        required: true
+        required: false
       SUDREG_CLIENT_SECRET:
-        required: true
+        required: false
 permissions:
   contents: read
 jobs:

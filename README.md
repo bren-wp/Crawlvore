@@ -26,6 +26,8 @@ Crawlvora is a local-first business data intelligence workspace for the Croatian
 | 🗓️ **Tasks and scheduling** | Queue registry synchronization jobs and schedule weekday registry updates while the application runs. |
 | 📊 **Flexible exports** | Export directory data to CSV, JSON or Excel; registry categories also support XML, JSONL and SQLite SQL. |
 | 🔒 **Local-first workspace** | Verified local database backups, atomic imports and workspace locking. Keep your database on your device. Access restrictions are respected and credentials stay outside public distribution. |
+| 🛡️ **Recovery and continuity** | Create verified copies, export encrypted archives and restore into a separate workspace. Optional system-protected key storage and independent-volume replication. |
+| ⚡ **Indexed search** | Find businesses by name, exact OIB or MBS, or indexed text. |
 | 🎨 **A unified workspace** | Obsidian and mint visual identity, light and dark themes, responsive layouts. |
 
 ## Screenshots
@@ -66,7 +68,7 @@ Third-party permissions, credentials and availability are required where applica
 - **Windows 10/11 x64:** Open `Portable.exe` directly (Microsoft WebView2 Runtime required), or run `Setup.exe` to install Crawlvora and provision WebView2 if missing.
 - **Linux x86_64 (Ubuntu 24.04 baseline):** Install the `.deb` package using your package manager, then open Crawlvora from the application menu. Alternatively extract the tar archive and launch `Crawlvora` with the system runtime dependencies installed.
 - No separate Python, development tools, Chromium download or local-server launch is needed for the native distributions.
-- **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Native portable, installer and Linux packages are published only after the complete release gates pass.
+- **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Preview releases are clearly identified as pre-release builds. Production releases require the complete acceptance checks.
 
 The official registry API is integrated in both desktop builds. Configure OAuth2 credentials privately in Settings for the current session or use the private local configuration for unattended refresh. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
 

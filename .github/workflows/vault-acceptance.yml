@@ -3,6 +3,7 @@ on:
   pull_request:
     paths: ['native_vault.py','protected_backups.py','backup_replica.py','portable_recovery.py','tests/test_native_vault.py','.github/workflows/vault-acceptance.yml']
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
