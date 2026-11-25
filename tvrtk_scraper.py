@@ -240,6 +240,11 @@ def run_workspace(args,selection,active):
                 if self.path=='/api/recovery/protected-enroll':
                     if data.get('confirmed') is not True: raise ValueError('Confirm secure vault enrollment first.')
                     return self.send_data(protected.enroll_vault())
+                if self.path=='/api/recovery/protected-replica':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm replica destination first.')
+                    return self.send_data(protected.configure_replica(data.get('directory')))
+                if self.path=='/api/recovery/protected-replicate': return self.send_data(protected.replicate())
+                if self.path=='/api/recovery/protected-restore-test': return self.send_data(protected.verify_restore(data.get('id')))
                 if self.path=='/api/recovery/protected-lock':
                     protected.lock_session()
                     return self.send_data(protected.snapshot())

@@ -54,6 +54,8 @@ class ProtectedBackups:
         self.vault=vault if vault is not None else NativeVault(self.database)
         self.vault_state='not-checked'
         self.anchor=None
+        self.marker=self.root/'vault-required'
+        self.replica_status='not-configured'
 
     def start(self):
         try:
@@ -63,7 +65,7 @@ class ProtectedBackups:
                 self.unlock(record['password'])
                 self.vault_state='enabled'
             else:
-                self.vault_state='not-enrolled'
+                self.vault_state='attention' if self.marker.exists() else 'not-enrolled'
         except (ValueError,KeyError,OSError,sqlite3.Error,VaultUnavailable):
             self.vault_state='attention'
             self.lock_session()
@@ -79,6 +81,7 @@ class ProtectedBackups:
         with self.lock:
             self.password=None
             self.key=None
+            self.anchor=None
             self.rows=[]
             self.orphans=[]
             self.status='locked'
@@ -93,9 +96,10 @@ class ProtectedBackups:
         pending=self.anchor.get('pending')
         if current==committed:
             if pending is not None:
-                # Interrupted transaction: retain orphan and clear pending only after exact old-head match.
-                self.anchor=dict(self.anchor,pending=None)
-                self.vault.save(self.anchor)
+                # Old head after a prepared mutation is ambiguous (crash or rollback).
+                # Never erase the evidence or silently adopt the old head.
+                self.vault_state='attention'
+                raise ValueError('Uncertain catalog commit; original archives preserved.')
         elif pending is not None and current==pending:
             self.anchor=dict(self.anchor,committed=pending,pending=None)
             self.vault.save(self.anchor)
@@ -113,11 +117,14 @@ class ProtectedBackups:
                     rows,head=self.validated_rows(c)
                     self.verify_anchor(rows,head)
             else:
-                if self.anchor is not None: raise ValueError('Previously enrolled vault is missing.')
+                if self.anchor is not None or self.marker.exists(): raise ValueError('Previously enrolled vault is missing.')
                 with self.connect() as c:
                     rows,head=self.validated_rows(c)
                 self.anchor={'password':self.password,'committed':self.checkpoint(rows,head),'pending':None}
                 self.vault.save(self.anchor)
+            if not self.marker.exists():
+                with self.marker.open('xb') as stream:
+                    stream.write(b'1'); stream.flush(); os.fsync(stream.fileno())
             self.vault_state='enabled'
             return self.snapshot()
 
@@ -142,6 +149,7 @@ class ProtectedBackups:
             if self.key is not None: raise ValueError('Lock the current session first.')
             self.paths_safe()
             if not self.catalog.exists():
+                if self.marker.exists() or self.anchor is not None: raise ValueError('Previously enrolled catalog missing.')
                 if not initialize or self.archives(): raise ValueError('Protected catalog missing; existing archives preserved.')
                 self.root.mkdir(mode=0o700,exist_ok=True)
                 salt=os.urandom(16)
@@ -166,9 +174,9 @@ class ProtectedBackups:
                 if self.vault_state!='not-checked':
                     try: record=self.vault.load()
                     except VaultUnavailable:
-                        if self.anchor is not None or self.vault_state=='enabled': raise
+                        if self.anchor is not None or self.marker.exists() or self.vault_state=='enabled': raise
                         self.vault_state='attention'
-                    if self.anchor is not None and record is None: raise ValueError('Previously enrolled vault is missing.')
+                    if (self.anchor is not None or self.marker.exists()) and record is None: raise ValueError('Previously enrolled vault is missing.')
                 if record is not None: self.anchor=record
                 if self.anchor is not None and not hmac.compare_digest(self.anchor['password'].encode(),password.encode()):
                     raise ValueError('Protected vault passphrase mismatch.')
@@ -232,7 +240,7 @@ class ProtectedBackups:
     def snapshot(self):
         with self.lock:
             self.paths_safe()
-            return {'configured':self.catalog.exists(),'unlocked':self.key is not None,'status':self.status,'archives':list(self.rows),'orphans':list(self.orphans),'interval_hours':6,'vault':self.vault_state,'vault_backend':self.vault.backend}
+            return {'configured':self.catalog.exists(),'unlocked':self.key is not None,'status':self.status,'archives':list(self.rows),'orphans':list(self.orphans),'interval_hours':6,'vault':self.vault_state,'vault_backend':self.vault.backend,'replica':self.replica_status,'replica_directory':(self.anchor or {}).get('replica','')}
 
     def create(self):
         with self.lock:
@@ -264,6 +272,9 @@ class ProtectedBackups:
                 c.execute('UPDATE catalog_meta SET count=?,head=?,seal=? WHERE id=1',(entry['seq'],signature,mac(self.key,'head',[entry['seq'],signature])))
             self.next_backup=time.monotonic()+BACKUP_INTERVAL
             self.verify()
+            if self.anchor and self.anchor.get('replica'):
+                try: self.replicate()
+                except (OSError,ValueError,sqlite3.Error,RuntimeError): self.replica_status='attention'
             return identifier
 
     def verified_archive(self,identifier):
@@ -295,6 +306,54 @@ class ProtectedBackups:
     def download(self,identifier):
         with self.lock:
             yield self.verified_archive(identifier)
+
+    def configure_replica(self,directory):
+        from backup_replica import destination_for
+        with self.lock:
+            if self.key is None or self.anchor is None or self.vault_state!='enabled':
+                raise ValueError('Enable the native vault first.')
+            target=destination_for(self.root,directory)
+            updated=dict(self.anchor,replica=str(target))
+            self.vault.save(updated)
+            self.anchor=updated
+            self.replica_status='pending'
+            return self.snapshot()
+
+    def replicate(self):
+        from backup_replica import destination_for, copy_verified, catalog_snapshot
+        with self.lock:
+            if self.key is None or self.anchor is None or not self.anchor.get('replica'):
+                raise ValueError('Configure a separate backup volume first.')
+            target=destination_for(self.root,self.anchor['replica'])
+            folder=target/('Crawlvora-'+self.vault.identity)
+            if folder.is_symlink(): raise ValueError('Invalid replica directory.')
+            folder.mkdir(mode=0o700,exist_ok=True)
+            if folder.stat().st_dev!=target.stat().st_dev: raise ValueError('Replica volume changed.')
+            self.replica_status='pending'
+            try:
+                with self.connect() as c:
+                    c.execute('BEGIN')
+                    rows,head=self.validated_rows(c)
+                    self.verify_anchor(rows,head)
+                for item in rows:
+                    source=self.verified_archive(item['archive'])
+                    copy_verified(source,folder/item['archive'],item['sha256'])
+                catalog_snapshot(self.catalog,folder/('catalog-'+head+'.sqlite3'))
+                self.replica_status='verified'
+                return self.snapshot()
+            except BaseException:
+                self.replica_status='attention'
+                raise
+
+    def verify_restore(self,identifier):
+        with self.lock:
+            source=self.verified_archive(identifier)
+            with tempfile.TemporaryDirectory(prefix='.cv-restore-test-',dir=self.root) as tmp:
+                decoded=decrypt_backup(source,Path(tmp)/'authenticated.sqlite3',self.password)
+                restored=restore_workspace(decoded,Path(tmp)/'test-workspace')
+                if inspect_database(restored,True)!='ok': raise ValueError('Restore validation failed.')
+                with closing(sqlite3.connect(restored)) as c:
+                    return {'verified':True,'records':c.execute('SELECT count(*) FROM companies').fetchone()[0]}
 
     def before_import(self):
         with self.lock:
