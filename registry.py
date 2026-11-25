@@ -48,9 +48,10 @@ class RegistryAccess:
         self.session=None
         self.saved=None
         self.loaded=False
+        self.retry_after=0.0
 
     def _load(self):
-        if not self.loaded:
+        if not self.loaded and time.monotonic()>=self.retry_after:
             try:
                 record=self.vault.load()
                 if record is not None and record.get('authorized') is True:
@@ -58,6 +59,8 @@ class RegistryAccess:
             except (VaultUnavailable,ValueError,OSError):
                 # No plaintext fallback is created when the OS vault is unavailable.
                 self.saved=None
+                self.retry_after=time.monotonic()+30.0
+                return
             self.loaded=True
 
     @staticmethod
