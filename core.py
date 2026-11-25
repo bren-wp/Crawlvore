@@ -224,7 +224,15 @@ class Store:
     def where(self,q='',city='',contact='',provider=''):
         # SQL fragments below are fixed literals; user input is only bound as parameters.
         clauses=[]; args=[]
-        if q: clauses.append('instr(search_text,?)>0'); args.append(norm(q))
+        # Explicit identifier prefixes use existing indexes; ordinary text semantics stay unchanged.
+        text=norm(q)
+        if text.startswith('oib:') and re.fullmatch(r'[0-9]{11}',text[4:].strip()):
+            clauses.append('oib=?'); args.append(text[4:].strip())
+        elif text.startswith('mbs:') and re.fullmatch(r'[0-9]{1,9}',text[4:].strip()):
+            mbs=text[4:].strip().zfill(9)
+            clauses.append('mbs IN (?,?,?,?,?,?,?,?,?)')
+            args.extend(mbs[i:] if not mbs[:i].strip('0') else mbs for i in range(9))
+        elif q: clauses.append('instr(search_text,?)>0'); args.append(text)
         if city: clauses.append('city=?'); args.append(city)
         if provider: clauses.append('EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider=?)'); args.append(provider)
         if contact=='phone': clauses.append("phone<>''")

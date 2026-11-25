@@ -109,6 +109,7 @@ async function refreshSettings(){
     const [s,r]=await Promise.all([api('/api/stats'),api('/api/registry')]);
     $('settings-count').textContent=n(s.total);
     $('settings-api').textContent=translate(r.configured?'API konfiguriran':'API nije konfiguriran');
+    await refreshRecovery();
 }
 function syncQuickFilters(){
     document.querySelectorAll('[data-contact-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.contactFilter===$('contact').value)));
@@ -132,3 +133,57 @@ $('detail').querySelectorAll('[data-profile-tab]').forEach(button=>button.addEve
 $('registry-credentials-apply').onclick=async()=>{const secret=$('registry-client-secret');try{await post('/api/registry/credentials',{client_id:$('registry-client-id').value,client_secret:secret.value});$('registry-client-id').value='';await refreshSettings();toast(translate('Pristupni podaci su primijenjeni.'));}catch(e){fail(e)}finally{secret.value=''}};
 
 $('file').onchange=()=>{const f=$('file').files[0];$('file-name').textContent=f?f.name:translate('Nije odabrana datoteka.');$('import-btn').disabled=!f};$('import-btn').onclick=async()=>{const f=$('file').files[0];if(!f)return;$('import-btn').disabled=true;try{const r=await api(f.name.toLowerCase().endsWith('.json')?'/api/import-json':'/api/import',{method:'POST',headers:{'X-Local-Token':token},body:f});toast(translate('Učitano ')+n(r.read)+translate(' · novih ')+n(r.added));await cities();await providers();$('file').value='';$('file-name').textContent=translate('Nije odabrana datoteka.');}catch(e){fail(e);$('import-btn').disabled=false}};
+
+let recoveryList=[];
+let recoveryBusy=false;
+function syncRecovery(){
+    const backup=$('recovery-backup').value, item=recoveryList.find(x=>x.id===backup);
+    $('recovery-size').textContent=item?translate('Veličina kopije')+': '+n(item.bytes)+' B':'';
+    $('recovery-download').disabled=recoveryBusy||!backup;
+    $('recovery-restore').disabled=recoveryBusy||!backup;
+    $('recovery-inspect').disabled=recoveryBusy||!$('recovery-space').value;
+    $('recovery-create').disabled=recoveryBusy;
+    $('recovery-refresh').disabled=recoveryBusy;
+}
+async function refreshRecovery(){
+    const r=await api('/api/recovery');
+    recoveryList=r.backups||[];
+    for(const [id,items,caption] of [['recovery-backup',recoveryList,'Odaberi kopiju'],['recovery-space',r.recovered||[],'Odaberi prostor']]){
+        const select=$(id),prev=select.value;
+        select.replaceChildren(new Option(translate(caption),''));
+        for(const item of items)select.add(new Option(item.id,item.id));
+        if(items.some(x=>x.id===prev))select.value=prev;
+    }
+    syncRecovery();
+}
+async function recoveryAction(action){
+    if(recoveryBusy)return;
+    recoveryBusy=true;syncRecovery();
+    try{await action()}catch(e){fail(e)}finally{recoveryBusy=false;syncRecovery()}
+}
+$('recovery-backup').onchange=syncRecovery;
+$('recovery-space').onchange=()=>{$('recovery-preview').replaceChildren();syncRecovery()};
+$('recovery-refresh').onclick=()=>recoveryAction(refreshRecovery);
+$('recovery-create').onclick=()=>recoveryAction(async()=>{
+    const r=await post('/api/recovery/create',{});
+    await refreshRecovery();$('recovery-backup').value=r.id;
+    $('recovery-status').textContent=translate('Kopija je izrađena.');
+});
+$('recovery-download').onclick=()=>{location.href='/api/recovery/download?'+new URLSearchParams({id:$('recovery-backup').value})};
+$('recovery-restore').onclick=()=>{
+    const id=$('recovery-backup').value;
+    if(!id||!confirm(translate('Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.')))return;
+    void recoveryAction(async()=>{
+        const r=await post('/api/recovery/restore',{id,confirmed:true});
+        await refreshRecovery();$('recovery-space').value=r.id;
+        $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
+        $('recovery-preview').replaceChildren();
+    });
+};
+$('recovery-inspect').onclick=()=>recoveryAction(async()=>{
+    const id=$('recovery-space').value;
+    const r=await api('/api/recovery/inspect?'+new URLSearchParams({id}));
+    if($('recovery-space').value!==id)return;
+    const preview=$('recovery-preview');preview.replaceChildren(make('strong',translate('Pregled samo za čitanje')+' · '+n(r.total)));
+    for(const row of r.rows)preview.append(make('p',row.title+' · '+row.city,'muted'));
+});

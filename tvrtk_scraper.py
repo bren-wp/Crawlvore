@@ -20,7 +20,7 @@ import tempfile
 import shutil
 from automation import Queue
 from snapshot_diff import compare
-from data_safety import workspace_lock, verified_backup
+from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 
 ROOT=Path(__file__).resolve().parent
@@ -66,6 +66,7 @@ def run_workspace(args):
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     verified_backup(database)
     store=Store(database); collector=Collector(store); registry=Registry(store)
+    recovery=RecoveryCenter(database)
     seed=ROOT/'tvrtk_output.csv'
     if seed.exists(): store.seed(seed)
     if args.registry_sync:
@@ -154,6 +155,14 @@ def run_workspace(args):
                     return
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
+                if p.path=='/api/recovery': return self.send_data(recovery.summary())
+                if p.path=='/api/recovery/inspect': return self.send_data(recovery.inspect(get('id')))
+                if p.path=='/api/recovery/download':
+                    path=recovery.backup_path(get('id'))
+                    with path.open('rb') as stream:
+                        self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(os.fstat(stream.fileno()).st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        shutil.copyfileobj(stream,self.wfile)
+                    return
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
@@ -181,6 +190,10 @@ def run_workspace(args):
                     if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                     return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if self.path=='/api/recovery/create': return self.send_data({'id':recovery.create()})
+                if self.path=='/api/recovery/restore':
+                    if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')
+                    return self.send_data({'id':recovery.restore(data.get('id'))})
                 if self.path=='/api/ui-ready':
                     if args.worker:
                         with ui_ready_lock:

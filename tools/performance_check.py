@@ -28,6 +28,7 @@ def run(count):
         result={'records':count,'seed_seconds':round(seed_seconds,3),
                 'filtered_page':measure(lambda:store.query(city=city)),
                 'substring_search':measure(lambda:store.query(q='company 000')),
+                'indexed_mbs':measure(lambda:store.query(q='mbs:'+str(count))),
                 'stats':measure(store.stats),
                 'filtered_json':measure(lambda:store.export_json(city=city),5)}
         t=time.perf_counter(); backup=verified_backup(path); result['backup_ms']=round((time.perf_counter()-t)*1000,3)

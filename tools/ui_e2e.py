@@ -81,6 +81,17 @@ def run():
                 page.locator('#registry-credentials-apply').click()
                 expect(page.locator('#settings-api')).to_have_text('API configured')
                 expect(page.locator('#registry-client-secret')).to_have_value('')
+                page.locator('#recovery-create').click()
+                expect(page.locator('#recovery-status')).to_have_text('Backup created.',timeout=30000)
+                expect(page.locator('#recovery-download')).to_be_enabled()
+                with page.expect_download(timeout=60000) as event:
+                    page.locator('#recovery-download').click()
+                assert event.value.path().stat().st_size>0
+                page.once('dialog',lambda dialog:dialog.accept())
+                page.locator('#recovery-restore').click()
+                expect(page.locator('#recovery-status')).to_have_text('Recovered workspace created.',timeout=30000)
+                page.locator('#recovery-inspect').click()
+                expect(page.locator('#recovery-preview')).to_contain_text('Read-only preview')
                 def set_theme(selector, expected):
                     # Match the exact request; never mistake an earlier queued response for the latest write.
                     with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.request.post_data_json=={'theme':expected} and r.ok):

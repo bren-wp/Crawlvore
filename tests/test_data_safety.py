@@ -133,3 +133,31 @@ with workspace_lock(path.parent):
                 self.assertEqual(store.query(q='Uncommitted company')['total'],0)
                 with store.db() as c:
                     self.assertEqual(c.execute('PRAGMA integrity_check').fetchone()[0],'ok')
+
+    def test_recovery_center_rejects_paths_and_preserves_active_data(self):
+        from data_safety import RecoveryCenter
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            store=Store(root/'companies.sqlite3')
+            store.import_json('[{"title":"Original"}]')
+            center=RecoveryCenter(root/'companies.sqlite3')
+            identifier=center.create()
+            self.assertEqual(center.summary()['backups'][0]['id'],identifier)
+            for invalid in ('../companies.sqlite3','/etc/passwd','companies-invalid.sqlite3'):
+                with self.assertRaises(ValueError): center.backup_path(invalid)
+            store.import_json('[{"title":"New company"}]')
+            recovered=center.restore(identifier)
+            self.assertEqual(center.inspect(recovered)['total'],1)
+            self.assertEqual(store.stats()['total'],2)
+            self.assertEqual(center.summary()['recovered'][0]['id'],recovered)
+            with self.assertRaises(ValueError): center.inspect('../companies.sqlite3')
+
+    def test_exact_mbs_search_and_export_preserve_text_search(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            store=Store(Path(tmp)/'companies.sqlite3')
+            store.import_json('[{"title":"Example company","mbs":"123"},{"title":"Other company","mbs":"1234"}]')
+            self.assertEqual(store.query(q='company')['total'],2)
+            self.assertEqual(store.query(q='mbs:123')['total'],1)
+            self.assertEqual(store.query(q='mbs:000000123')['rows'][0]['title'],'Example company')
+            self.assertEqual(len(json.loads(store.export_json(q='mbs:123'))),1)

@@ -319,7 +319,24 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "Nema povezanih izvora.": "No source links recorded.",
   "Pristupni podaci uneseni ovdje vrijede samo do zatvaranja aplikacije.": "Credentials entered here are available until the application closes.",
   "Primijeni pristupne podatke": "Apply credentials",
-  "Pristupni podaci su primijenjeni.": "Credentials applied."
+  "Pristupni podaci su primijenjeni.": "Credentials applied.",
+  "Sigurnosne kopije i oporavak": "Backup & Recovery",
+  "Originalna baza ostaje netaknuta.": "The original database remains untouched.",
+  "Izradi kopiju": "Create backup",
+  "Sigurnosna kopija": "Backup",
+  "Odaberi kopiju": "Select backup",
+  "Preuzmi kopiju": "Download backup",
+  "Vrati u novi prostor": "Restore to new workspace",
+  "Preuzetu kopiju spremite na drugi fizički disk. Kopija nije šifrirana.": "Save the downloaded copy on a separate physical drive. The backup is not encrypted.",
+  "Oporavljeni radni prostor": "Recovered workspace",
+  "Odaberi prostor": "Select workspace",
+  "Pregledaj bez izmjena": "Inspect read-only",
+  "Kopija je izrađena.": "Backup created.",
+  "Oporavljeni prostor je izrađen.": "Recovered workspace created.",
+  "Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.": "Restore this backup into a separate workspace? The active database will not change.",
+  "Pregled samo za čitanje": "Read-only preview",
+  "Naziv, grad, oib: ili mbs:…": "Name, city, oib: or mbs:…",
+  "Veličina kopije": "Backup size"
 };
 function translate(value: string): string {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;

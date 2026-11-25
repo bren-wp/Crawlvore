@@ -105,3 +105,75 @@ def restore_workspace(backup, destination):
         finally:
             if pending.exists(): pending.unlink()
     finally: source.close()
+
+
+class RecoveryCenter:
+    """Only server-generated identifiers can select local backups or recovered copies."""
+    def __init__(self,database):
+        import threading
+        self.database=Path(database)
+        self.backups=self.database.parent/'backups'
+        self.recovered=self.database.parent/'recovered'
+        self.lock=threading.Lock()
+
+    def backup_path(self,name):
+        import re
+        if not isinstance(name,str) or not re.fullmatch(r'companies-[0-9]{8}T[0-9]{12}Z-pending-[a-zA-Z0-9_-]+\.sqlite3',name):
+            raise ValueError('Invalid backup identifier.')
+        path=self.backups/name
+        if self.backups.is_symlink() or path.is_symlink() or not path.is_file():
+            raise ValueError('Backup unavailable.')
+        return path
+
+    def recovered_path(self,name):
+        import re
+        if not isinstance(name,str) or not re.fullmatch(r'recovery-[a-f0-9]{32}',name):
+            raise ValueError('Invalid recovery identifier.')
+        directory=self.recovered/name
+        path=directory/'companies.sqlite3'
+        if self.recovered.is_symlink() or directory.is_symlink() or path.is_symlink() or not path.is_file():
+            raise ValueError('Recovered workspace unavailable.')
+        return path
+
+    def summary(self):
+        backups=[]
+        if not self.backups.is_symlink():
+            for path in sorted(self.backups.glob('companies-*.sqlite3'),reverse=True):
+                try:
+                    item=self.backup_path(path.name)
+                    backups.append({'id':item.name,'bytes':item.stat().st_size})
+                except (OSError,ValueError): continue
+        recovered=[]
+        if not self.recovered.is_symlink():
+            for path in sorted(self.recovered.glob('recovery-*'),reverse=True):
+                try:
+                    self.recovered_path(path.name)
+                    recovered.append({'id':path.name})
+                except (OSError,ValueError): continue
+        return {'backups':backups,'recovered':recovered}
+
+    def create(self):
+        with self.lock:
+            if self.backups.is_symlink(): raise ValueError('Invalid backup directory.')
+            return verified_backup(self.database).name
+
+    def restore(self,name):
+        import uuid
+        with self.lock:
+            backup=self.backup_path(name)
+            if self.recovered.is_symlink(): raise ValueError('Invalid recovery directory.')
+            self.recovered.mkdir(mode=0o700,exist_ok=True)
+            identifier='recovery-'+uuid.uuid4().hex
+            restore_workspace(backup,self.recovered/identifier)
+            return identifier
+
+    def inspect(self,name):
+        path=self.recovered_path(name)
+        with self.lock:
+            c=sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True,timeout=20)
+            try:
+                c.execute('BEGIN')
+                total=c.execute('SELECT count(*) FROM companies').fetchone()[0]
+                rows=[{'title':r[0],'city':r[1]} for r in c.execute('SELECT title,city FROM companies ORDER BY title COLLATE NOCASE,id LIMIT 10')]
+                return {'id':name,'total':total,'rows':rows}
+            finally: c.close()
