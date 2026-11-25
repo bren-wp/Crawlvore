@@ -1,7 +1,8 @@
-import tempfile, unittest
+import json, os, tempfile, unittest
+from unittest.mock import patch
 from pathlib import Path
 from core import Store, Collector
-from registry import Registry, catalog, rows_of, normalized_id
+from registry import Registry, catalog, rows_of, normalized_id, credentials, configured
 
 def spec():
     def p(n): return {'in':'query','name':n,'required':False}
@@ -68,3 +69,49 @@ class UpgradeTests(unittest.TestCase):
                 return super().get(name,q)
         self.reg.sync(self.bot,New(),1)
         self.assertEqual(self.reg.summary()['runs'],[{'snapshot':'21','complete':1}])
+
+
+class CredentialSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name)/'root'
+        self.data=Path(self.tmp.name)/'data'
+        self.cwd=Path(self.tmp.name)/'cwd'
+        for directory in (self.root,self.data,self.cwd):
+            directory.mkdir()
+        self.environment=patch.dict(os.environ,{},clear=True)
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+
+    def write_pair(self,directory,client_id='file-id',client_secret='file-secret'):
+        (directory/'sudreg.private.json').write_text(json.dumps({
+            'client_id':client_id,'client_secret':client_secret}),encoding='utf-8')
+
+    def test_partial_environment_never_borrows_file_secret(self):
+        self.write_pair(self.data)
+        with patch.dict(os.environ,{'SUDREG_CLIENT_ID':'env-id'}):
+            self.assertEqual(credentials(self.root,self.data),('env-id',''))
+            self.assertFalse(configured(self.root,self.data))
+
+    def test_complete_environment_overrides_file_as_pair(self):
+        self.write_pair(self.data)
+        with patch.dict(os.environ,{'SUDREG_CLIENT_ID':'env-id','SUDREG_CLIENT_SECRET':'env-secret'}):
+            self.assertEqual(credentials(self.root,self.data),('env-id','env-secret'))
+            self.assertTrue(configured(self.root,self.data))
+
+    def test_explicit_empty_environment_does_not_fall_back(self):
+        self.write_pair(self.data)
+        with patch.dict(os.environ,{'SUDREG_CLIENT_ID':'','SUDREG_CLIENT_SECRET':''}):
+            self.assertEqual(credentials(self.root,self.data),('',''))
+            self.assertFalse(configured(self.root,self.data))
+
+    def test_arbitrary_working_directory_is_not_a_credential_source(self):
+        self.write_pair(self.cwd)
+        with patch('registry.Path.cwd',return_value=self.cwd):
+            self.assertEqual(credentials(self.root,self.data),('',''))
+
+    def test_workspace_configuration_precedes_application_configuration(self):
+        self.write_pair(self.root,'root-id','root-secret')
+        self.write_pair(self.data,'workspace-id','workspace-secret')
+        self.assertEqual(credentials(self.root,self.data),('workspace-id','workspace-secret'))
