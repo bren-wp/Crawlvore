@@ -14,6 +14,11 @@ interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
 interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
 interface InterfaceElements {
+  "encrypted-file":HTMLInputElement;
+  "encrypted-password":HTMLInputElement;
+  "encrypted-restore":HTMLButtonElement;
+  "integrity-check":HTMLButtonElement;
+  "integrity-results":HTMLElement;
   "backup-password":HTMLInputElement;
   "backup-confirm":HTMLInputElement;
   "backup-encrypt":HTMLButtonElement;
@@ -286,6 +291,8 @@ function syncRecovery(){
     $('recovery-refresh').disabled=recoveryBusy;
     $('workspace-activate').disabled=recoveryBusy||!$('recovery-space').value;
     $('workspace-primary').disabled=recoveryBusy;
+    $('encrypted-restore').disabled=recoveryBusy;
+    $('integrity-check').disabled=recoveryBusy;
 }
 async function refreshRecovery(){
     const r=await api<{backups:{id:string;bytes:number}[];recovered:{id:string}[];active:string;selected:string}>('/api/recovery');
@@ -300,6 +307,7 @@ async function refreshRecovery(){
         if(items.some(x=>x.id===prev))select.value=prev;
     }
     syncRecovery();
+    await refreshIntegrity();
 }
 async function recoveryAction(action:()=>Promise<void>){
     if(recoveryBusy)return;
@@ -344,10 +352,28 @@ $('backup-encrypt').onclick=()=>recoveryAction(async()=>{
     const password=$('backup-password').value, id=$('recovery-backup').value;
     if(password.length<16||password!==$('backup-confirm').value)throw Error(translate('Lozinke se moraju podudarati i imati najmanje 16 znakova.'));
     $('backup-password').value='';$('backup-confirm').value='';
-    const response=await fetch('/api/recovery/encrypt',{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify({id,password})});
-    if(!response.ok)throw Error(translate('Operacija nije uspjela.'));
-    const url=URL.createObjectURL(await response.blob()), a=document.createElement('a');
-    a.href=url;a.download=id.replace(/\.sqlite3$/,'')+'.cvbackup';document.body.append(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    const r=await post<{ticket:string}>('/api/recovery/encrypt',{id,password});
+    const a=document.createElement('a');a.href='/api/recovery/encrypted-download?'+new URLSearchParams({ticket:r.ticket});a.download=id.replace(/\.sqlite3$/,'')+'.cvbackup';document.body.append(a);a.click();a.remove();
     $('recovery-status').textContent=translate('Šifrirana kopija pripremljena je za preuzimanje.');
+});
+
+let integrityTimer:ReturnType<typeof setTimeout>;
+async function refreshIntegrity(){
+    clearTimeout(integrityTimer);
+    const r=await api<{running:boolean;search:string;workspaces:{id:string;status:string}[]}>('/api/recovery/integrity');
+    const target=$('integrity-results');target.replaceChildren();
+    const label=(status:string)=>translate(({ok:'Provjereno',rebuilt:'Obnovljeno',failed:'Neispravno',unavailable:'Nedostupno'} as Record<string,string>)[status]||'Nedostupno');
+    target.append(make('p',translate('Indeks pretraživanja')+': '+label(r.search)));
+    if(r.running){target.append(make('p',translate('Provjera u tijeku')));integrityTimer=setTimeout(()=>{if(current==='settings')refreshIntegrity().catch(fail)},1500);}
+    for(const item of r.workspaces)target.append(make('p',(item.id==='primary'?translate('Originalna baza'):item.id)+': '+label(item.status)));
+}
+$('integrity-check').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/integrity',{});await refreshIntegrity()});
+$('encrypted-restore').onclick=()=>recoveryAction(async()=>{
+    const file=$('encrypted-file').files?.[0],password=$('encrypted-password').value;
+    if(!file||password.length<16)throw Error(translate('Odaberite šifriranu kopiju i unesite lozinku.'));
+    if(!confirm(translate('Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.')))return;
+    $('encrypted-password').value='';
+    const r=await api<{id:string}>('/api/recovery/encrypted-restore',{method:'POST',headers:{'X-Local-Token':token,'X-Backup-Passphrase':encodeURIComponent(password),'Content-Type':'application/octet-stream'},body:file});
+    $('encrypted-file').value='';await refreshRecovery();$('recovery-space').value=r.id;
+    $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
 });

@@ -23,7 +23,10 @@ from snapshot_diff import compare
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 from workspace_selection import WorkspaceSelection
-from encrypted_backup import encrypt_backup
+from backup_transfer import BackupTransfer
+from workspace_integrity import WorkspaceIntegrity, inspect_database, check_search_index
+from cryptography.exceptions import InvalidTag
+from urllib.parse import unquote
 
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_hex(32)
@@ -73,11 +76,16 @@ def main():
 def run_workspace(args,selection,active):
     database=args.data_dir/'companies.sqlite3'
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
+    if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
     verified_backup(database)
     store=Store(database); collector=Collector(store); registry=Registry(store)
     recovery=RecoveryCenter(database,root=selection.root)
+    transfers=BackupTransfer(recovery)
+    integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
     if active=='primary' and seed.exists(): store.seed(seed)
+    search_integrity=check_search_index(store,repair=True)
+    integrity.start()
     if args.registry_sync:
         if not 1 <= args.registry_limit <= 1000: ap.error('Invalid registry page size.')
         start_registry(collector,registry,credentials(ROOT,args.data_dir),args.registry_limit)
@@ -165,6 +173,12 @@ def run_workspace(args,selection,active):
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
+                if p.path=='/api/recovery/integrity': return self.send_data(dict(integrity.snapshot(),search=search_integrity))
+                if p.path=='/api/recovery/encrypted-download':
+                    with transfers.download(get('ticket')) as (path,name):
+                        self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(path.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{name}"'); self.send_header('Cache-Control','no-store'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with path.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
                 if p.path=='/api/recovery/inspect': return self.send_data(recovery.inspect(get('id')))
                 if p.path=='/api/recovery/download':
                     path=recovery.backup_path(get('id'))
@@ -191,6 +205,14 @@ def run_workspace(args,selection,active):
             if not self.authorized() or not self.session_authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 n=int(self.headers.get('Content-Length','0'))
+                if self.path=='/api/recovery/encrypted-restore':
+                    password=unquote(self.headers.get('X-Backup-Passphrase',''),errors='strict')
+                    if not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
+                    self.connection.settimeout(120)
+                    try: identifier=transfers.restore(self.rfile,n,password)
+                    except InvalidTag: raise ValueError('Incorrect passphrase or damaged encrypted backup.') from None
+                    integrity.start()
+                    return self.send_data({'id':identifier})
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 raw=self.rfile.read(n)
                 if self.path in ('/api/import-json','/api/import'):
@@ -203,13 +225,10 @@ def run_workspace(args,selection,active):
                     if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
                     password=data.get('password')
                     if not isinstance(password,str) or not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
-                    with recovery.lock:
-                        source=recovery.backup_path(data.get('id'))
-                        with tempfile.TemporaryDirectory(dir=args.data_dir) as directory:
-                            out=encrypt_backup(source,Path(directory)/'backup.cvbackup',password)
-                            self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{source.stem}.cvbackup"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
-                            with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile)
-                    return
+                    return self.send_data({'ticket':transfers.prepare(data.get('id'),password)})
+                if self.path=='/api/recovery/integrity':
+                    integrity.start(full=True)
+                    return self.send_data({'ok':True})
                 if self.path=='/api/recovery/select':
                     if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm workspace selection first.')
                     return self.send_data({'selected':selection.choose(data.get('id'))})

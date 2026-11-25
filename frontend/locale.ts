@@ -352,7 +352,19 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "Spremite kopiju na drugi fizički disk. Zaboravljena lozinka ne može se obnoviti.": "Save the copy on a separate physical drive. A forgotten passphrase cannot be recovered.",
   "Lozinke se moraju podudarati i imati najmanje 16 znakova.": "Passphrases must match and contain at least 16 characters.",
   "Šifrirana kopija pripremljena je za preuzimanje.": "Encrypted backup prepared for download.",
-  "Use a backup passphrase of at least 16 characters.": "Use a backup passphrase of at least 16 characters."
+  "Use a backup passphrase of at least 16 characters.": "Use a backup passphrase of at least 16 characters.",
+  "Šifrirana sigurnosna kopija": "Encrypted backup file",
+  "Lozinka za oporavak": "Recovery passphrase",
+  "Vrati šifriranu kopiju": "Restore encrypted backup",
+  "Provjeri integritet": "Check integrity",
+  "Provjera u tijeku": "Checking integrity",
+  "Indeks pretraživanja": "Search index",
+  "Provjereno": "Verified",
+  "Nedostupno": "Unavailable",
+  "Neispravno": "Failed",
+  "Obnovljeno": "Rebuilt",
+  "Odaberite šifriranu kopiju i unesite lozinku.": "Select an encrypted backup and enter the passphrase.",
+  "Incorrect passphrase or damaged encrypted backup.": "Incorrect passphrase or damaged encrypted backup."
 };
 function translate(value: string): string {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;
