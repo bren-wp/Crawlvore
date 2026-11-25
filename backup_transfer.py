@@ -29,6 +29,12 @@ class BackupTransfer:
         self.lock=threading.Lock()
         self.pending=None
 
+    def close(self):
+        with self.lock:
+            if self.pending:
+                self.pending[1].cleanup()
+                self.pending=None
+
     def prepare(self,identifier,password):
         with self.lock:
             if self.pending:

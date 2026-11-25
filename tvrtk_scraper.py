@@ -235,7 +235,9 @@ def run_workspace(args,selection,active):
                 if self.path=='/api/recovery/create': return self.send_data({'id':recovery.create()})
                 if self.path=='/api/recovery/restore':
                     if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')
-                    return self.send_data({'id':recovery.restore(data.get('id'))})
+                    identifier=recovery.restore(data.get('id'))
+                    integrity.start()
+                    return self.send_data({'id':identifier})
                 if self.path=='/api/ui-ready':
                     if args.worker:
                         with ui_ready_lock:
@@ -287,7 +289,7 @@ def run_workspace(args,selection,active):
         threading.Thread(target=parent_watch,daemon=True).start()
         try: server.serve_forever()
         finally:
-            queue.close(); collector.stop(); server.server_close()
+            queue.close(); collector.stop(); server.server_close(); transfers.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
@@ -298,10 +300,10 @@ def run_workspace(args,selection,active):
             webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
             webview.start(gui='edgechromium')
         finally:
-            queue.close(); collector.stop(); server.shutdown(); server.server_close()
+            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close()
         return 0
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: queue.close(); collector.stop(); server.server_close()
+    finally: queue.close(); collector.stop(); server.server_close(); transfers.close()
 if __name__=='__main__': sys.exit(main())

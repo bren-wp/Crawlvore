@@ -24,6 +24,8 @@ def run(count):
                 store.upsert(c,{'title':f'Synthetic company {i:07}','city':f'City {i%100:03}','phone':str(i),'mbs':str(i+1)},provider='registry')
         seed_seconds=time.perf_counter()-t
         assert store.stats()['total']==count
+        assert store.fts_available, 'FTS5 is required for the indexed benchmark'
+        assert store.query(q='fts:company 0000001')['total']==store.query(q='company 0000001')['total']==1
         city='City 001'
         result={'records':count,'seed_seconds':round(seed_seconds,3),
                 'filtered_page':measure(lambda:store.query(city=city)),
