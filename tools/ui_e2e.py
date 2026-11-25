@@ -79,6 +79,13 @@ def run():
                 expect(page.locator('html')).to_have_attribute('data-theme','dark')
                 page.locator('#theme').click()
                 expect(page.locator('html')).to_have_attribute('data-theme','light')
+                with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.ok):
+                    page.locator('#theme').click()
+                expect(page.locator('html')).to_have_attribute('data-theme','dark')
+                with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.ok):
+                    page.locator('#theme').click()
+                page.reload()
+                expect(page.locator('html')).to_have_attribute('data-theme','light')
                 page.locator('#language').click()
                 expect(page.locator('html')).to_have_attribute('lang','hr')
                 expect(page.locator('#overview h1')).to_have_text('Pregled imenika')

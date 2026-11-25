@@ -75,6 +75,8 @@ def main():
             collector.stop()
             while collector.snapshot()['status']=='stopping': time.sleep(0.2)
             return 130
+    ui_ready=threading.Event()
+    ui_ready_lock=threading.Lock()
     session_credentials=None
     credentials_lock=threading.Lock()
     def registry_credentials():
@@ -118,8 +120,10 @@ def main():
                 if p.path=='/':
                     with store.db() as db:
                         preferred=db.execute("SELECT value FROM meta WHERE key='ui_language'").fetchone()
+                        theme_row=db.execute("SELECT value FROM meta WHERE key='ui_theme'").fetchone()
                     lang='hr' if preferred and preferred[0]=='hr' else 'en'
-                    return self.send_data((ROOT/'static/index.html').read_text(encoding='utf-8').replace('__TOKEN__',TOKEN).replace('__LANGUAGE__',lang).encode(),'text/html; charset=utf-8')
+                    theme='light' if theme_row and theme_row[0]=='light' else 'dark'
+                    return self.send_data((ROOT/'static/index.html').read_text(encoding='utf-8').replace('__TOKEN__',TOKEN).replace('__LANGUAGE__',lang).replace('data-theme="dark"','data-theme="'+theme+'"',1).encode(),'text/html; charset=utf-8')
                 if p.path in ('/app.js','/locale.js','/style.css','/logo.svg'):
                     return self.send_data((ROOT/'static'/p.path[1:]).read_bytes(),'text/javascript; charset=utf-8' if p.path.endswith('js') else ('image/svg+xml' if p.path.endswith('svg') else 'text/css; charset=utf-8'))
                 if p.path=='/api/registry/diff': return self.send_data(compare(registry,get('before'),get('after')))
@@ -167,6 +171,19 @@ def main():
                 if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                 if self.path=='/api/import': return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if self.path=='/api/ui-ready':
+                    if args.worker:
+                        with ui_ready_lock:
+                            if not ui_ready.is_set():
+                                ui_ready.set()
+                                print('CRAWLVORA_UI_READY',flush=True)
+                    return self.send_data({'ok':True})
+                if self.path=='/api/preferences/theme':
+                    theme=data.get('theme') if isinstance(data,dict) else None
+                    if theme not in ('dark','light'): raise ValueError('Invalid theme.')
+                    with store.db() as db:
+                        db.execute("INSERT INTO meta(key,value) VALUES('ui_theme',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(theme,))
+                    return self.send_data({'ok':True,'theme':theme})
                 if self.path=='/api/preferences/language':
                     lang=data.get('language') if isinstance(data,dict) else None
                     if lang not in ('en','hr'): raise ValueError('Invalid language.')

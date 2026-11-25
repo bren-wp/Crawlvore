@@ -35,6 +35,21 @@ class DesktopWorkerTests(unittest.TestCase):
                     self.assertIn(b'Crawlvora',response.read())
                 with opener.open(base+'/api/stats',timeout=5) as response:
                     self.assertEqual(json.load(response)['total'],26261)
+                import re
+                with opener.open(base+'/',timeout=5) as response:
+                    html=response.read().decode()
+                token=re.search(r'name="local-token" content="([0-9a-f]+)"',html).group(1)
+                def post(path, payload):
+                    req=urllib.request.Request(base+path,data=json.dumps(payload).encode(),headers={'X-Local-Token':token,'Content-Type':'application/json'})
+                    with opener.open(req,timeout=5) as response: return json.load(response)
+                self.assertEqual(post('/api/preferences/theme',{'theme':'light'})['theme'],'light')
+                with opener.open(base+'/',timeout=5) as response:
+                    self.assertIn(b'data-theme="light"',response.read())
+                self.assertTrue(post('/api/ui-ready',{})['ok'])
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future=executor.submit(p.stdout.readline)
+                    try: self.assertEqual(future.result(timeout=5).strip(),'CRAWLVORA_UI_READY')
+                    except TimeoutError: p.kill(); raise
                 p.stdin.close()
                 self.assertEqual(p.wait(timeout=20),0)
             finally:
