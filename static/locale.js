@@ -364,7 +364,27 @@ const UI_MESSAGES = {
   "Neispravno": "Failed",
   "Obnovljeno": "Rebuilt",
   "Odaberite šifriranu kopiju i unesite lozinku.": "Select an encrypted backup and enter the passphrase.",
-  "Incorrect passphrase or damaged encrypted backup.": "Incorrect passphrase or damaged encrypted backup."
+  "Incorrect passphrase or damaged encrypted backup.": "Incorrect passphrase or damaged encrypted backup.",
+  "Zaštićene automatske kopije": "Protected automatic backups",
+  "Otključajte katalog za automatske šifrirane kopije svakih 6 sati. Nakon ponovnog pokretanja potrebno je ponovno otključavanje.": "Unlock the catalog for automatic encrypted backups every 6 hours. Unlock again after restarting.",
+  "Pristupna fraza kataloga": "Catalog passphrase",
+  "Ponovite pristupnu frazu": "Repeat passphrase",
+  "Otključaj katalog": "Unlock catalog",
+  "Zaključaj katalog": "Lock catalog",
+  "Izradi šifriranu kopiju": "Create encrypted backup",
+  "Provjeri katalog": "Verify catalog",
+  "Zaštićeni arhiv": "Protected archive",
+  "Preuzmi arhiv": "Download archive",
+  "Oporavi arhiv": "Restore archive",
+  "Postojeće obične kopije ostaju sačuvane. Pristupnu frazu i neovisnu kopiju čuvajte odvojeno.": "Existing plain backups are retained. Keep your passphrase and independent backup separately.",
+  "Katalog je zaključan.": "Catalog is locked.",
+  "Katalog nije postavljen.": "Catalog is not configured.",
+  "Katalog je provjeren.": "Catalog verified.",
+  "Katalog zahtijeva provjeru.": "Catalog requires attention.",
+  "Nepotvrđeni arhivi (sačuvani)": "Uncataloged archives (preserved)",
+  "Izraditi novi zaštićeni katalog?": "Create a new protected catalog?",
+  "Katalog je otključan.": "Catalog unlocked.",
+  "Šifrirana kopija je izrađena.": "Encrypted backup created."
 };
 function translate(value) {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;

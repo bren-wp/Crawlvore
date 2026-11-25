@@ -140,6 +140,7 @@ class ProtectedBackups:
 
     def verify(self):
         with self.lock:
+            if self.key is None or not self.catalog.is_file(): raise ValueError('Protected backups are locked or unavailable.')
             with self.connect() as c:
                 c.execute('BEGIN')
                 rows,_=self.validated_rows(c)
@@ -164,7 +165,7 @@ class ProtectedBackups:
 
     def create(self):
         with self.lock:
-            if self.key is None: raise ValueError('Protected backups are locked.')
+            if self.key is None or not self.catalog.is_file(): raise ValueError('Protected backups are locked or unavailable.')
             with self.connect() as c:
                 c.execute('BEGIN')
                 self.validated_rows(c)
@@ -190,6 +191,7 @@ class ProtectedBackups:
             return identifier
 
     def verified_archive(self,identifier):
+        if self.key is None or not self.catalog.is_file(): raise ValueError('Protected backups are locked or unavailable.')
         with self.connect() as c:
             c.execute('BEGIN')
             rows,_=self.validated_rows(c)

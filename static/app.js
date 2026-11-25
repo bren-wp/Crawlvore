@@ -149,6 +149,7 @@ function syncRecovery(){
     $('workspace-primary').disabled=recoveryBusy;
     $('encrypted-restore').disabled=recoveryBusy;
     $('integrity-check').disabled=recoveryBusy;
+    syncProtected();
 }
 async function refreshRecovery(){
     const r=await api('/api/recovery');
@@ -164,6 +165,7 @@ async function refreshRecovery(){
     }
     syncRecovery();
     await refreshIntegrity();
+    await refreshProtected();
 }
 async function recoveryAction(action){
     if(recoveryBusy)return;
@@ -231,5 +233,54 @@ $('encrypted-restore').onclick=()=>recoveryAction(async()=>{
     $('encrypted-password').value='';
     const r=await api('/api/recovery/encrypted-restore',{method:'POST',headers:{'X-Local-Token':token,'X-Backup-Passphrase':encodeURIComponent(password),'Content-Type':'application/octet-stream'},body:file});
     $('encrypted-file').value='';await refreshRecovery();$('recovery-space').value=r.id;
+    $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
+});
+
+let protectedState={configured:false,unlocked:false,status:'locked',archives:[],orphans:[]};
+function syncProtected(){
+    const unlocked=protectedState.unlocked;
+    const selected=protectedState.archives.find(x=>x.archive===$('protected-archive').value);
+    $('protected-confirm-label').hidden=protectedState.configured;
+    $('protected-unlock').disabled=recoveryBusy||unlocked;
+    $('protected-lock').disabled=recoveryBusy||!unlocked;
+    $('protected-create').disabled=recoveryBusy||!unlocked;
+    $('protected-verify').disabled=recoveryBusy||!unlocked;
+    $('protected-download').disabled=recoveryBusy||!unlocked||selected?.status!=='ok';
+    $('protected-restore').disabled=$('protected-download').disabled;
+}
+async function refreshProtected(){
+    protectedState=await api('/api/recovery/protected');
+    const currentId=$('protected-archive').value;
+    $('protected-archive').replaceChildren(new Option(translate('Odaberi kopiju'),''));
+    for(const item of protectedState.archives){
+        const status=translate(item.status==='ok'?'Provjereno':item.status==='failed'?'Neispravno':'Nedostupno');
+        $('protected-archive').add(new Option(new Date(item.created*1000).toLocaleString()+' · '+n(item.bytes)+' B · '+status,item.archive));
+    }
+    if(protectedState.archives.some(x=>x.archive===currentId))$('protected-archive').value=currentId;
+    $('protected-status').textContent=translate(!protectedState.configured?'Katalog nije postavljen.':!protectedState.unlocked?'Katalog je zaključan.':protectedState.status==='verified'?'Katalog je provjeren.':'Katalog zahtijeva provjeru.');
+    $('protected-orphans').textContent=protectedState.orphans.length?translate('Nepotvrđeni arhivi (sačuvani)')+': '+protectedState.orphans.join(', '):'';
+    syncProtected();
+}
+$('protected-archive').onchange=syncProtected;
+$('protected-unlock').onclick=()=>recoveryAction(async()=>{
+    const password=$('protected-password').value,initialize=!protectedState.configured;
+    if(password.length<16||(initialize&&password!==$('protected-confirm').value))throw Error(translate('Lozinke se moraju podudarati i imati najmanje 16 znakova.'));
+    if(initialize&&!confirm(translate('Izraditi novi zaštićeni katalog?')))return;
+    $('protected-password').value='';$('protected-confirm').value='';
+    await post('/api/recovery/protected-unlock',{password,initialize});
+    await refreshProtected();
+});
+$('protected-lock').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/protected-lock',{});await refreshProtected()});
+$('protected-create').onclick=()=>recoveryAction(async()=>{
+    const r=await post('/api/recovery/protected-create',{});
+    await refreshProtected();$('protected-archive').value=r.id;
+    $('recovery-status').textContent=translate('Šifrirana kopija je izrađena.');
+});
+$('protected-verify').onclick=()=>recoveryAction(async()=>{await post('/api/recovery/protected-verify',{});await refreshProtected()});
+$('protected-download').onclick=()=>{const a=document.createElement('a');a.href='/api/recovery/protected-download?'+new URLSearchParams({id:$('protected-archive').value});a.download=$('protected-archive').value;document.body.append(a);a.click();a.remove()};
+$('protected-restore').onclick=()=>recoveryAction(async()=>{
+    if(!confirm(translate('Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.')))return;
+    const r=await post('/api/recovery/protected-restore',{id:$('protected-archive').value,confirmed:true});
+    await refreshRecovery();$('recovery-space').value=r.id;
     $('recovery-status').textContent=translate('Oporavljeni prostor je izrađen.');
 });
