@@ -29,6 +29,9 @@ def run(count):
                 'filtered_page':measure(lambda:store.query(city=city)),
                 'substring_search':measure(lambda:store.query(q='company 000')),
                 'indexed_mbs':measure(lambda:store.query(q='mbs:'+str(count))),
+                'fts_available':store.fts_available,
+                'indexed_phrase':measure(lambda:store.query(q='fts:company 0000001')),
+                'same_phrase_scan':measure(lambda:store.query(q='company 0000001')),
                 'stats':measure(store.stats),
                 'filtered_json':measure(lambda:store.export_json(city=city),5)}
         t=time.perf_counter(); backup=verified_backup(path); result['backup_ms']=round((time.perf_counter()-t)*1000,3)

@@ -22,6 +22,7 @@ from automation import Queue
 from snapshot_diff import compare
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
+from workspace_selection import WorkspaceSelection
 
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_hex(32)
@@ -30,6 +31,7 @@ def main():
     ap=argparse.ArgumentParser(description='Crawlvora — lokalni poslovni imenik')
     ap.add_argument('--port',type=int,default=0 if getattr(sys,'frozen',False) else 8765)
     ap.add_argument('--data-dir',type=Path,default=(Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'Crawlvora' if getattr(sys,'frozen',False) else ROOT/'data'))
+    ap.add_argument('--primary-workspace',action='store_true',help='Open the original workspace without changing the saved selection')
     ap.add_argument('--registry-sync',action='store_true')
     ap.add_argument('--registry-limit',type=int,default=500)
     ap.add_argument('--desktop',action='store_true')
@@ -58,17 +60,23 @@ def main():
             Workbook().close(); result={'ok':True,'records':26261,'browser':True}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
         args.self_test.write_text(json.dumps(result),encoding='utf-8'); return 0 if result['ok'] else 1
-    with workspace_lock(args.data_dir):
-        return run_workspace(args)
+    root=args.data_dir
+    with workspace_lock(root):
+        selection=WorkspaceSelection(root)
+        active='primary' if args.primary_workspace else selection.chosen()
+        args.data_dir=selection.resolve(active)
+        if active=='primary': return run_workspace(args,selection,active)
+        with workspace_lock(args.data_dir):
+            return run_workspace(args,selection,active)
 
-def run_workspace(args):
+def run_workspace(args,selection,active):
     database=args.data_dir/'companies.sqlite3'
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     verified_backup(database)
     store=Store(database); collector=Collector(store); registry=Registry(store)
-    recovery=RecoveryCenter(database)
+    recovery=RecoveryCenter(database,root=selection.root)
     seed=ROOT/'tvrtk_output.csv'
-    if seed.exists(): store.seed(seed)
+    if active=='primary' and seed.exists(): store.seed(seed)
     if args.registry_sync:
         if not 1 <= args.registry_limit <= 1000: ap.error('Invalid registry page size.')
         start_registry(collector,registry,credentials(ROOT,args.data_dir),args.registry_limit)
@@ -155,7 +163,7 @@ def run_workspace(args):
                     return
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
-                if p.path=='/api/recovery': return self.send_data(recovery.summary())
+                if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
                 if p.path=='/api/recovery/inspect': return self.send_data(recovery.inspect(get('id')))
                 if p.path=='/api/recovery/download':
                     path=recovery.backup_path(get('id'))
@@ -190,6 +198,9 @@ def run_workspace(args):
                     if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                     return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if self.path=='/api/recovery/select':
+                    if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm workspace selection first.')
+                    return self.send_data({'selected':selection.choose(data.get('id'))})
                 if self.path=='/api/recovery/create': return self.send_data({'id':recovery.create()})
                 if self.path=='/api/recovery/restore':
                     if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')

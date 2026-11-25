@@ -109,11 +109,11 @@ def restore_workspace(backup, destination):
 
 class RecoveryCenter:
     """Only server-generated identifiers can select local backups or recovered copies."""
-    def __init__(self,database):
+    def __init__(self,database,root=None):
         import threading
         self.database=Path(database)
         self.backups=self.database.parent/'backups'
-        self.recovered=self.database.parent/'recovered'
+        self.recovered=Path(root if root is not None else self.database.parent)/'recovered'
         self.lock=threading.Lock()
 
     def backup_path(self,name):

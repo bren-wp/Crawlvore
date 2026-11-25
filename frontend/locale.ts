@@ -336,7 +336,15 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "Vratiti kopiju u zaseban radni prostor? Aktivna baza neće se mijenjati.": "Restore this backup into a separate workspace? The active database will not change.",
   "Pregled samo za čitanje": "Read-only preview",
   "Naziv, grad, oib: ili mbs:…": "Name, city, oib: or mbs:…",
-  "Veličina kopije": "Backup size"
+  "Veličina kopije": "Backup size",
+  "Aktiviraj pri ponovnom pokretanju": "Activate on restart",
+  "Koristi originalnu bazu": "Use original database",
+  "Aktivni radni prostor": "Active workspace",
+  "Odabir za sljedeće pokretanje": "Selected for next launch",
+  "Originalna baza": "Original database",
+  "Odabir je spremljen. Zatvorite i ponovno pokrenite aplikaciju.": "Selection saved. Close and reopen the application.",
+  "Promijeniti radni prostor pri sljedećem pokretanju? Sve baze ostaju sačuvane.": "Switch workspace on next launch? All databases are preserved.",
+  "Naziv, grad, fts:, oib: ili mbs:…": "Name, city, fts:, oib: or mbs:…"
 };
 function translate(value: string): string {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;

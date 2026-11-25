@@ -92,6 +92,29 @@ class Store:
             c.execute('CREATE INDEX IF NOT EXISTS history_changed_at ON company_history(changed_at)')
             c.execute('CREATE TABLE IF NOT EXISTS alternate_values(company_id INTEGER NOT NULL, field TEXT NOT NULL, value TEXT NOT NULL, provider TEXT NOT NULL, observed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,field,value,provider), FOREIGN KEY(company_id) REFERENCES companies(id))')
             c.execute('CREATE INDEX IF NOT EXISTS origin_provider ON origins(provider,company_id)')
+            # The derived index and its maintenance triggers commit together.
+            c.execute('SAVEPOINT search_index')
+            try:
+                c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS company_fts USING fts5(search_text, content='companies', content_rowid='id', tokenize='unicode61')")
+                c.execute("""CREATE TRIGGER IF NOT EXISTS company_fts_insert AFTER INSERT ON companies BEGIN
+                    INSERT INTO company_fts(rowid,search_text) VALUES(new.id,new.search_text); END""")
+                c.execute("""CREATE TRIGGER IF NOT EXISTS company_fts_delete AFTER DELETE ON companies BEGIN
+                    INSERT INTO company_fts(company_fts,rowid,search_text) VALUES('delete',old.id,old.search_text); END""")
+                c.execute("""CREATE TRIGGER IF NOT EXISTS company_fts_update AFTER UPDATE OF search_text ON companies WHEN old.search_text<>new.search_text BEGIN
+                    INSERT INTO company_fts(company_fts,rowid,search_text) VALUES('delete',old.id,old.search_text);
+                    INSERT INTO company_fts(rowid,search_text) VALUES(new.id,new.search_text); END""")
+                if not c.execute("SELECT 1 FROM meta WHERE key='fts_v1'").fetchone():
+                    c.execute("INSERT INTO company_fts(company_fts) VALUES('rebuild')")
+                    c.execute("INSERT INTO meta VALUES('fts_v1','1')")
+                self.fts_available=True
+            except sqlite3.OperationalError as error:
+                c.execute('ROLLBACK TO search_index')
+                if 'no such module: fts5' not in str(error).lower(): raise
+                # An existing FTS database must not be opened for writes by an incompatible runtime.
+                if c.execute("SELECT 1 FROM meta WHERE key='fts_v1'").fetchone(): raise
+                self.fts_available=False
+            finally:
+                c.execute('RELEASE search_index')
             if not c.execute("SELECT 1 FROM meta WHERE key='origins_v2'").fetchone():
                 c.execute("INSERT OR IGNORE INTO origins(company_id,provider,url) SELECT id,CASE WHEN source IS NULL THEN 'csv' ELSE 'tvrtke' END,coalesce(source,'') FROM companies")
                 c.execute("INSERT INTO meta VALUES ('origins_v2','1')")
@@ -232,6 +255,14 @@ class Store:
             mbs=text[4:].strip().zfill(9)
             clauses.append('mbs IN (?,?,?,?,?,?,?,?,?)')
             args.extend(mbs[i:] if not mbs[:i].strip('0') else mbs for i in range(9))
+        elif text.startswith('fts:'):
+            phrase=text[4:].strip()
+            if not phrase or len(phrase)>200 or '\x00' in phrase: raise ValueError('Invalid full-text query.')
+            if self.fts_available:
+                clauses.append('id IN (SELECT rowid FROM company_fts WHERE company_fts MATCH ?)')
+                args.append('"'+phrase.replace('"','""')+'"')
+            else:
+                clauses.append('instr(search_text,?)>0'); args.append(phrase)
         elif q: clauses.append('instr(search_text,?)>0'); args.append(text)
         if city: clauses.append('city=?'); args.append(city)
         if provider: clauses.append('EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider=?)'); args.append(provider)

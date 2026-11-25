@@ -1,0 +1,24 @@
+name: Million-record performance
+on:
+  push:
+    branches: [data-safety-release]
+    paths: ['.github/workflows/million-records.yml', 'tools/performance_check.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python tools/performance_check.py --records 1000000 > million-records.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: million-records
+          path: million-records.json

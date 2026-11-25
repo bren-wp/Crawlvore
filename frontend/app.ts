@@ -14,6 +14,10 @@ interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
 interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
 interface InterfaceElements {
+  "workspace-active":HTMLElement;
+  "workspace-selected":HTMLElement;
+  "workspace-activate":HTMLButtonElement;
+  "workspace-primary":HTMLButtonElement;
   "recovery-create":HTMLButtonElement;
   "recovery-refresh":HTMLButtonElement;
   "recovery-backup":HTMLSelectElement;
@@ -276,10 +280,15 @@ function syncRecovery(){
     $('recovery-inspect').disabled=recoveryBusy||!$('recovery-space').value;
     $('recovery-create').disabled=recoveryBusy;
     $('recovery-refresh').disabled=recoveryBusy;
+    $('workspace-activate').disabled=recoveryBusy||!$('recovery-space').value;
+    $('workspace-primary').disabled=recoveryBusy;
 }
 async function refreshRecovery(){
-    const r=await api<{backups:{id:string;bytes:number}[];recovered:{id:string}[]}>('/api/recovery');
+    const r=await api<{backups:{id:string;bytes:number}[];recovered:{id:string}[];active:string;selected:string}>('/api/recovery');
     recoveryList=r.backups||[];
+    const label=(id:string)=>id==='primary'?translate('Originalna baza'):id;
+    $('workspace-active').textContent=translate('Aktivni radni prostor')+': '+label(r.active||'primary');
+    $('workspace-selected').textContent=translate('Odabir za sljedeće pokretanje')+': '+label(r.selected||'primary');
     for(const [id,items,caption] of ([['recovery-backup',recoveryList,'Odaberi kopiju'],['recovery-space',r.recovered||[],'Odaberi prostor']] as const)){
         const select=$(id),prev=select.value;
         select.replaceChildren(new Option(translate(caption),''));
@@ -319,3 +328,10 @@ $('recovery-inspect').onclick=()=>recoveryAction(async()=>{
     const preview=$('recovery-preview');preview.replaceChildren(make('strong',translate('Pregled samo za čitanje')+' · '+n(r.total)));
     for(const row of r.rows)preview.append(make('p',row.title+' · '+row.city,'muted'));
 });
+
+function selectWorkspace(id:string){
+    if(!id||!confirm(translate('Promijeniti radni prostor pri sljedećem pokretanju? Sve baze ostaju sačuvane.')))return;
+    void recoveryAction(async()=>{await post('/api/recovery/select',{id,confirmed:true});await refreshRecovery();$('recovery-status').textContent=translate('Odabir je spremljen. Zatvorite i ponovno pokrenite aplikaciju.');});
+}
+$('workspace-activate').onclick=()=>selectWorkspace($('recovery-space').value);
+$('workspace-primary').onclick=()=>selectWorkspace('primary');

@@ -57,7 +57,7 @@ fn worker_path() -> io::Result<PathBuf> {
     Ok(dir.join("worker").join(name))
 }
 
-fn spawn_worker(data: &Path) -> Result<(Worker, Url, mpsc::Receiver<String>), io::Error> {
+fn spawn_worker(data: &Path, primary: bool) -> Result<(Worker, Url, mpsc::Receiver<String>), io::Error> {
     #[cfg(not(feature = "portable"))]
     let binary = worker_path()?;
     #[cfg(all(feature = "portable", windows))]
@@ -77,6 +77,7 @@ fn spawn_worker(data: &Path) -> Result<(Worker, Url, mpsc::Receiver<String>), io
     let mut command = Command::new(binary);
     command.args(["--worker", "--port", "0", "--data-dir"]).arg(data)
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+    if primary { command.arg("--primary-workspace"); }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -118,6 +119,7 @@ fn allowed_external_url(url: &Url) -> bool {
 
 fn main() {
     let smoke = std::env::args().any(|arg| arg == "--native-smoke");
+    let primary = std::env::args().any(|arg| arg == "--primary-workspace");
     let application = tauri::Builder::default()
         .manage(Mutex::new(None::<Worker>))
         .setup(move |app| {
@@ -126,7 +128,7 @@ fn main() {
             } else {
                 app.path().local_data_dir()?.join("Crawlvora")
             };
-            let (worker, url, ui_ready) = spawn_worker(&data)?;
+            let (worker, url, ui_ready) = spawn_worker(&data, primary)?;
             let port = url.port();
             *app.state::<Mutex<Option<Worker>>>().lock().map_err(|_| invalid("Worker state unavailable"))? = Some(worker);
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
