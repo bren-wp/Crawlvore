@@ -81,17 +81,17 @@ def run():
                 page.locator('#registry-credentials-apply').click()
                 expect(page.locator('#settings-api')).to_have_text('API configured')
                 expect(page.locator('#registry-client-secret')).to_have_value('')
-                page.locator('#settings-light').click()
-                expect(page.locator('html')).to_have_attribute('data-theme','light')
-                page.locator('#settings-dark').click()
-                expect(page.locator('html')).to_have_attribute('data-theme','dark')
-                page.locator('#theme').click()
-                expect(page.locator('html')).to_have_attribute('data-theme','light')
-                with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.ok):
-                    page.locator('#theme').click()
-                expect(page.locator('html')).to_have_attribute('data-theme','dark')
-                with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.ok):
-                    page.locator('#theme').click()
+                def set_theme(selector, expected):
+                    # Match the exact request; never mistake an earlier queued response for the latest write.
+                    with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.request.post_data_json=={'theme':expected} and r.ok):
+                        page.locator(selector).click()
+                    page.evaluate("themeWrite")
+                    expect(page.locator('html')).to_have_attribute('data-theme',expected)
+                set_theme('#settings-light','light')
+                set_theme('#settings-dark','dark')
+                set_theme('#theme','light')
+                set_theme('#theme','dark')
+                set_theme('#theme','light')
                 page.reload()
                 expect(page.locator('html')).to_have_attribute('data-theme','light')
                 page.locator('#language').click()
