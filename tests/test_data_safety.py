@@ -1,4 +1,5 @@
 import csv
+from contextlib import closing
 import io
 import sqlite3
 import tempfile
@@ -21,7 +22,7 @@ class DataSafetyTests(unittest.TestCase):
                 second=verified_backup(path)
             self.assertNotEqual(first,second)
             for backup,count in ((first,1),(second,2)):
-                with sqlite3.connect(backup) as c:
+                with closing(sqlite3.connect(backup)) as c:
                     self.assertEqual(c.execute('SELECT count(*) FROM companies').fetchone()[0],count)
                     self.assertEqual(c.execute('PRAGMA integrity_check').fetchone()[0],'ok')
 
@@ -96,7 +97,9 @@ class DataSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
             bad=root/'unrelated.sqlite3'
-            with sqlite3.connect(bad) as c: c.execute('CREATE TABLE unrelated (id INTEGER)')
+            with closing(sqlite3.connect(bad)) as c:
+                c.execute('CREATE TABLE unrelated (id INTEGER)')
+                c.commit()
             with self.assertRaises(ValueError): restore_workspace(bad,root/'recovered')
             self.assertFalse((root/'recovered').exists())
 
