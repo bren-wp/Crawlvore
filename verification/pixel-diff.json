@@ -1,0 +1,322 @@
+[
+  {
+    "file": "collector-dark-1440-fixture.png",
+    "size": [
+      1440,
+      1401
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "collector-dark-390-fixture.png",
+    "size": [
+      390,
+      2316
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "collector-light-1440-fixture.png",
+    "size": [
+      1440,
+      1401
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "collector-light-390-fixture.png",
+    "size": [
+      390,
+      2316
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "data-dark-1440-fixture.png",
+    "size": [
+      1440,
+      900
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "data-dark-390-fixture.png",
+    "size": [
+      390,
+      1185
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "data-light-1440-fixture.png",
+    "size": [
+      1440,
+      900
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "data-light-390-fixture.png",
+    "size": [
+      390,
+      1185
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "detail-dark-1440-fixture.png",
+    "size": [
+      1440,
+      900
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "detail-dark-390-fixture.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "detail-light-1440-fixture.png",
+    "size": [
+      1440,
+      900
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "detail-light-390-fixture.png",
+    "size": [
+      390,
+      844
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "directory-dark-1440-fixture.png",
+    "size": [
+      1440,
+      2404
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "directory-dark-390-fixture.png",
+    "size": [
+      390,
+      2998
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "directory-light-1440-fixture.png",
+    "size": [
+      1440,
+      2404
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "directory-light-390-fixture.png",
+    "size": [
+      390,
+      2998
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "jobs-dark-1440-fixture.png",
+    "size": [
+      1440,
+      980
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "jobs-dark-390-fixture.png",
+    "size": [
+      390,
+      1742
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "jobs-light-1440-fixture.png",
+    "size": [
+      1440,
+      980
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "jobs-light-390-fixture.png",
+    "size": [
+      390,
+      1742
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "overview-dark-1440-fixture.png",
+    "size": [
+      1440,
+      2878
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "overview-dark-390-fixture.png",
+    "size": [
+      390,
+      3685
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "overview-light-1440-fixture.png",
+    "size": [
+      1440,
+      2878
+    ],
+    "changed_pixels": 28,
+    "changed_percent": 0.00068,
+    "identical": false
+  },
+  {
+    "file": "overview-light-390-fixture.png",
+    "size": [
+      390,
+      3685
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "registry-dark-1440-fixture.png",
+    "size": [
+      1440,
+      1736
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "registry-dark-390-fixture.png",
+    "size": [
+      390,
+      2819
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "registry-light-1440-fixture.png",
+    "size": [
+      1440,
+      1736
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "registry-light-390-fixture.png",
+    "size": [
+      390,
+      2819
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "studio-dark-1440-fixture.png",
+    "size": [
+      1440,
+      1181
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "studio-dark-390-fixture.png",
+    "size": [
+      390,
+      2165
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "studio-light-1440-fixture.png",
+    "size": [
+      1440,
+      1181
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  },
+  {
+    "file": "studio-light-390-fixture.png",
+    "size": [
+      390,
+      2165
+    ],
+    "changed_pixels": 0,
+    "changed_percent": 0.0,
+    "identical": true
+  }
+]

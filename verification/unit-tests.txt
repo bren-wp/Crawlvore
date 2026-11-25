@@ -1,0 +1,45 @@
+test_crawler_and_resume (test_core.CoreTests.test_crawler_and_resume) ... ok
+test_denied (test_core.CoreTests.test_denied) ... ok
+test_import_export (test_core.CoreTests.test_import_export) ... ok
+test_parser (test_core.CoreTests.test_parser) ... ok
+test_catalog (test_registry.RegistryTests.test_catalog) ... ok
+test_mirror (test_registry.RegistryTests.test_mirror) ... ok
+test_mismatch (test_registry.RegistryTests.test_mismatch) ... ok
+test_resume (test_registry.RegistryTests.test_resume) ... ok
+test_shape (test_registry.RegistryTests.test_shape) ... ok
+test_csv_and_search (test_registry.UpgradeTests.test_csv_and_search) ... ok
+test_new_snapshot_refreshes_official_fields (test_registry.UpgradeTests.test_new_snapshot_refreshes_official_fields) ... ok
+test_resume_previous_available_snapshot (test_registry.UpgradeTests.test_resume_previous_available_snapshot) ... ok
+test_api_run (test_sources.SourcesTests.test_api_run) ... ok
+test_denied_api (test_sources.SourcesTests.test_denied_api) ... ok
+test_mapping (test_sources.SourcesTests.test_mapping) ... ok
+test_provenance_and_export (test_sources.SourcesTests.test_provenance_and_export) ... ok
+test_url_rules (test_sources.SourcesTests.test_url_rules) ... ok
+test_cursor (test_studio.StudioTests.test_cursor) ... ok
+test_inspect (test_studio.StudioTests.test_inspect) ... ok
+test_next_link (test_studio.StudioTests.test_next_link) ... ok
+test_projects (test_studio.StudioTests.test_projects) ... ok
+test_xlsx (test_studio.StudioTests.test_xlsx) ... ok
+test_dynamic_dispatch (test_v6.V6.test_dynamic_dispatch) ... ok
+test_formats (test_v6.V6.test_formats) ... ok
+test_history (test_v6.V6.test_history) ... ok
+test_queue (test_v6.V6.test_queue) ... ok
+test_queue_interruption (test_v6.V6.test_queue_interruption) ... ok
+test_semantics (test_v6.V6.test_semantics) ... ok
+test_diff (test_v7.V7.test_diff) ... ok
+test_dns_pinned (test_v7.V7.test_dns_pinned) ... ok
+test_dns_private_mixed (test_v7.V7.test_dns_private_mixed) ... ok
+test_retry (test_v7.V7.test_retry) ... ok
+test_table_detection (test_v7.V7.test_table_detection) ... ok
+test_invalid_inputs (test_v8.DetectionTests.test_invalid_inputs) ... ok
+test_label_value_and_attributes (test_v8.DetectionTests.test_label_value_and_attributes) ... ok
+test_mixed_classes_navigation (test_v8.DetectionTests.test_mixed_classes_navigation) ... ok
+test_no_arbitrary_titles (test_v8.DetectionTests.test_no_arbitrary_titles) ... ok
+test_preview_bounded (test_v8.DetectionTests.test_preview_bounded) ... ok
+test_public_ip_rejects_multicast (test_v8.DetectionTests.test_public_ip_rejects_multicast) ... ok
+test_table_hr_labels (test_v8.DetectionTests.test_table_hr_labels) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 0.632s
+
+OK
