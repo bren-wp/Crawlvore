@@ -46,7 +46,8 @@ def verified_backup(database):
                     raise RuntimeError('Database backup integrity check failed.')
             finally: dest.close()
         finally: source.close()
-        with pending.open('rb') as stream: os.fsync(stream.fileno())
+        # Windows FlushFileBuffers requires a writable descriptor; do not truncate the backup.
+        with pending.open('r+b') as stream: os.fsync(stream.fileno())
         # Unique name, exclusive creation; never replace a previous backup.
         final=directory/('companies-'+stamp+'-'+pending.stem+'.sqlite3')
         os.rename(pending,final)
