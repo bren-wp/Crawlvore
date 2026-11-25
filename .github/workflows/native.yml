@@ -1,0 +1,65 @@
+name: Native Tauri preview
+on:
+  pull_request:
+  push:
+    branches: [initialize-crawlvora, main]
+    paths: ['desktop/**', 'tvrtk_scraper.py', 'static/**', 'requirements.txt', '.github/workflows/native.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install Linux webview dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev xvfb
+      - run: rustup update stable
+      - run: python -m pip install -r requirements.txt -r windows/requirements-build.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Install bundled Chromium
+        shell: bash
+        run: |
+          PLAYWRIGHT_BROWSERS_PATH=0 python -m playwright install chromium
+      - name: Build the native host
+        working-directory: desktop/src-tauri
+        run: cargo +stable test --release
+      - name: Compile native executable
+        working-directory: desktop/src-tauri
+        run: cargo +stable build --release
+      - name: Build worker and assemble preview
+        shell: bash
+        run: |
+          export PLAYWRIGHT_BROWSERS_PATH=0
+          python -m PyInstaller --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --collect-all playwright --collect-all webview tvrtk_scraper.py
+          mkdir -p native-preview
+          cp -R dist/CrawlvoraWorker native-preview/worker
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp desktop/src-tauri/target/release/crawlvora-desktop.exe native-preview/Crawlvora.exe
+          else
+            cp desktop/src-tauri/target/release/crawlvora-desktop native-preview/Crawlvora
+          fi
+      - name: Native window smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: timeout 180 xvfb-run -a native-preview/Crawlvora --native-smoke
+      - name: Native window smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath (Resolve-Path native-preview/Crawlvora.exe).Path -ArgumentList '--native-smoke' -PassThru
+          if (!$p.WaitForExit(180000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
+          if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Crawlvora-native-preview-${{ runner.os }}
+          path: native-preview/
+          if-no-files-found: error

@@ -1,0 +1,15 @@
+[package]
+name = "crawlvora-desktop"
+version = "8.1.0"
+edition = "2024"
+publish = false
+
+[build-dependencies]
+tauri-build = "=2.7.6"
+
+[dependencies]
+tauri = "=2.12.7"
+
+[profile.release]
+strip = true
+lto = "thin"

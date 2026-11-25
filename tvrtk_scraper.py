@@ -6,6 +6,7 @@ import sys
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 import io
@@ -31,6 +32,7 @@ def main():
     ap.add_argument('--registry-sync',action='store_true')
     ap.add_argument('--registry-limit',type=int,default=500)
     ap.add_argument('--desktop',action='store_true')
+    ap.add_argument('--worker',action='store_true',help='Run the authenticated desktop worker on loopback')
     ap.add_argument('--self-test',type=Path,help='Write packaged runtime smoke test result and exit')
     ap.add_argument('--no-browser',action='store_true')
     ap.add_argument('--crawl',action='store_true',help='Pokreni web bot bez nadzorne ploče')
@@ -41,6 +43,8 @@ def main():
     ap.add_argument('--refresh',action='store_true',help='Ponovno obradi već prikupljene profile')
     if getattr(sys,'frozen',False): os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH','0')
     args=ap.parse_args()
+    if args.worker and (args.desktop or args.crawl or args.registry_sync or args.self_test):
+        ap.error('Worker mode cannot be combined with other modes.')
     if args.self_test:
         result={'ok':False}
         try:
@@ -89,9 +93,25 @@ def main():
             self.end_headers(); self.wfile.write(data)
         def authorized(self):
             return self.headers.get('Host') in (f'127.0.0.1:{self.server.server_port}',f'localhost:{self.server.server_port}')
+        def cookie_name(self):
+            return 'crawlvora_session_'+str(self.server.server_port)
+        def session_authorized(self):
+            if not args.worker: return True
+            try:
+                cookie=SimpleCookie(self.headers.get('Cookie',''))
+                value=cookie.get(self.cookie_name())
+                return value is not None and secrets.compare_digest(value.value,TOKEN)
+            except (CookieError,TypeError):
+                return False
         def do_GET(self):
             if not self.authorized(): return self.send_data({'error':'Nedopušten host.'},status=403)
-            p=urlsplit(self.path); params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
+            p=urlsplit(self.path)
+            if args.worker and p.path.startswith('/session/'):
+                if not secrets.compare_digest(p.path,'/session/'+TOKEN):
+                    return self.send_data({'error':'Access denied.'},status=403)
+                return self.send_data(b'',status=303,extra={'Location':'/','Set-Cookie':self.cookie_name()+'='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict'})
+            if not self.session_authorized(): return self.send_data({'error':'Access denied.'},status=403)
+            params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
             filters={k:get(k) for k in ('q','city','contact','provider')}
             try:
                 if p.path=='/': return self.send_data((ROOT/'static/index.html').read_text().replace('__TOKEN__',TOKEN).encode(),'text/html; charset=utf-8')
@@ -133,7 +153,7 @@ def main():
             except (BrokenPipeError,ConnectionResetError): pass
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Interna pogreška.'},status=500)
         def do_POST(self):
-            if not self.authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
+            if not self.authorized() or not self.session_authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 n=int(self.headers.get('Content-Length','0'))
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
@@ -170,6 +190,19 @@ def main():
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Operacija nije uspjela.'},status=500)
         def log_message(self,*args): pass
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler); url=f'http://127.0.0.1:{server.server_port}'
+    if args.worker:
+        # The parent receives this secret over a private stdout pipe. Never log it.
+        print('CRAWLVORA_READY '+url+'/session/'+TOKEN,flush=True)
+        def parent_watch():
+            try:
+                if sys.stdin is not None: sys.stdin.buffer.read(1)
+            finally:
+                server.shutdown()
+        threading.Thread(target=parent_watch,daemon=True).start()
+        try: server.serve_forever()
+        finally:
+            queue.close(); collector.stop(); server.server_close()
+        return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
         import webview
