@@ -24,3 +24,12 @@ Reviewed the current worker authentication and request parsing, registry-only ru
 | CSS selectors exclusively targeting retired Collector/Studio screen IDs | Removed 6 exclusive rules; shared rules and historical data/source compatibility retained. |
 
 The literal frontend ID scan found no absent element IDs and no unreferenced named top-level functions by lexical count. Legacy source helpers still have test/historical compatibility references and are not safe to remove solely based on lexical results. These are incremental findings, not certification: automated dependency, Bandit, Vulture, clone, native and browser checks for the new commit remain required. Original reference archive, authorized production API and full native acceptance remain outstanding.
+
+
+## Audit coverage follow-up
+
+Evidence: [quality job 139567390507](https://github.com/bren-wp/Crawlvore/actions/runs/45717551105/job/139567390507) on c3e24e1 scanned 201 functions, found zero unused import candidates, zero high-risk call patterns, one normalized whole-function clone (backup SHA-256; consolidated in c2231ce), and zero candidates across 298 normalized statement windows. The dependency report listed PyInstaller and legacy PyWebView as not installed. This was an audit scope gap, not a verified vulnerability.
+
+The active native build now shares a pinned PyInstaller requirement file with the quality job. The source inventory fails on unresolved active dependencies; both native platform jobs run pip check and pip-audit against their installed runtime/build dependencies before packaging. The historical PyWebView build remains separate, is not claimed to be audited, and is not a production release route. Regression coverage checks that synthetic OAuth credentials are never returned by the registry status endpoint. Applying or removing registry credentials is serialized against active collection.
+
+All new checks require execution on the latest commit; historical results cannot certify it.

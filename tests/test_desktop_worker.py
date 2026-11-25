@@ -51,6 +51,13 @@ class DesktopWorkerTests(unittest.TestCase):
                     with self.assertRaises(urllib.error.HTTPError) as rejected:
                         post('/api/preferences/theme',payload)
                     self.assertEqual(rejected.exception.code,400)
+                credentials={'client_id':'synthetic-audit-id','client_secret':'synthetic-audit-secret'}
+                self.assertEqual(post('/api/registry/credentials',credentials),{'ok':True,'configured':True,'authorized':False})
+                with opener.open(base+'/api/registry',timeout=5) as response:
+                    raw=response.read()
+                    self.assertNotIn(credentials['client_id'].encode(),raw)
+                    self.assertNotIn(credentials['client_secret'].encode(),raw)
+                    self.assertTrue(json.loads(raw)['configured'])
                 self.assertEqual(post('/api/preferences/theme',{'theme':'light'})['theme'],'light')
                 with opener.open(base+'/',timeout=5) as response:
                     self.assertIn(b'data-theme="light"',response.read())

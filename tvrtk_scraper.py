@@ -291,7 +291,11 @@ def run_workspace(args,selection,active):
                         db.execute("INSERT INTO meta(key,value) VALUES('ui_language',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(lang,))
                     return self.send_data({'ok':True,'language':lang})
                 if self.path=='/api/registry/credentials':
-                    return self.send_data(dict(registry_access.apply(data),ok=True))
+                    def apply_access():
+                        if collector.snapshot()['status'] in ('running','stopping'):
+                            raise ValueError('Zaustavite sinkronizaciju prije promjene pristupa.')
+                        return registry_access.apply(data)
+                    return self.send_data(dict(queue.direct(apply_access),ok=True))
                 if self.path=='/api/registry/forget':
                     def forget_access():
                         if collector.snapshot()['status'] in ('running','stopping'):

@@ -324,6 +324,7 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "Ukloni spremljeni pristup": "Remove saved access",
   "Spremljeni pristup je uklonjen.": "Saved access removed.",
   "Zaustavite sinkronizaciju prije uklanjanja pristupa.": "Stop synchronization before removing access.",
+  "Zaustavite sinkronizaciju prije promjene pristupa.": "Stop synchronization before changing access.",
   "Sigurna pohrana pristupnih podataka nije dostupna.": "Secure credential storage is unavailable.",
   "Pristupni podaci su primijenjeni.": "Credentials applied.",
   "Sigurnosne kopije i oporavak": "Backup & Recovery",
