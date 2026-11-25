@@ -14,6 +14,9 @@ interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
 interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
 interface InterfaceElements {
+  "backup-password":HTMLInputElement;
+  "backup-confirm":HTMLInputElement;
+  "backup-encrypt":HTMLButtonElement;
   "workspace-active":HTMLElement;
   "workspace-selected":HTMLElement;
   "workspace-activate":HTMLButtonElement;
@@ -276,6 +279,7 @@ function syncRecovery(){
     const backup=$('recovery-backup').value, item=recoveryList.find(x=>x.id===backup);
     $('recovery-size').textContent=item?translate('Veličina kopije')+': '+n(item.bytes)+' B':'';
     $('recovery-download').disabled=recoveryBusy||!backup;
+    $('backup-encrypt').disabled=recoveryBusy||!backup;
     $('recovery-restore').disabled=recoveryBusy||!backup;
     $('recovery-inspect').disabled=recoveryBusy||!$('recovery-space').value;
     $('recovery-create').disabled=recoveryBusy;
@@ -335,3 +339,15 @@ function selectWorkspace(id:string){
 }
 $('workspace-activate').onclick=()=>selectWorkspace($('recovery-space').value);
 $('workspace-primary').onclick=()=>selectWorkspace('primary');
+
+$('backup-encrypt').onclick=()=>recoveryAction(async()=>{
+    const password=$('backup-password').value, id=$('recovery-backup').value;
+    if(password.length<16||password!==$('backup-confirm').value)throw Error(translate('Lozinke se moraju podudarati i imati najmanje 16 znakova.'));
+    $('backup-password').value='';$('backup-confirm').value='';
+    const response=await fetch('/api/recovery/encrypt',{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify({id,password})});
+    if(!response.ok)throw Error(translate('Operacija nije uspjela.'));
+    const url=URL.createObjectURL(await response.blob()), a=document.createElement('a');
+    a.href=url;a.download=id.replace(/\.sqlite3$/,'')+'.cvbackup';document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    $('recovery-status').textContent=translate('Šifrirana kopija pripremljena je za preuzimanje.');
+});

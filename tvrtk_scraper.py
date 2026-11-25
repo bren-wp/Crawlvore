@@ -23,6 +23,7 @@ from snapshot_diff import compare
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 from workspace_selection import WorkspaceSelection
+from encrypted_backup import encrypt_backup
 
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_hex(32)
@@ -198,6 +199,17 @@ def run_workspace(args,selection,active):
                     if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                     return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if self.path=='/api/recovery/encrypt':
+                    if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
+                    password=data.get('password')
+                    if not isinstance(password,str) or not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
+                    with recovery.lock:
+                        source=recovery.backup_path(data.get('id'))
+                        with tempfile.TemporaryDirectory(dir=args.data_dir) as directory:
+                            out=encrypt_backup(source,Path(directory)/'backup.cvbackup',password)
+                            self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{source.stem}.cvbackup"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                            with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile)
+                    return
                 if self.path=='/api/recovery/select':
                     if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm workspace selection first.')
                     return self.send_data({'selected':selection.choose(data.get('id'))})
