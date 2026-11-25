@@ -27,10 +27,11 @@ def workspace_lock(directory):
         # Closing the descriptor releases the OS lock even after an abnormal exit.
         yield
 
-def verified_backup(database):
+def verified_backup(database, directory=None):
     database=Path(database)
     if not database.is_file(): return None
-    directory=database.parent/'backups'
+    directory=Path(directory) if directory is not None else database.parent/'backups'
+    if directory.is_symlink(): raise ValueError('Invalid backup directory.')
     directory.mkdir(mode=0o700,exist_ok=True)
     stamp=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
     fd,temporary=tempfile.mkstemp(prefix='pending-',suffix='.sqlite3',dir=directory)

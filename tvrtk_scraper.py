@@ -24,6 +24,7 @@ from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
+from protected_backups import ProtectedBackups
 from workspace_integrity import WorkspaceIntegrity, inspect_database, check_search_index
 from cryptography.exceptions import InvalidTag
 from urllib.parse import unquote
@@ -81,6 +82,7 @@ def run_workspace(args,selection,active):
     store=Store(database); collector=Collector(store); registry=Registry(store)
     recovery=RecoveryCenter(database,root=selection.root)
     transfers=BackupTransfer(recovery)
+    protected=ProtectedBackups(database,recovery)
     integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
     if active=='primary' and seed.exists(): store.seed(seed)
@@ -111,6 +113,7 @@ def run_workspace(args,selection,active):
         try: return all(registry_credentials())
         except ValueError: return False
     queue=Queue(store,collector,registry,registry_credentials); queue.start()
+    protected.start()
     class Handler(BaseHTTPRequestHandler):
         def send_data(self,data,kind='application/json; charset=utf-8',status=200,extra=None):
             if not isinstance(data,bytes): data=json.dumps(data,ensure_ascii=False).encode()
@@ -173,6 +176,12 @@ def run_workspace(args,selection,active):
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
+                if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())
+                if p.path=='/api/recovery/protected-download':
+                    with protected.download(get('id')) as path:
+                        self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(path.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with path.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
                 if p.path=='/api/recovery/integrity': return self.send_data(dict(integrity.snapshot(),search=search_integrity))
                 if p.path=='/api/recovery/encrypted-download':
                     with transfers.download(get('ticket')) as (path,name):
@@ -217,7 +226,7 @@ def run_workspace(args,selection,active):
                 raw=self.rfile.read(n)
                 if self.path in ('/api/import-json','/api/import'):
                     # A consistent backup precedes every user-initiated import; rejected imports never mutate the directory.
-                    verified_backup(database)
+                    protected.before_import()
                     if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                     return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
@@ -226,6 +235,20 @@ def run_workspace(args,selection,active):
                     password=data.get('password')
                     if not isinstance(password,str) or not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
                     return self.send_data({'ticket':transfers.prepare(data.get('id'),password)})
+                if self.path=='/api/recovery/protected-unlock':
+                    return self.send_data(protected.unlock(data.get('password'),initialize=data.get('initialize') is True))
+                if self.path=='/api/recovery/protected-lock':
+                    protected.lock_session()
+                    return self.send_data(protected.snapshot())
+                if self.path=='/api/recovery/protected-create':
+                    return self.send_data({'id':protected.create()})
+                if self.path=='/api/recovery/protected-verify':
+                    return self.send_data(protected.verify())
+                if self.path=='/api/recovery/protected-restore':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')
+                    identifier=protected.restore(data.get('id'))
+                    integrity.start()
+                    return self.send_data({'id':identifier})
                 if self.path=='/api/recovery/integrity':
                     integrity.start(full=True)
                     return self.send_data({'ok':True})
@@ -289,7 +312,7 @@ def run_workspace(args,selection,active):
         threading.Thread(target=parent_watch,daemon=True).start()
         try: server.serve_forever()
         finally:
-            queue.close(); collector.stop(); server.server_close(); transfers.close()
+            queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
@@ -300,10 +323,10 @@ def run_workspace(args,selection,active):
             webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
             webview.start(gui='edgechromium')
         finally:
-            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close()
+            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
         return 0
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: queue.close(); collector.stop(); server.server_close(); transfers.close()
+    finally: queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
 if __name__=='__main__': sys.exit(main())
