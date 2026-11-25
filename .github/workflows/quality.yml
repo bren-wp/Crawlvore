@@ -26,6 +26,7 @@ jobs:
       - run: python tools/ui_e2e.py
       - run: python tools/visual_check.py
       - run: python tools/pixel_diff.py > pixel-diff.json
+      - run: python tools/performance_check.py --records 100000 > performance.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -34,4 +35,5 @@ jobs:
             package-lock.json
             source-audit.json
             pixel-diff.json
+            performance.json
             branding/*fixture.png

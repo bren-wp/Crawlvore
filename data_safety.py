@@ -58,3 +58,50 @@ def verified_backup(database):
         return final
     finally:
         if pending.exists(): pending.unlink()
+
+
+def restore_workspace(backup, destination):
+    """Restore a verified database into an exclusively created NEW workspace.
+
+    Never opens the active workspace for writing or overwrites a previous recovery.
+    Private credential files are deliberately not copied.
+    """
+    backup=Path(backup).resolve(strict=True)
+    destination=Path(destination)
+    if not backup.is_file(): raise ValueError('Backup must be a file.')
+    # Read-only connection, including committed WAL if present.
+    source=sqlite3.connect(backup.as_uri()+'?mode=ro',uri=True,timeout=20)
+    try:
+        source.execute('BEGIN')
+        if source.execute('PRAGMA integrity_check').fetchall()!=[('ok',)]:
+            raise ValueError('Backup failed integrity check.')
+        if source.execute('PRAGMA foreign_key_check').fetchone() is not None:
+            raise ValueError('Backup contains broken references.')
+        tables={r[0] for r in source.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if not {'companies','meta','origins'}<=tables:
+            raise ValueError('Not a supported Crawlvora database.')
+        # mkdir without exist_ok rejects existing paths including symlinks.
+        destination.mkdir(mode=0o700)
+        fd,name=tempfile.mkstemp(prefix='recovery-',suffix='.pending',dir=destination)
+        os.close(fd)
+        pending=Path(name)
+        target=destination/'companies.sqlite3'
+        try:
+            out=sqlite3.connect(pending,timeout=20)
+            try:
+                source.backup(out,pages=256,sleep=.05)
+                if out.execute('PRAGMA integrity_check').fetchall()!=[('ok',)] or out.execute('PRAGMA foreign_key_check').fetchone() is not None:
+                    raise ValueError('Recovered copy failed validation.')
+            finally: out.close()
+            with pending.open('r+b') as stream: os.fsync(stream.fileno())
+            # Hard link is atomic and fails if any target already exists.
+            os.link(pending,target)
+            pending.unlink()
+            if os.name!='nt':
+                fd=os.open(destination,os.O_RDONLY)
+                try: os.fsync(fd)
+                finally: os.close(fd)
+            return target
+        finally:
+            if pending.exists(): pending.unlink()
+    finally: source.close()

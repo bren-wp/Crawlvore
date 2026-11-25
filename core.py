@@ -78,6 +78,7 @@ class Store:
             c.execute('CREATE TABLE IF NOT EXISTS companies (id INTEGER PRIMARY KEY, identity TEXT UNIQUE NOT NULL, source TEXT UNIQUE, '+','.join(k+" TEXT NOT NULL DEFAULT ''" for k in COLS)+', search_text TEXT NOT NULL DEFAULT \'\')')
             c.execute('CREATE INDEX IF NOT EXISTS idx_city ON companies(city)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_title ON companies(title COLLATE NOCASE)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_city_title ON companies(city,title COLLATE NOCASE,id)')
             c.execute('CREATE TABLE IF NOT EXISTS completed (job TEXT, url TEXT, PRIMARY KEY(job,url))')
             c.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
             existing={r[1] for r in c.execute('PRAGMA table_info(companies)')}
@@ -216,6 +217,7 @@ class Store:
         return {'days':days}
     def stats(self):
         with self.db() as c:
+            c.execute('BEGIN')
             r=c.execute("SELECT count(*) total,count(DISTINCT NULLIF(city,'')) cities,count(NULLIF(phone,'')) phones,count(NULLIF(website,'')) websites FROM companies").fetchone()
             cities=[dict(x) for x in c.execute("SELECT city,count(*) n FROM companies WHERE city<>'' GROUP BY city ORDER BY n DESC,city LIMIT 6")]
             return dict(r,top_cities=cities)

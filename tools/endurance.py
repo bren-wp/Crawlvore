@@ -3,6 +3,7 @@ import argparse, concurrent.futures, json, sys, tempfile, threading, time
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from core import Store
+from data_safety import verified_backup,restore_workspace
 
 def run(seconds):
     with tempfile.TemporaryDirectory() as td:
@@ -29,6 +30,9 @@ def run(seconds):
         with store.db() as c: integrity=c.execute('PRAGMA integrity_check').fetchone()[0]; fk=list(c.execute('PRAGMA foreign_key_check'))
         assert integrity=='ok' and not fk
         assert initial<=store.stats()['total']<=initial+100
-        return {'requested_seconds':seconds,'elapsed_seconds':round(time.monotonic()-start,3),'operations':counts,'latencies':latencies,'initial_records':initial,'final_records':store.stats()['total'],'integrity':integrity,'foreign_key_violations':len(fk)}
+        backup=verified_backup(Path(store.path))
+        restored=Store(restore_workspace(backup,Path(td)/'recovered'))
+        assert restored.stats()==store.stats()
+        return {'recovery_verified':True,'requested_seconds':seconds,'elapsed_seconds':round(time.monotonic()-start,3),'operations':counts,'latencies':latencies,'initial_records':initial,'final_records':store.stats()['total'],'integrity':integrity,'foreign_key_violations':len(fk)}
 if __name__=='__main__':
     ap=argparse.ArgumentParser(); ap.add_argument('--seconds',type=int,default=14400); args=ap.parse_args(); assert args.seconds>0; print(json.dumps(run(args.seconds),indent=2))
