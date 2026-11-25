@@ -81,3 +81,54 @@ dialog{width:min(700px,calc(100% - 24px));padding:20px;border-color:color-mix(in
 .recovery-panel label{margin-top:12px}.recovery-panel .actions{flex-wrap:wrap}.recovery-panel select{min-width:0;width:100%;max-width:100%}.recovery-panel #recovery-preview{max-height:180px;overflow:auto;overflow-wrap:anywhere}.recovery-panel #recovery-preview p{margin-top:5px}.recovery-panel #recovery-status{margin-top:8px}
 
 .protected-panel{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}.protected-panel summary{cursor:pointer;font-weight:600;color:var(--text)}.protected-panel summary+ p{margin-top:9px}.protected-panel #protected-orphans{overflow-wrap:anywhere}
+
+
+/* Resizable desktop workspace: preserve the reference layout at large sizes,
+   reflow controls rather than clipping them at compact sizes or high DPI. */
+.sidebar{overflow-y:auto;overscroll-behavior:contain}
+.sidebar>*,.sidebar nav>*{flex-shrink:0}
+main,.view,.panel,.panel-head>*,.heading>*,.topbar>*,.actions>*,.settings-grid>*{min-width:0}
+.topbar{height:auto;min-height:47px;padding-block:6px;flex-wrap:wrap}
+.top-actions{flex-wrap:wrap;min-width:0;gap:8px}
+.panel-head,.result-bar,.pagination{flex-wrap:wrap}
+.panel-head>div:first-child,.heading>div:first-child{overflow-wrap:anywhere}
+.actions,.pagination>div{max-width:100%;flex-wrap:wrap}
+.btn,.nav{max-width:100%;overflow-wrap:anywhere}
+.check input{flex:0 0 16px}
+.check{overflow-wrap:anywhere}
+label,select,input,textarea{max-width:100%}
+.table-wrap{max-width:calc(100% + 30px);overscroll-behavior-inline:contain}
+dialog{max-width:calc(100% - 24px);max-height:calc(100vh - 24px);overscroll-behavior:contain}
+@media(max-width:1100px){
+  .overview-grid,.analytics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .heading{flex-wrap:wrap}
+  .btn{white-space:normal}
+}
+@media(max-width:960px){
+  .overview-grid,.automation-grid,.analytics-grid,.diff-controls{grid-template-columns:minmax(0,1fr)}
+  .diff-controls .btn{justify-self:start}
+}
+@media(max-height:660px) and (min-width:761px){
+  .sidebar{padding-top:12px;padding-bottom:12px}
+  .brand{padding-bottom:12px}
+  .nav-label{margin-block:7px 4px}
+  .nav{padding-block:7px}
+  .sidebottom{margin-top:8px}
+}
+@media(max-width:760px){
+  .sidebar{overflow:visible}
+  .overview-grid,.analytics-grid{grid-template-columns:minmax(0,1fr)}
+  .table-wrap{max-width:calc(100% + 26px)}
+  .topbar{min-height:47px}
+  .top-actions .btn{white-space:normal}
+  .registry-search label,.compact-label{min-width:0;max-width:100%}
+}
+@media(max-width:400px){
+  .metrics,.registry-metrics{grid-template-columns:minmax(0,1fr)}
+  .metric strong,.reg-metric strong{font-size:26px}
+  .top-actions{gap:5px}
+  .panel{padding:12px}
+  .table-wrap{margin-inline:-12px;max-width:calc(100% + 24px)}
+  .heading h1{font-size:24px}
+  dialog{padding:12px}
+}
