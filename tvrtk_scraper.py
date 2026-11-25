@@ -20,6 +20,7 @@ import tempfile
 import shutil
 from automation import Queue
 from snapshot_diff import compare
+from data_safety import workspace_lock, verified_backup
 from registry_export import export as registry_export
 
 ROOT=Path(__file__).resolve().parent
@@ -57,8 +58,14 @@ def main():
             Workbook().close(); result={'ok':True,'records':26261,'browser':True}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
         args.self_test.write_text(json.dumps(result),encoding='utf-8'); return 0 if result['ok'] else 1
-    args.data_dir.mkdir(parents=True,exist_ok=True)
-    store=Store(args.data_dir/'companies.sqlite3'); collector=Collector(store); registry=Registry(store)
+    with workspace_lock(args.data_dir):
+        return run_workspace(args)
+
+def run_workspace(args):
+    database=args.data_dir/'companies.sqlite3'
+    # Fail closed before schema changes or seed imports if a backup cannot be verified.
+    verified_backup(database)
+    store=Store(database); collector=Collector(store); registry=Registry(store)
     seed=ROOT/'tvrtk_output.csv'
     if seed.exists(): store.seed(seed)
     if args.registry_sync:

@@ -88,6 +88,8 @@ class Store:
             c.execute("CREATE TABLE IF NOT EXISTS origins (company_id INTEGER NOT NULL, provider TEXT NOT NULL, url TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,provider,url), FOREIGN KEY(company_id) REFERENCES companies(id))")
             c.execute('CREATE TABLE IF NOT EXISTS company_history(id INTEGER PRIMARY KEY,company_id INTEGER NOT NULL,provider TEXT NOT NULL,changed_at TEXT DEFAULT CURRENT_TIMESTAMP,changes TEXT NOT NULL)')
             c.execute('CREATE INDEX IF NOT EXISTS history_company ON company_history(company_id,id DESC)')
+            c.execute('CREATE INDEX IF NOT EXISTS history_changed_at ON company_history(changed_at)')
+            c.execute('CREATE TABLE IF NOT EXISTS alternate_values(company_id INTEGER NOT NULL, field TEXT NOT NULL, value TEXT NOT NULL, provider TEXT NOT NULL, observed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,field,value,provider), FOREIGN KEY(company_id) REFERENCES companies(id))')
             c.execute('CREATE INDEX IF NOT EXISTS origin_provider ON origins(provider,company_id)')
             if not c.execute("SELECT 1 FROM meta WHERE key='origins_v2'").fetchone():
                 c.execute("INSERT OR IGNORE INTO origins(company_id,provider,url) SELECT id,CASE WHEN source IS NULL THEN 'csv' ELSE 'tvrtke' END,coalesce(source,'') FROM companies")
@@ -97,6 +99,7 @@ class Store:
         c=sqlite3.connect(self.path,timeout=20)
         c.row_factory=sqlite3.Row
         c.execute("PRAGMA foreign_keys=ON")
+        c.execute("PRAGMA synchronous=FULL")
         try:
             with c: yield c
         finally: c.close()
@@ -144,11 +147,15 @@ class Store:
         if old and vals['mbs'] and old['mbs'] and vals['mbs'].zfill(9)!=old['mbs'].zfill(9):
             raise ValueError('Conflicting MBS; existing records preserved.')
         if old:
+            # Preserve differing incoming values even when the directory prefers an existing contact.
+            for key,value in vals.items():
+                if value and old[key] and value!=old[key]:
+                    c.execute('INSERT OR IGNORE INTO alternate_values(company_id,field,value,provider) VALUES (?,?,?,?)',(old['id'],key,value,provider or ('tvrtke' if source else 'csv')))
             official={'title','mbs','oib','city','country','address'}
             vals={k:(vals[k] or old[k]) if provider=='registry' and k in official else (old[k] or vals[k]) for k in cols}
             changes={k:{'before':old[k],'after':v} for k,v in vals.items() if old[k]!=v}
             if changes: c.execute('INSERT INTO company_history(company_id,provider,changes) VALUES (?,?,?)',(old['id'],provider or ('tvrtke' if source else 'csv'),json.dumps(changes,ensure_ascii=False)))
-            c.execute('UPDATE companies SET title=?,logo=?,website=?,social=?,address=?,postal=?,city=?,country=?,phone=?,fax=?,person=?,year=?,employees=?,account=?,mbs=?,rating=?,description=?,products=?,oib=?,email=?,industry=?,source=?,search_text=? WHERE id=?',(*vals.values(),old['source'] or source,norm(' '.join(vals.values())),old['id']))
+            if changes or (source and not old['source']): c.execute('UPDATE companies SET title=?,logo=?,website=?,social=?,address=?,postal=?,city=?,country=?,phone=?,fax=?,person=?,year=?,employees=?,account=?,mbs=?,rating=?,description=?,products=?,oib=?,email=?,industry=?,source=?,search_text=? WHERE id=?',(*vals.values(),old['source'] or source,norm(' '.join(vals.values())),old['id']))
             i=old['id']
         else:
             i=c.execute('INSERT INTO companies(identity,source,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry,search_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(identity,source,*vals.values(),norm(' '.join(vals.values())))).lastrowid
@@ -172,19 +179,23 @@ class Store:
             for r in rows: r['sources']=origins.get(r['id'],[])
         return __import__('json').dumps(rows,ensure_ascii=False,indent=2).encode()
     def import_csv(self,stream):
+        with self.db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            return self._import_csv(c,stream)
+    def _import_csv(self,c,stream):
         reader=csv.DictReader(stream)
         if not reader.fieldnames or not set(FIELDS).issubset(reader.fieldnames): raise ValueError('CSV ne sadrži očekivanih 18 stupaca.')
         count=added=0
-        with self.db() as c:
-            for row in reader:
-                if None in row or any(row.get(k) is None for k in FIELDS): raise ValueError(f'Neispravan CSV redak {reader.line_num}.')
-                count+=1; added+=self.upsert(c,dict(zip(COLS,(row[k] for k in FIELDS)),oib=row.get('OIB',''),email=row.get('Email',''),industry=row.get('Industry','')))
+        for row in reader:
+            if None in row or any(row.get(k) is None for k in FIELDS): raise ValueError(f'Neispravan CSV redak {reader.line_num}.')
+            count+=1; added+=self.upsert(c,dict(zip(COLS,(row[k] for k in FIELDS)),oib=row.get('OIB',''),email=row.get('Email',''),industry=row.get('Industry','')))
         return {'read':count,'added':added}
     def seed(self,path):
         with self.db() as c:
+            c.execute('BEGIN IMMEDIATE')
             if c.execute("SELECT 1 FROM meta WHERE key='seeded'").fetchone(): return
-        with open(path,encoding='utf-8-sig',newline='') as f: self.import_csv(f)
-        with self.db() as c: c.execute("INSERT OR IGNORE INTO meta VALUES ('seeded','1')")
+            with open(path,encoding='utf-8-sig',newline='') as f: self._import_csv(c,f)
+            c.execute("INSERT INTO meta VALUES ('seeded','1')")
     def analytics(self):
         # Local observations, not inferred business growth or fabricated register events.
         with self.db() as c:

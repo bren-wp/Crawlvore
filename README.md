@@ -25,7 +25,7 @@ Crawlvora is a local-first business data intelligence workspace for the Croatian
 | 🏛️ **Court Registry** | Connect to the Croatian public registry API, synchronize consistent snapshots and compare completed snapshots. |
 | 🗓️ **Tasks and scheduling** | Queue registry synchronization jobs and schedule weekday registry updates while the application runs. |
 | 📊 **Flexible exports** | Export directory data to CSV, JSON or Excel; registry categories also support XML, JSONL and SQLite SQL. |
-| 🔒 **Local-first workspace** | Keep your database on your device. Access restrictions are respected and credentials stay outside public distribution. |
+| 🔒 **Local-first workspace** | Verified local database backups, atomic imports and workspace locking. Keep your database on your device. Access restrictions are respected and credentials stay outside public distribution. |
 | 🎨 **A unified workspace** | Obsidian and mint visual identity, light and dark themes, responsive layouts. |
 
 ## Screenshots

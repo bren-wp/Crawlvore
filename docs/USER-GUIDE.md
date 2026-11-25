@@ -15,3 +15,7 @@ The bundled original CSV contains 26,261 records and is seeded only once. Existi
 Use Court Registry to synchronize public bulk categories with the same snapshot ID, resume interrupted pages, browse records, compare completed snapshots and export. Official data updates compatible identity fields while retaining existing contacts. Tasks & Schedule provides the registry-only queue and weekday refresh.
 
 Live credentials, complete synchronization, platform packaging and exact design parity must be verified before a production release.
+
+## Data protection
+
+Every normal launch acquires an OS workspace lock and creates a verified SQLite online backup before modifying an existing database. Backups are stored in the workspace's `backups` directory and are never automatically deleted. A failed backup prevents opening the workspace for changes. First-time seed import and its completion marker commit atomically. Differing incoming nonempty field values are retained in the local alternate_values table. These safeguards do not guarantee survival of disk failure: keep independent encrypted backups. For recovery, close all instances, copy the entire current workspace to a separate location, then restore a verified backup into a new workspace; never overwrite the only original. Backups contain business/contact data and must remain private.
