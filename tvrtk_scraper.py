@@ -287,7 +287,11 @@ def run_workspace(args,selection,active):
                 if self.path=='/api/registry/credentials':
                     return self.send_data(dict(registry_access.apply(data),ok=True))
                 if self.path=='/api/registry/forget':
-                    return self.send_data(dict(registry_access.forget(),ok=True))
+                    def forget_access():
+                        if collector.snapshot()['status'] in ('running','stopping'):
+                            raise ValueError('Zaustavite sinkronizaciju prije uklanjanja pristupa.')
+                        return registry_access.forget()
+                    return self.send_data(dict(queue.direct(forget_access),ok=True))
                 if self.path=='/api/jobs/add': return self.send_data(queue.enqueue(data.get('kind'),data.get('config',{})))
                 if self.path=='/api/jobs/cancel': return self.send_data(queue.cancel(data.get('id')))
                 if self.path=='/api/jobs/schedule':
