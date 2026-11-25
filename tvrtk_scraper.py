@@ -177,6 +177,10 @@ def run_workspace(args,selection,active):
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
                 if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())
+                if p.path=='/api/recovery/protected-manifest':
+                    identifier=get('id')
+                    raw=protected.portable_manifest(identifier)
+                    return self.send_data(raw,kind='application/json',extra={'Content-Disposition':f'attachment; filename="{identifier}.manifest.json"'})
                 if p.path=='/api/recovery/protected-download':
                     with protected.download(get('id')) as path:
                         self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(path.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()

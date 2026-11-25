@@ -101,11 +101,38 @@ class ProtectedBackups:
                 self.vault_state='attention'
                 raise ValueError('Uncertain catalog commit; original archives preserved.')
         elif pending is not None and current==pending:
-            self.anchor=dict(self.anchor,committed=pending,pending=None)
-            self.vault.save(self.anchor)
+            updated=dict(self.anchor,committed=pending,pending=None,prepared_entry=None)
+            self.vault.save(updated)
+            self.anchor=updated
         else:
             self.vault_state='attention'
             raise ValueError('Catalog rollback or unexpected checkpoint detected.')
+
+    def complete_pending(self):
+        # Roll forward only an exact, authenticated prepared entry; never accept a stale head.
+        if not self.anchor or not self.anchor.get('pending'): return
+        pending=self.anchor['pending']
+        prepared=self.anchor.get('prepared_entry')
+        with self.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            rows,head=self.validated_rows(c)
+            current=self.checkpoint(rows,head)
+            if current==pending: pass
+            elif current==self.anchor['committed'] and isinstance(prepared,dict):
+                entry=dict(prepared)
+                signature=entry.pop('signature',None)
+                if set(entry)!={'seq','archive','bytes','sha256','created','previous'} or not isinstance(signature,str) or entry['seq']!=len(rows)+1 or entry['previous']!=head or pending!={'count':entry['seq'],'head':signature} or not hmac.compare_digest(signature,mac(self.key,'entry',entry)):
+                    raise ValueError('Prepared checkpoint authentication failed.')
+                path=self.archive_path(entry['archive'])
+                if path.stat().st_size!=entry['bytes'] or not hmac.compare_digest(digest(path),entry['sha256']):
+                    raise ValueError('Prepared archive unavailable or modified.')
+                c.execute('INSERT INTO entries VALUES(?,?,?,?,?,?,?)',(entry['seq'],entry['archive'],entry['bytes'],entry['sha256'],entry['created'],entry['previous'],signature))
+                c.execute('UPDATE catalog_meta SET count=?,head=?,seal=? WHERE id=1',(entry['seq'],signature,mac(self.key,'head',[entry['seq'],signature])))
+            else: raise ValueError('Uncertain catalog commit; original archives preserved.')
+        # Commit first, then finalize the protected checkpoint. Failure remains recoverable.
+        with self.connect() as c:
+            rows,head=self.validated_rows(c)
+            self.verify_anchor(rows,head)
 
     def enroll_vault(self):
         with self.lock:
@@ -180,6 +207,7 @@ class ProtectedBackups:
                 if record is not None: self.anchor=record
                 if self.anchor is not None and not hmac.compare_digest(self.anchor['password'].encode(),password.encode()):
                     raise ValueError('Protected vault passphrase mismatch.')
+                self.complete_pending()
                 self.verify()
             except BaseException:
                 self.lock_session()
@@ -266,8 +294,9 @@ class ProtectedBackups:
                 signature=mac(self.key,'entry',entry)
                 if self.anchor is not None:
                     self.verify_anchor(rows,previous)
-                    self.anchor=dict(self.anchor,pending={'count':entry['seq'],'head':signature})
-                    self.vault.save(self.anchor)
+                    updated=dict(self.anchor,pending={'count':entry['seq'],'head':signature},prepared_entry=dict(entry,signature=signature))
+                    self.vault.save(updated)
+                    self.anchor=updated
                 c.execute('INSERT INTO entries VALUES(?,?,?,?,?,?,?)',(*entry.values(),signature))
                 c.execute('UPDATE catalog_meta SET count=?,head=?,seal=? WHERE id=1',(entry['seq'],signature,mac(self.key,'head',[entry['seq'],signature])))
             self.next_backup=time.monotonic()+BACKUP_INTERVAL
@@ -307,6 +336,18 @@ class ProtectedBackups:
         with self.lock:
             yield self.verified_archive(identifier)
 
+    def portable_manifest(self,identifier):
+        from portable_recovery import manifest_bytes
+        with self.lock:
+            self.verified_archive(identifier)
+            with self.connect() as c:
+                c.execute('BEGIN')
+                rows,head=self.validated_rows(c)
+                self.verify_anchor(rows,head)
+                salt=c.execute('SELECT salt FROM catalog_meta WHERE id=1').fetchone()[0]
+            entry=next(x for x in rows if x['archive']==identifier)
+            return manifest_bytes(self.key,salt,entry,len(rows),head)
+
     def configure_replica(self,directory):
         from backup_replica import destination_for
         with self.lock:
@@ -339,6 +380,13 @@ class ProtectedBackups:
                     source=self.verified_archive(item['archive'])
                     copy_verified(source,folder/item['archive'],item['sha256'])
                 catalog_snapshot(self.catalog,folder/('catalog-'+head+'.sqlite3'))
+                # Manifest names include the authenticated head so older checkpoints survive.
+                for item in rows:
+                    raw=self.portable_manifest(item['archive'])
+                    with tempfile.TemporaryDirectory(dir=self.root) as tmp:
+                        source=Path(tmp)/'manifest.json'
+                        source.write_bytes(raw)
+                        copy_verified(source,folder/(item['archive']+'.'+head+'.manifest.json'),digest(source))
                 self.replica_status='verified'
                 return self.snapshot()
             except BaseException:

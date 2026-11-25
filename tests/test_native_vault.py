@@ -84,3 +84,32 @@ class NativeVaultTests(unittest.TestCase):
             self.assertNotIn(record['password'].encode(),vault.windows_path().read_bytes())
             other=NativeVault(Path(tmp)/'other-workspace')
             self.assertIsNone(other.load())
+
+    def test_prepared_transaction_rolls_forward_exact_signed_entry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); path=root/'companies.sqlite3'
+            Store(path).import_json('[{"title":"Synthetic record"}]')
+            vault=TestVault(); center=RecoveryCenter(path)
+            engine=ProtectedBackups(path,center,vault)
+            password='synthetic recovery passphrase'
+            engine.unlock(password,initialize=True)
+            engine.enroll_vault()
+            engine.create()
+            prior=engine.catalog.read_bytes()
+            old=copy.deepcopy(vault.value['committed'])
+            name=engine.create()
+            with engine.connect() as c:
+                entry=dict(c.execute('SELECT * FROM entries ORDER BY seq DESC LIMIT 1').fetchone())
+            latest=copy.deepcopy(vault.value['committed'])
+            engine.lock_session()
+            engine.catalog.write_bytes(prior)
+            vault.value.update(committed=old,pending=latest,prepared_entry=entry)
+            reopened=ProtectedBackups(path,center,vault)
+            reopened.start()
+            try:
+                self.assertTrue(reopened.snapshot()['unlocked'])
+                self.assertEqual(vault.value['committed'],latest)
+                self.assertIsNone(vault.value['pending'])
+                self.assertEqual(reopened.snapshot()['archives'][-1]['archive'],name)
+                self.assertTrue(reopened.verify_restore(name)['verified'])
+            finally: reopened.close()
