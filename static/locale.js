@@ -323,6 +323,7 @@ const UI_MESSAGES = {
   "Ovlašten sam za pristup API-ju i želim sigurno spremiti pristupne podatke.": "I am authorized to access the API and want to securely save my credentials.",
   "Ukloni spremljeni pristup": "Remove saved access",
   "Spremljeni pristup je uklonjen.": "Saved access removed.",
+  "Zaustavite sinkronizaciju prije uklanjanja pristupa.": "Stop synchronization before removing access.",
   "Sigurna pohrana pristupnih podataka nije dostupna.": "Secure credential storage is unavailable.",
   "Pristupni podaci su primijenjeni.": "Credentials applied.",
   "Sigurnosne kopije i oporavak": "Backup & Recovery",
