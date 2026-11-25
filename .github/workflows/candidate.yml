@@ -1,0 +1,60 @@
+name: Verified desktop release candidate
+on:
+  push:
+    branches: [data-safety-release]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    if: github.ref == 'refs/heads/data-safety-release'
+    uses: ./.github/workflows/quality.yml
+  native:
+    if: github.ref == 'refs/heads/data-safety-release'
+    uses: ./.github/workflows/native.yml
+  publish:
+    needs: [quality, native]
+    if: github.ref == 'refs/heads/data-safety-release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: Crawlvora-native-Windows
+          path: release
+      - uses: actions/download-artifact@v8
+        with:
+          name: Crawlvora-native-Linux
+          path: release
+      - name: Validate complete candidate assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
+          cd release
+          files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip)
+          for file in "${files[@]}"; do test -s "$file"; done
+          sha256sum "${files[@]}" > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+      - name: Publish explicitly non-production candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION)"
+          tag="preview-${version}-${GITHUB_SHA:0:12}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'Candidate already published; immutable assets retained.'
+            exit 0
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Release Candidate" --notes "Native Windows and Linux packaging and quality CI passed for $GITHUB_SHA. Non-production candidate: exact design parity, committed dependency locks, live registry access and endurance acceptance are outstanding. Back up your workspace independently before testing. No credentials included." release/Portable.exe release/Setup.exe release/Crawlvora-Linux-amd64.deb release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-source.zip release/SHA256SUMS.txt
