@@ -111,12 +111,27 @@ class Store:
             for digit in oib[:10]: a=((a+int(digit))%10 or 10)*2%11
             vals['oib']=oib if (11-a)%10==int(oib[-1]) else ''
         else: vals['oib']=''
+        raw_mbs=vals['mbs']
+        if re.fullmatch(r'[0-9]{1,9}',raw_mbs): vals['mbs']=raw_mbs.zfill(9)
         identity=norm(vals['title'])+'\x1f'+norm(vals['city'])
         old=c.execute('SELECT * FROM companies WHERE source=?',(source,)).fetchone() if source else None
+        if not old and re.fullmatch(r'[0-9]{9}',vals['mbs']):
+            matches=c.execute('SELECT * FROM companies WHERE mbs IN (?,?) LIMIT 2',(vals['mbs'],vals['mbs'].lstrip('0') or '0')).fetchall()
+            if len(matches)==1 and (not vals['oib'] or not matches[0]['oib'] or vals['oib']==matches[0]['oib']):
+                old=matches[0]
+            elif len(matches)>1:
+                raise ValueError('Ambiguous MBS; existing records preserved.')
+            elif matches:
+                raise ValueError('Conflicting OIB and MBS; existing records preserved.')
         if not old and vals['oib']:
             matches=c.execute('SELECT * FROM companies WHERE oib=? LIMIT 2',(vals['oib'],)).fetchall()
-            if len(matches)==1 and not (provider=='registry' and vals['mbs'] and matches[0]['mbs'] and vals['mbs']!=matches[0]['mbs']): old=matches[0]
+            if len(matches)==1 and not (provider=='registry' and vals['mbs'] and matches[0]['mbs'] and vals['mbs']!=matches[0]['mbs'].zfill(9)): old=matches[0]
         if old and vals['oib'] and old['oib'] and vals['oib']!=old['oib']: raise ValueError('Sukob OIB identifikatora; zapis nije spojen.')
+        if not old and provider=='registry' and vals['mbs']:
+            if vals['city'] and vals['address']:
+                candidate=c.execute('SELECT * FROM companies WHERE identity=?',(identity,)).fetchone()
+                if candidate and norm(candidate['address'])==norm(vals['address']) and (not candidate['oib'] or candidate['oib']==vals['oib']) and (not candidate['mbs'] or candidate['mbs'].zfill(9)==vals['mbs']):
+                    old=candidate
         if not old and provider=='registry' and vals['mbs']:
             old=c.execute("SELECT * FROM companies WHERE mbs=? AND EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider='registry')",(vals['mbs'],)).fetchone()
             identity='registry\x1f'+vals['mbs']
@@ -125,7 +140,9 @@ class Store:
             if old and vals['oib'] and old['oib'] and vals['oib']!=old['oib']:
                 identity+='\x1f'+vals['oib']; old=c.execute('SELECT * FROM companies WHERE identity=?',(identity,)).fetchone()
         if old and vals['oib'] and old['oib'] and vals['oib']!=old['oib']: raise ValueError('Sukob OIB identifikatora; zapis nije spojen.')
-        if old and provider=='registry' and vals['mbs'] and old['mbs'] and vals['mbs']!=old['mbs']: raise ValueError('Sukob MBS identifikatora; zapis nije spojen.')
+        if old and provider=='registry' and vals['mbs'] and old['mbs'] and vals['mbs']!=old['mbs'].zfill(9): raise ValueError('Sukob MBS identifikatora; zapis nije spojen.')
+        if old and vals['mbs'] and old['mbs'] and vals['mbs'].zfill(9)!=old['mbs'].zfill(9):
+            raise ValueError('Conflicting MBS; existing records preserved.')
         if old:
             official={'title','mbs','oib','city','country','address'}
             vals={k:(vals[k] or old[k]) if provider=='registry' and k in official else (old[k] or vals[k]) for k in cols}

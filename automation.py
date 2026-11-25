@@ -1,7 +1,6 @@
 """Durable single-worker job queue; credentials are resolved only at execution."""
 import json, threading
 from datetime import datetime
-from sources import start_external
 from registry import start_registry
 
 class Queue:
@@ -16,15 +15,12 @@ class Queue:
             for name,definition in [('scheduled','INTEGER NOT NULL DEFAULT 0'),('attempts','INTEGER NOT NULL DEFAULT 0'),('next_run','INTEGER NOT NULL DEFAULT 0')]:
                 if name not in cols: c.execute(f'ALTER TABLE jobs ADD COLUMN {name} {definition}')
             c.execute("UPDATE jobs SET state='interrupted',finished=CURRENT_TIMESTAMP WHERE state='running'")
+            c.execute("UPDATE jobs SET state='cancelled',finished=CURRENT_TIMESTAMP WHERE kind<>'registry' AND state IN ('queued','retry_wait')")
     def enqueue(self,kind,config):
-        if kind not in ('registry','tvrtke','html') or config.get('permission') is not True: raise ValueError('Potrebna je potvrda dopuštenja izvora.')
-        if kind=='registry': config={'permission':True,'limit':int(config.get('limit',500))}
-        elif kind=='tvrtke': config={k:config[k] for k in ('permission','term','start','end','delay','resume') if k in config}
-        else:
-            from urllib.parse import urlsplit
-            u=urlsplit(config.get('url',''))
-            if u.query or u.username or u.password: raise ValueError('Red zadataka ne sprema URL parametre ni tajne. Koristite izravno pokretanje.')
-            config={k:config[k] for k in ('permission','provider','url','selector','mapping','pages','delay','mode','next_selector','page_start','offset_step','engine') if k in config}; config['provider']='html'
+        if kind!='registry' or not isinstance(config,dict) or config.get('permission') is not True: raise ValueError('Only authorized Court Registry jobs are supported.')
+        limit=int(config.get('limit',500))
+        if not 1<=limit<=1000: raise ValueError('Invalid registry page size.')
+        config={'permission':True,'limit':limit}
         raw=json.dumps(config,ensure_ascii=False)
         if len(raw)>30000: raise ValueError('Konfiguracija je prevelika.')
         with self.store.db() as c: return {'id':c.execute('INSERT INTO jobs(kind,config) VALUES (?,?)',(kind,raw)).lastrowid}
@@ -61,17 +57,13 @@ class Queue:
             self.active=None
         if state in ('running','stopping'): return
         with self.store.db() as c:
-            c.execute('BEGIN IMMEDIATE'); r=c.execute("SELECT * FROM jobs WHERE state='queued' OR (state='retry_wait' AND next_run<=?) ORDER BY id LIMIT 1",(epoch,)).fetchone()
+            c.execute('BEGIN IMMEDIATE'); r=c.execute("SELECT * FROM jobs WHERE kind='registry' AND (state='queued' OR (state='retry_wait' AND next_run<=?)) ORDER BY id LIMIT 1",(epoch,)).fetchone()
             if not r: return
             c.execute("UPDATE jobs SET state='running',attempts=attempts+1,next_run=0 WHERE id=?",(r['id'],))
         try:
             d=json.loads(r['config']); k=r['kind']
-            if k=='registry': start_registry(self.bot,self.registry,self.credentials(),d['limit'])
-            elif k=='html': start_external(self.bot,d)
-            else:
-                term=str(d.get('term','a')); start=int(d.get('start',1)); end=d.get('end'); end=int(end) if end is not None else None; delay=float(d.get('delay',3))
-                if len(term)>100 or not 1<=start<=100000 or (end is not None and not start<=end<=100000) or not 3<=delay<=60: raise ValueError('Parametri')
-                self.bot.start(term,start,end,delay,bool(d.get('resume',True)))
+            if k!='registry': raise ValueError('Unsupported collection source.')
+            start_registry(self.bot,self.registry,self.credentials(),d['limit'])
             self.active=r['id']
         except Exception:
             with self.store.db() as c: c.execute("UPDATE jobs SET state='failed',finished=CURRENT_TIMESTAMP WHERE id=?",(r['id'],))

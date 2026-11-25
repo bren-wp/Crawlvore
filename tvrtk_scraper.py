@@ -11,9 +11,9 @@ from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 import io
 from core import Store, Collector
-from sources import start_external, NAMES, fetch_preview
-from studio import Projects, inspect_html, excel
-from registry import Registry, credentials, configured, start_registry
+from sources import NAMES
+from studio import excel
+from registry import Registry, credentials, start_registry
 import os
 import threading
 import tempfile
@@ -35,15 +35,9 @@ def main():
     ap.add_argument('--worker',action='store_true',help='Run the authenticated desktop worker on loopback')
     ap.add_argument('--self-test',type=Path,help='Write packaged runtime smoke test result and exit')
     ap.add_argument('--no-browser',action='store_true')
-    ap.add_argument('--crawl',action='store_true',help='Pokreni web bot bez nadzorne ploče')
-    ap.add_argument('--term',default='a')
-    ap.add_argument('--start',type=int,default=1)
-    ap.add_argument('--end',type=int)
-    ap.add_argument('--delay',type=float,default=3)
-    ap.add_argument('--refresh',action='store_true',help='Ponovno obradi već prikupljene profile')
     if getattr(sys,'frozen',False): os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH','0')
     args=ap.parse_args()
-    if args.worker and (args.desktop or args.crawl or args.registry_sync or args.self_test):
+    if args.worker and (args.desktop or args.registry_sync or args.self_test):
         ap.error('Worker mode cannot be combined with other modes.')
     if args.self_test:
         result={'ok':False}
@@ -64,13 +58,12 @@ def main():
         except Exception as e: result={'ok':False,'error':type(e).__name__}
         args.self_test.write_text(json.dumps(result),encoding='utf-8'); return 0 if result['ok'] else 1
     args.data_dir.mkdir(parents=True,exist_ok=True)
-    store=Store(args.data_dir/'companies.sqlite3'); collector=Collector(store); projects=Projects(store); registry=Registry(store)
+    store=Store(args.data_dir/'companies.sqlite3'); collector=Collector(store); registry=Registry(store)
     seed=ROOT/'tvrtk_output.csv'
     if seed.exists(): store.seed(seed)
-    if args.crawl or args.registry_sync:
-        if not 1 <= args.start <= 100000 or (args.end is not None and not args.start <= args.end <= 100000) or not 3 <= args.delay <= 60 or len(args.term)>100: ap.error('Neispravni parametri bota.')
-        if args.registry_sync: start_registry(collector,registry,credentials(ROOT,args.data_dir),args.registry_limit)
-        else: collector.start(args.term,args.start,args.end,args.delay,not args.refresh)
+    if args.registry_sync:
+        if not 1 <= args.registry_limit <= 1000: ap.error('Invalid registry page size.')
+        start_registry(collector,registry,credentials(ROOT,args.data_dir),args.registry_limit)
         last=None
         try:
             while True:
@@ -82,7 +75,15 @@ def main():
             collector.stop()
             while collector.snapshot()['status']=='stopping': time.sleep(0.2)
             return 130
-    queue=Queue(store,collector,registry,lambda: credentials(ROOT,args.data_dir)); queue.start()
+    session_credentials=None
+    credentials_lock=threading.Lock()
+    def registry_credentials():
+        with credentials_lock:
+            return session_credentials or credentials(ROOT,args.data_dir)
+    def registry_configured():
+        try: return all(registry_credentials())
+        except ValueError: return False
+    queue=Queue(store,collector,registry,registry_credentials); queue.start()
     class Handler(BaseHTTPRequestHandler):
         def send_data(self,data,kind='application/json; charset=utf-8',status=200,extra=None):
             if not isinstance(data,bytes): data=json.dumps(data,ensure_ascii=False).encode()
@@ -131,7 +132,7 @@ def main():
                         self.send_response(200); self.send_header('Content-Type',{'xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','xml':'application/xml','sql':'application/sql'}[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="sudreg-{snapshot}-{category}.{kind}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         with out.open('rb') as f: shutil.copyfileobj(f,self.wfile)
                     return
-                if p.path=='/api/registry': return self.send_data(dict(registry.summary(),configured=configured(ROOT,args.data_dir)))
+                if p.path=='/api/registry': return self.send_data(dict(registry.summary(),configured=registry_configured()))
                 if p.path in ('/api/registry/export','/api/registry/export-csv'):
                     import re
                     snapshot,category=get('snapshot'),get('category')
@@ -141,7 +142,6 @@ def main():
                     for chunk in (registry.export_csv(snapshot,category) if is_csv else registry.export_rows(snapshot,category)): self.wfile.write(chunk)
                     return
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
-                if p.path=='/api/projects': return self.send_data(projects.list())
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
@@ -158,6 +158,7 @@ def main():
             except (BrokenPipeError,ConnectionResetError): pass
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Interna pogreška.'},status=500)
         def do_POST(self):
+            nonlocal session_credentials
             if not self.authorized() or not self.session_authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 n=int(self.headers.get('Content-Length','0'))
@@ -172,29 +173,21 @@ def main():
                     with store.db() as db:
                         db.execute("INSERT INTO meta(key,value) VALUES('ui_language',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(lang,))
                     return self.send_data({'ok':True,'language':lang})
+                if self.path=='/api/registry/credentials':
+                    if not isinstance(data,dict): raise ValueError('Invalid credentials.')
+                    client_id,client_secret=(data.get(k) for k in ('client_id','client_secret'))
+                    if not all(isinstance(v,str) and 0<len(v.strip())<=512 and not any(ord(ch)<32 for ch in v) for v in (client_id,client_secret)):
+                        raise ValueError('Enter valid Client ID and Client Secret.')
+                    with credentials_lock: session_credentials=(client_id.strip(),client_secret.strip())
+                    return self.send_data({'ok':True,'configured':True})
                 if self.path=='/api/jobs/add': return self.send_data(queue.enqueue(data.get('kind'),data.get('config',{})))
                 if self.path=='/api/jobs/cancel': return self.send_data(queue.cancel(data.get('id')))
                 if self.path=='/api/jobs/schedule':
                     if data.get('enabled') and data.get('permission') is not True: raise ValueError('Potvrdite dopuštenje API-ja.')
                     return self.send_data(queue.schedule(data.get('enabled'),int(data.get('hour',3))))
                 if self.path in ('/api/registry/start','/api/registry/check'):
-                    if not data.get('permission'): raise ValueError('Potvrdite korištenje javnog API-ja.')
-                    queue.direct(lambda: start_registry(collector,registry,credentials(ROOT,args.data_dir),int(data.get('limit',500)),check=self.path.endswith('/check'))); return self.send_data({'ok':True})
-                if self.path=='/api/projects/save': return self.send_data(projects.save(data))
-                if self.path=='/api/projects/delete': return self.send_data(projects.delete(data.get('id')))
-                if self.path=='/api/inspect':
-                    if not isinstance(data,dict): raise ValueError('Neispravan uzorak.')
-                    html=data.get('html','')
-                    if not html:
-                        if not data.get('permission'): raise ValueError('Potvrdite dopuštenje izvora.')
-                        html=fetch_preview(str(data.get('url','')),data.get('engine','http'))
-                    return self.send_data(dict(inspect_html(html,str(data.get('selector','')),data.get('mapping')),html=html))
-                if self.path=='/api/start-external': queue.direct(lambda: start_external(collector,data)); return self.send_data({'ok':True})
-                if self.path=='/api/start':
-                    term=str(data.get('term','a')).strip(); start=int(data.get('start',1)); end=int(data['end']) if data.get('end') else None; delay=float(data.get('delay',3))
-                    if len(term)>100 or not 1<=start<=100000 or (end is not None and not start<=end<=100000) or not 3<=delay<=60: raise ValueError('Provjerite parametre. Razmak mora biti 3–60 sekundi.')
-                    if not data.get('permission'): raise ValueError('Potvrdite dopuštenje izvora.')
-                    queue.direct(lambda: collector.start(term,start,end,delay,bool(data.get('resume',True)))); return self.send_data({'ok':True})
+                    if data.get('permission') is not True: raise ValueError('Potvrdite korištenje javnog API-ja.')
+                    queue.direct(lambda: start_registry(collector,registry,registry_credentials(),int(data.get('limit',500)),check=self.path.endswith('/check'))); return self.send_data({'ok':True})
                 if self.path=='/api/stop': collector.stop(); return self.send_data({'ok':True})
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)
             except (ValueError,TypeError,UnicodeError) as e: self.send_data({'error':str(e)},status=400)
