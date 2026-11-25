@@ -15,7 +15,7 @@ Architecture: amd64
 Maintainer: Crawlvora
 Section: utils
 Priority: optional
-Depends: libc6 (>= 2.39), libwebkit2gtk-4.1-0, libgtk-3-0t64 | libgtk-3-0, libssl3t64 | libssl3, libayatana-appindicator3-1, librsvg2-2, libxdo3
+Depends: libc6 (>= 2.39), libwebkit2gtk-4.1-0, libgtk-3-0t64 | libgtk-3-0, libssl3t64 | libssl3, libayatana-appindicator3-1, librsvg2-2, libxdo3, libsecret-tools
 Description: Crawlvora Court Registry business directory
  Local-first Croatian Court Registry workspace.
 EOF

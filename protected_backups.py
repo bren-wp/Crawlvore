@@ -18,6 +18,7 @@ from pathlib import Path
 from encrypted_backup import encrypt_backup, decrypt_backup, key_for
 from data_safety import verified_backup, restore_workspace
 from workspace_integrity import inspect_database
+from native_vault import NativeVault, VaultUnavailable
 
 BACKUP_INTERVAL=6*3600
 VERIFY_INTERVAL=24*3600
@@ -35,7 +36,7 @@ def mac(key,kind,value):
     return hmac.new(key,payload,hashlib.sha256).hexdigest()
 
 class ProtectedBackups:
-    def __init__(self,database,recovery):
+    def __init__(self,database,recovery,vault=None):
         self.database=Path(database)
         self.recovery=recovery
         self.root=self.database.parent/'protected-backups'
@@ -50,8 +51,22 @@ class ProtectedBackups:
         self.rows=[]
         self.orphans=[]
         self.thread=None
+        self.vault=vault if vault is not None else NativeVault(self.database)
+        self.vault_state='not-checked'
+        self.anchor=None
 
     def start(self):
+        try:
+            record=self.vault.load()
+            if record is not None:
+                self.anchor=record
+                self.unlock(record['password'])
+                self.vault_state='enabled'
+            else:
+                self.vault_state='not-enrolled'
+        except (ValueError,KeyError,OSError,sqlite3.Error,VaultUnavailable):
+            self.vault_state='attention'
+            self.lock_session()
         self.thread=threading.Thread(target=self.run,daemon=True)
         self.thread.start()
 
@@ -67,6 +82,44 @@ class ProtectedBackups:
             self.rows=[]
             self.orphans=[]
             self.status='locked'
+
+    def checkpoint(self,rows,head):
+        return {'count':len(rows),'head':head}
+
+    def verify_anchor(self,rows,head):
+        if self.anchor is None: return
+        current=self.checkpoint(rows,head)
+        committed=self.anchor['committed']
+        pending=self.anchor.get('pending')
+        if current==committed:
+            if pending is not None:
+                # Interrupted transaction: retain orphan and clear pending only after exact old-head match.
+                self.anchor=dict(self.anchor,pending=None)
+                self.vault.save(self.anchor)
+        elif pending is not None and current==pending:
+            self.anchor=dict(self.anchor,committed=pending,pending=None)
+            self.vault.save(self.anchor)
+        else:
+            self.vault_state='attention'
+            raise ValueError('Catalog rollback or unexpected checkpoint detected.')
+
+    def enroll_vault(self):
+        with self.lock:
+            if self.key is None: raise ValueError('Unlock the catalog first.')
+            existing=self.vault.load()
+            if existing is not None:
+                self.anchor=existing
+                with self.connect() as c:
+                    rows,head=self.validated_rows(c)
+                    self.verify_anchor(rows,head)
+            else:
+                if self.anchor is not None: raise ValueError('Previously enrolled vault is missing.')
+                with self.connect() as c:
+                    rows,head=self.validated_rows(c)
+                self.anchor={'password':self.password,'committed':self.checkpoint(rows,head),'pending':None}
+                self.vault.save(self.anchor)
+            self.vault_state='enabled'
+            return self.snapshot()
 
     def paths_safe(self):
         if self.root.is_symlink() or self.catalog.is_symlink():
@@ -108,6 +161,17 @@ class ProtectedBackups:
             self.key=key
             self.password=password
             try:
+                # Manual unlock must not bypass an existing native anchor.
+                record=self.anchor
+                if self.vault_state!='not-checked':
+                    try: record=self.vault.load()
+                    except VaultUnavailable:
+                        if self.anchor is not None or self.vault_state=='enabled': raise
+                        self.vault_state='attention'
+                    if self.anchor is not None and record is None: raise ValueError('Previously enrolled vault is missing.')
+                if record is not None: self.anchor=record
+                if self.anchor is not None and not hmac.compare_digest(self.anchor['password'].encode(),password.encode()):
+                    raise ValueError('Protected vault passphrase mismatch.')
                 self.verify()
             except BaseException:
                 self.lock_session()
@@ -144,7 +208,8 @@ class ProtectedBackups:
             try:
                 with self.connect() as c:
                     c.execute('BEGIN')
-                    rows,_=self.validated_rows(c)
+                    rows,head=self.validated_rows(c)
+                    self.verify_anchor(rows,head)
             except (ValueError,sqlite3.Error,OSError):
                 self.rows=[]
                 self.orphans=[]
@@ -167,14 +232,15 @@ class ProtectedBackups:
     def snapshot(self):
         with self.lock:
             self.paths_safe()
-            return {'configured':self.catalog.exists(),'unlocked':self.key is not None,'status':self.status,'archives':list(self.rows),'orphans':list(self.orphans),'interval_hours':6}
+            return {'configured':self.catalog.exists(),'unlocked':self.key is not None,'status':self.status,'archives':list(self.rows),'orphans':list(self.orphans),'interval_hours':6,'vault':self.vault_state,'vault_backend':self.vault.backend}
 
     def create(self):
         with self.lock:
             if self.key is None or not self.catalog.is_file(): raise ValueError('Protected backups are locked or unavailable.')
             with self.connect() as c:
                 c.execute('BEGIN')
-                self.validated_rows(c)
+                rows,head=self.validated_rows(c)
+                self.verify_anchor(rows,head)
             # Temporary SQLite snapshot remains private, never published as a plain backup.
             with tempfile.TemporaryDirectory(prefix='.cv-stage-',dir=self.root) as tmp:
                 plain=verified_backup(self.database,Path(tmp))
@@ -190,6 +256,10 @@ class ProtectedBackups:
                 rows,previous=self.validated_rows(c)
                 entry={'seq':len(rows)+1,'archive':identifier,'bytes':size,'sha256':sha,'created':int(time.time()),'previous':previous}
                 signature=mac(self.key,'entry',entry)
+                if self.anchor is not None:
+                    self.verify_anchor(rows,previous)
+                    self.anchor=dict(self.anchor,pending={'count':entry['seq'],'head':signature})
+                    self.vault.save(self.anchor)
                 c.execute('INSERT INTO entries VALUES(?,?,?,?,?,?,?)',(*entry.values(),signature))
                 c.execute('UPDATE catalog_meta SET count=?,head=?,seal=? WHERE id=1',(entry['seq'],signature,mac(self.key,'head',[entry['seq'],signature])))
             self.next_backup=time.monotonic()+BACKUP_INTERVAL
@@ -200,7 +270,8 @@ class ProtectedBackups:
         if self.key is None or not self.catalog.is_file(): raise ValueError('Protected backups are locked or unavailable.')
         with self.connect() as c:
             c.execute('BEGIN')
-            rows,_=self.validated_rows(c)
+            rows,head=self.validated_rows(c)
+            self.verify_anchor(rows,head)
         entry=next((x for x in rows if x['archive']==identifier),None)
         if entry is None: raise ValueError('Archive is not authenticated by this catalog.')
         path=self.archive_path(identifier)

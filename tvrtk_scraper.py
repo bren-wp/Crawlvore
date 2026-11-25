@@ -237,6 +237,9 @@ def run_workspace(args,selection,active):
                     return self.send_data({'ticket':transfers.prepare(data.get('id'),password)})
                 if self.path=='/api/recovery/protected-unlock':
                     return self.send_data(protected.unlock(data.get('password'),initialize=data.get('initialize') is True))
+                if self.path=='/api/recovery/protected-enroll':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm secure vault enrollment first.')
+                    return self.send_data(protected.enroll_vault())
                 if self.path=='/api/recovery/protected-lock':
                     protected.lock_session()
                     return self.send_data(protected.snapshot())
