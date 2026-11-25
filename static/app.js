@@ -26,6 +26,7 @@ $('theme').onclick=()=>{const t=document.documentElement.dataset.theme==='light'
 
 $('xlsx-export').onclick=()=>location.href='/api/export-xlsx';$('filtered-xlsx').onclick=()=>location.href='/api/export-xlsx?'+filters();
 let regSelection=null, regPage=1, regTotal=0;
+let previousRegistryAuthorization=false;
 let regRefreshBusy=false, regRowsSerial=0, regSearchTimer;
 async function registryRefresh(){
  if(regRefreshBusy)return; regRefreshBusy=true;
@@ -34,6 +35,7 @@ async function registryRefresh(){
  const active=['running','stopping'].includes(s.status), ours=['registry','registry-check'].includes(s.kind);
  $('reg-config').textContent=r.configured?translate('API konfiguriran'):translate('API nije konfiguriran');
  $('reg-config').dataset.state=r.configured?'ready':'warning';
+ if(!!r.authorized!==previousRegistryAuthorization){$('reg-permission').checked=!!r.authorized;previousRegistryAuthorization=!!r.authorized;}
  $('reg-start').disabled=!r.configured||active; $('reg-check').disabled=!r.configured||active; $('reg-stop').disabled=!ours||s.status!=='running';
  $('reg-status').textContent=active&&!ours?translate('Aktivan je drugi web bot'):ours?(({running:translate('Aktivno'),stopping:translate('Zaustavljanje'),completed:translate('Završeno'),failed:translate('Pogreška'),stopped:translate('Zaustavljeno')})[s.status]||s.status):translate('Spremno');
  $('reg-logs').textContent=ours?s.logs.slice(-12).join('\n')||translate('Čekanje na API…'):translate('Nema aktivnosti registra.');
@@ -130,7 +132,8 @@ function setProfileTab(tab){
 }
 $('detail').querySelectorAll('[data-profile-tab]').forEach(button=>button.addEventListener('click',()=>setProfileTab(button.dataset.profileTab||'details')));
 
-$('registry-credentials-apply').onclick=async()=>{const secret=$('registry-client-secret');try{await post('/api/registry/credentials',{client_id:$('registry-client-id').value,client_secret:secret.value});$('registry-client-id').value='';await refreshSettings();toast(translate('Pristupni podaci su primijenjeni.'));}catch(e){fail(e)}finally{secret.value=''}};
+$('registry-credentials-apply').onclick=async()=>{const secret=$('registry-client-secret');try{await post('/api/registry/credentials',{client_id:$('registry-client-id').value,client_secret:secret.value,persist:$('registry-credentials-persist').checked,permission:$('registry-credentials-persist').checked});$('registry-client-id').value='';$('registry-credentials-persist').checked=false;await refreshSettings();toast(translate('Pristupni podaci su primijenjeni.'));}catch(e){fail(e)}finally{secret.value=''}};
+$('registry-credentials-forget').onclick=async()=>{try{await post('/api/registry/forget',{});$('registry-credentials-persist').checked=false;$('reg-permission').checked=false;previousRegistryAuthorization=false;await refreshSettings();toast(translate('Spremljeni pristup je uklonjen.'));}catch(e){fail(e)}};
 
 $('file').onchange=()=>{const f=$('file').files[0];$('file-name').textContent=f?f.name:translate('Nije odabrana datoteka.');$('import-btn').disabled=!f};$('import-btn').onclick=async()=>{const f=$('file').files[0];if(!f)return;$('import-btn').disabled=true;try{const r=await api(f.name.toLowerCase().endsWith('.json')?'/api/import-json':'/api/import',{method:'POST',headers:{'X-Local-Token':token},body:f});toast(translate('Učitano ')+n(r.read)+translate(' · novih ')+n(r.added));await cities();await providers();$('file').value='';$('file-name').textContent=translate('Nije odabrana datoteka.');}catch(e){fail(e);$('import-btn').disabled=false}};
 
