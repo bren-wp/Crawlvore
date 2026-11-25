@@ -2,8 +2,8 @@ name: Native Tauri packages
 on:
   pull_request:
   push:
-    branches: [initialize-crawlvora, main]
-    paths: ['desktop/**', 'windows/**', 'tvrtk_scraper.py', 'static/**', 'frontend/**', 'requirements.txt', 'VERSION', '.github/workflows/native.yml']
+    branches: [registry-only-desktop, main]
+    paths: ['desktop/**', 'windows/**', 'linux/**', 'tvrtk_scraper.py', 'static/**', 'frontend/**', 'requirements.txt', 'VERSION', '.github/workflows/native.yml']
   workflow_dispatch:
   workflow_call:
 permissions:
@@ -33,10 +33,6 @@ jobs:
           npm run build:frontend
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.3
       - run: python -m unittest discover -s tests -v
-      - name: Install bundled Chromium
-        shell: bash
-        run: |
-          PLAYWRIGHT_BROWSERS_PATH=0 python -m playwright install chromium
       - name: Resolve Rust dependency lock
         working-directory: desktop/src-tauri
         shell: bash
@@ -50,8 +46,7 @@ jobs:
       - name: Build worker and assemble preview
         shell: bash
         run: |
-          export PLAYWRIGHT_BROWSERS_PATH=0
-          python -m PyInstaller --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --collect-all playwright --exclude-module webview tvrtk_scraper.py
+          python -m PyInstaller --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
           mkdir -p native-preview
           cp -R dist/CrawlvoraWorker native-preview/worker
           if [ "$RUNNER_OS" = Windows ]; then
@@ -61,13 +56,13 @@ jobs:
           fi
       - name: Native window smoke test (Linux)
         if: runner.os == 'Linux'
-        run: WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 180 xvfb-run -a native-preview/Crawlvora --native-smoke
+        run: WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a native-preview/Crawlvora --native-smoke
       - name: Native window smoke test (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $p = Start-Process -FilePath (Resolve-Path native-preview/Crawlvora.exe).Path -ArgumentList '--native-smoke' -PassThru
-          if (!$p.WaitForExit(180000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
+          if (!$p.WaitForExit(240000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
           if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
       - name: Build and smoke-test standalone portable and installer
         if: runner.os == 'Windows'
@@ -84,7 +79,11 @@ jobs:
           tar -czf release-assets/Crawlvora-Linux-x86_64.tar.gz -C native-preview .
           mkdir -p /tmp/crawlvora-extracted
           tar -xzf release-assets/Crawlvora-Linux-x86_64.tar.gz -C /tmp/crawlvora-extracted
-          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 180 xvfb-run -a /tmp/crawlvora-extracted/Crawlvora --native-smoke
+          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a /tmp/crawlvora-extracted/Crawlvora --native-smoke
+          bash linux/package.sh
+          sudo apt-get install -y ./release-assets/Crawlvora-Linux-amd64.deb
+          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a /usr/bin/crawlvora --native-smoke
+          sudo apt-get remove -y crawlvora
       - name: Rust dependency vulnerability audit
         if: runner.os == 'Linux'
         working-directory: desktop/src-tauri

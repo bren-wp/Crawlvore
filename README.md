@@ -63,8 +63,9 @@ Third-party permissions, credentials and availability are required where applica
 
 ## Get started
 
-- **Windows:** Run `START-WINDOWS.bat` with Python installed.
-- **Linux:** Run `bash start-linux.sh`.
+- **Windows 10/11 x64:** Open `Portable.exe` directly (Microsoft WebView2 Runtime required), or run `Setup.exe` to install Crawlvora and provision WebView2 if missing.
+- **Linux x86_64 (Ubuntu 24.04 baseline):** Install the `.deb` package using your package manager, then open Crawlvora from the application menu. Alternatively extract the tar archive and launch `Crawlvora` with the system runtime dependencies installed.
+- No separate Python, development tools, Chromium download or local-server launch is needed for the native distributions.
 - **Desktop packages:** Check [Releases](https://github.com/bren-wp/Crawlvore/releases) for published builds. Native portable, installer and Linux packages are published only after the complete release gates pass.
 
 The official registry API is integrated in both desktop builds. Configure OAuth2 credentials privately in Settings for the current session or use the private local configuration for unattended refresh. See the [user guide](docs/USER-GUIDE.md) and [verification report](AUDIT.md).
