@@ -296,7 +296,7 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   " · izmjena retka prikazuje se kao uklanjanje i dodavanje.": " · modified rows are shown as removed and added.",
   " · provjerite mapiranje": " · review mapping"
 };
-function tr(value: string): string {
+function translate(value: string): string {
     return UI_LANGUAGE === "en" && Object.hasOwn(UI_MESSAGES, value) ? UI_MESSAGES[value] : value;
 }
 function translateStaticUI() {
@@ -308,12 +308,12 @@ function translateStaticUI() {
             if (node.parentElement?.closest("script,style")) continue;
             const original = node.nodeValue ?? "";
             const text = original.trim();
-            if (Object.hasOwn(UI_MESSAGES, text)) node.nodeValue = original.replace(text, tr(text));
+            if (Object.hasOwn(UI_MESSAGES, text)) node.nodeValue = original.replace(text, translate(text));
         }
         for (const element of document.querySelectorAll("[placeholder],[title],[aria-label]")) {
             for (const attr of ["placeholder","title","aria-label"]) {
                 const value = element.getAttribute(attr);
-                if (value !== null) element.setAttribute(attr, tr(value));
+                if (value !== null) element.setAttribute(attr, translate(value));
             }
         }
     }

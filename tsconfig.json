@@ -15,6 +15,6 @@
     "noEmitOnError": true
   },
   "include": [
-    "frontend/**/*.ts"
+    "frontend/locale.ts"
   ]
 }

@@ -1,5 +1,8 @@
 name: Four-hour endurance
 on:
+  push:
+    branches: [initialize-crawlvora]
+    paths: ['.github/workflows/endurance.yml', 'tools/endurance.py']
   workflow_dispatch:
   workflow_call:
 permissions:

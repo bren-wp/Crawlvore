@@ -101,6 +101,21 @@ fn spawn_worker(data: &Path) -> Result<(Worker, Url), io::Error> {
     Ok((worker, url))
 }
 
+// Only ordinary public-domain HTTP(S) links may leave the local webview.
+// Do not allow file URLs, custom protocols, IP literals, local hostnames or embedded credentials.
+fn allowed_external_url(url: &Url) -> bool {
+    if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() {
+        return false;
+    }
+    let Some(host) = url.host_str() else { return false; };
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    if host.parse::<std::net::IpAddr>().is_ok() || !host.contains('.') || host.contains(':') {
+        return false;
+    }
+    !["localhost", "local", "internal", "test", "invalid", "onion"].iter()
+        .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
+}
+
 fn main() {
     let smoke = std::env::args().any(|arg| arg == "--native-smoke");
     let application = tauri::Builder::default()
@@ -119,7 +134,15 @@ fn main() {
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(900.0, 620.0)
                 .on_navigation(move |url| url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.port() == port)
-                .on_new_window(|_, _| NewWindowResponse::Deny)
+                .on_new_window(move |url, _| {
+                    if !smoke && allowed_external_url(&url) {
+                        // Rust-only opener; no JavaScript plugin permissions are exposed.
+                        if tauri_plugin_opener::open_url(url.as_str(), None::<&str>).is_err() {
+                            eprintln!("Unable to open external link");
+                        }
+                    }
+                    NewWindowResponse::Deny
+                })
                 .on_page_load(move |window, payload| {
                     if smoke && payload.event() == PageLoadEvent::Finished && payload.url().path() == "/" {
                         window.app_handle().exit(0);
@@ -147,6 +170,19 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn external_links_are_restricted_to_web_domains() {
+        for value in ["https://example.com/path?q=1", "http://www.example.org/"] {
+            assert!(allowed_external_url(&Url::parse(value).unwrap()));
+        }
+        for value in ["file:///etc/passwd", "javascript:alert(1)", "mailto:test@example.com",
+            "https://user:pass@example.com", "http://localhost", "http://127.0.0.1",
+            "http://192.168.1.1", "http://[::1]", "https://service.internal/",
+            "https://foo.localhost/", "https://foo.local/"] {
+            assert!(!allowed_external_url(&Url::parse(value).unwrap()), "{value}");
+        }
+    }
+
     #[test]
     fn only_accepts_loopback_session() {
         let token = "a".repeat(64);

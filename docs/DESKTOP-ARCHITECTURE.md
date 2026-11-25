@@ -20,3 +20,5 @@ References: https://tauri.app/release/ ; https://github.com/tauri-apps/tauri/rel
 ## Implemented migration stage
 
 The Rust host now supervises a packaged Python worker on a dynamically assigned authenticated loopback origin. The existing scraper, registry and database remain in the worker. TypeScript provides the English-first locale catalog and a persisted Croatian preference. The Windows native packaging workflow builds a standalone embedded-worker portable executable and an Inno installer; Linux packaging creates a tar archive. New-window requests are denied in the native host pending a reviewed system-browser link handler. Native compile, package verification, full TypeScript UI migration and production parity remain release gates.
+
+The frontend application source is migrated to TypeScript with explicit API contracts and typed DOM IDs. The compatibility compiler profile still permits implicit any and legacy null handling; the locale module remains strictly checked. External links use the Rust-only Tauri opener and are restricted to HTTP(S) domain URLs without credentials or local hostnames. No native command capability is exposed to the webview.
