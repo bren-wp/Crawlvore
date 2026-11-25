@@ -16,7 +16,7 @@
 
 Crawlvora is a local-first business data intelligence workspace for collecting authorized web and API data, organizing company records and exporting structured information. From visual extraction to registry synchronization, everything is designed around a single searchable workspace.
 
-![Crawlvora dashboard](branding/overview-dark-1440-fixture.png)
+![Crawlvora dashboard](branding/en-overview-dark-1440-fixture.png)
 
 ## Features
 
@@ -33,17 +33,17 @@ Crawlvora is a local-first business data intelligence workspace for collecting a
 
 ## Screenshots
 
-Actual application UI rendered with controlled sample data. These reference captures show the existing Croatian interface. English is now the default; new bilingual captures are verified by the visual workflow.
+Actual application UI rendered with controlled sample data. Screenshots are captured from the running application interface in English, with controlled sample data. Both themes and Croatian are also supported.
 
 | Business directory | Web bot |
 |---|---|
-| ![Business directory](branding/directory-dark-1440-fixture.png) | ![Web bot](branding/collector-dark-1440-fixture.png) |
+| ![Business directory](branding/en-directory-dark-1440-fixture.png) | ![Web bot](branding/en-collector-dark-1440-fixture.png) |
 | **Scraper Studio** | **Court Registry** |
-| ![Scraper Studio](branding/studio-dark-1440-fixture.png) | ![Court Registry](branding/registry-dark-1440-fixture.png) |
+| ![Scraper Studio](branding/en-studio-dark-1440-fixture.png) | ![Court Registry](branding/en-registry-dark-1440-fixture.png) |
 | **Tasks & scheduling** | **Data management** |
-| ![Tasks](branding/jobs-dark-1440-fixture.png) | ![Data management](branding/data-dark-1440-fixture.png) |
+| ![Tasks](branding/en-jobs-dark-1440-fixture.png) | ![Data management](branding/en-data-dark-1440-fixture.png) |
 | **Company profile** | **Light theme** |
-| ![Company profile](branding/detail-dark-1440-fixture.png) | ![Light theme](branding/overview-light-1440-fixture.png) |
+| ![Company profile](branding/en-detail-dark-1440-fixture.png) | ![Light theme](branding/en-overview-light-1440-fixture.png) |
 
 ## Data sources
 
