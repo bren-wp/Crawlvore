@@ -118,6 +118,25 @@ def run():
                 page.once('dialog',lambda dialog:dialog.accept())
                 page.locator('#workspace-primary').click()
                 expect(page.locator('#workspace-selected')).to_contain_text('Original database')
+                page.locator('.protected-panel summary').click()
+                page.locator('#protected-password').fill('synthetic catalog passphrase for browser test')
+                page.locator('#protected-confirm').fill('synthetic catalog passphrase for browser test')
+                page.once('dialog',lambda dialog:dialog.accept())
+                page.locator('#protected-unlock').click()
+                expect(page.locator('#protected-lock')).to_be_enabled(timeout=60000)
+                page.locator('#protected-create').click()
+                expect(page.locator('#protected-download')).to_be_enabled(timeout=60000)
+                with page.expect_download(timeout=60000) as protected_download:
+                    page.locator('#protected-download').click()
+                with protected_download.value.path().open('rb') as stream:
+                    assert stream.read(9)==b'CVBACKUP1'
+                old_count=page.locator('#recovery-space option').count()
+                page.once('dialog',lambda dialog:dialog.accept())
+                page.locator('#protected-restore').click()
+                expect(page.locator('#recovery-space option')).to_have_count(old_count+1,timeout=60000)
+                page.locator('#protected-lock').click()
+                expect(page.locator('#protected-status')).to_have_text('Catalog is locked.')
+                expect(page.locator('#protected-download')).to_be_disabled()
                 def set_theme(selector, expected):
                     # Match the exact request; never mistake an earlier queued response for the latest write.
                     with page.expect_response(lambda r:r.url.endswith('/api/preferences/theme') and r.request.post_data_json=={'theme':expected} and r.ok):

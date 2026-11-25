@@ -141,9 +141,15 @@ class ProtectedBackups:
     def verify(self):
         with self.lock:
             if self.key is None or not self.catalog.is_file(): raise ValueError('Protected backups are locked or unavailable.')
-            with self.connect() as c:
-                c.execute('BEGIN')
-                rows,_=self.validated_rows(c)
+            try:
+                with self.connect() as c:
+                    c.execute('BEGIN')
+                    rows,_=self.validated_rows(c)
+            except (ValueError,sqlite3.Error,OSError):
+                self.rows=[]
+                self.orphans=[]
+                self.status='attention'
+                raise
             results=[]
             for item in rows:
                 try:
@@ -227,16 +233,19 @@ class ProtectedBackups:
                 # Keep the existing fail-closed safety net while the user key is unavailable.
                 verified_backup(self.database)
 
+    def tick(self):
+        with self.lock:
+            if self.key is None: return
+            try:
+                now=time.monotonic()
+                if now>=self.next_verify: self.verify()
+                if now>=self.next_backup: self.create()
+            except Exception:
+                # Report failure, retain all archives, retry only after a bounded interval.
+                self.status='attention'
+                self.next_backup=time.monotonic()+300
+                self.next_verify=time.monotonic()+300
+
     def run(self):
         while not self.stop.wait(5):
-            with self.lock:
-                if self.key is None: continue
-                try:
-                    now=time.monotonic()
-                    if now>=self.next_verify: self.verify()
-                    if now>=self.next_backup: self.create()
-                except Exception:
-                    # Report failure, retain all archives, retry only after a bounded interval.
-                    self.status='attention'
-                    self.next_backup=time.monotonic()+300
-                    self.next_verify=time.monotonic()+300
+            self.tick()
