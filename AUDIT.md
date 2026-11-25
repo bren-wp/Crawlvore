@@ -10,3 +10,17 @@ Baseline commit: `0d80441d2a0ce4899361226886cd6a0036869d1d`.
 ## Remaining acceptance gates
 
 Latest native packages, endurance on release SHA, authorized live Court Registry OAuth/API check, original approved reference PNGs, updated Settings reference, strict pixel comparison, actual physical separate disk and replacement-computer drill, refreshed actual English fixture captures and committed dependency locks. Automated source scan and normalized clone candidates are review aids, not proof of semantic equivalence, absence of dead code or complete security. New CI changes require fresh checks. No production release or merge until acceptance. Previous historical audit reports remain in Git history.
+
+
+## Incremental manual audit — PR #4
+
+Reviewed the current worker authentication and request parsing, registry-only runtime routing, native vault and registry credential lifecycle, recovery/replica digest implementations, frontend element bindings, retired screen styling, and existing automated audit coverage.
+
+| Finding | Disposition |
+| --- | --- |
+| Non-ASCII local token could raise TypeError before the POST error handler | Reject non-ASCII tokens before constant-time comparison; regression coverage for incorrect and non-ASCII headers. |
+| Ordinary request reads had no explicit timeout or completeness check; non-object JSON could reach object-only handlers | Apply a 120-second socket inactivity timeout, reject incomplete bodies and non-object JSON; object-shape regression tests. |
+| Backup catalog and replica modules independently implemented identical streaming SHA-256 calculation | Reuse the existing replica file_digest implementation; retain the digest alias and existing archive format. |
+| CSS selectors exclusively targeting retired Collector/Studio screen IDs | Removed 6 exclusive rules; shared rules and historical data/source compatibility retained. |
+
+The literal frontend ID scan found no absent element IDs and no unreferenced named top-level functions by lexical count. Legacy source helpers still have test/historical compatibility references and are not safe to remove solely based on lexical results. These are incremental findings, not certification: automated dependency, Bandit, Vulture, clone, native and browser checks for the new commit remain required. Original reference archive, authorized production API and full native acceptance remain outstanding.

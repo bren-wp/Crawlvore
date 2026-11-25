@@ -42,6 +42,15 @@ class DesktopWorkerTests(unittest.TestCase):
                 def post(path, payload):
                     req=urllib.request.Request(base+path,data=json.dumps(payload).encode(),headers={'X-Local-Token':token,'Content-Type':'application/json'})
                     with opener.open(req,timeout=5) as response: return json.load(response)
+                for invalid in ('wrong-token','caf\u00e9'):
+                    req=urllib.request.Request(base+'/api/preferences/theme',data=b'{}',headers={'X-Local-Token':invalid,'Content-Type':'application/json'})
+                    with self.assertRaises(urllib.error.HTTPError) as denied:
+                        opener.open(req,timeout=5)
+                    self.assertEqual(denied.exception.code,403)
+                for payload in ([],None,'invalid'):
+                    with self.assertRaises(urllib.error.HTTPError) as rejected:
+                        post('/api/preferences/theme',payload)
+                    self.assertEqual(rejected.exception.code,400)
                 self.assertEqual(post('/api/preferences/theme',{'theme':'light'})['theme'],'light')
                 with opener.open(base+'/',timeout=5) as response:
                     self.assertIn(b'data-theme="light"',response.read())

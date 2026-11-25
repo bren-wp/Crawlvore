@@ -32,6 +32,9 @@ from urllib.parse import unquote
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_hex(32)
 
+def token_matches(value,expected):
+    return isinstance(value,str) and value.isascii() and secrets.compare_digest(value,expected)
+
 def main():
     ap=argparse.ArgumentParser(description='Crawlvora — lokalni poslovni imenik')
     ap.add_argument('--port',type=int,default=0 if getattr(sys,'frozen',False) else 8765)
@@ -124,14 +127,14 @@ def run_workspace(args,selection,active):
             try:
                 cookie=SimpleCookie(self.headers.get('Cookie',''))
                 value=cookie.get(self.cookie_name())
-                return value is not None and secrets.compare_digest(value.value,TOKEN)
+                return value is not None and token_matches(value.value,TOKEN)
             except (CookieError,TypeError):
                 return False
         def do_GET(self):
             if not self.authorized(): return self.send_data({'error':'Nedopušten host.'},status=403)
             p=urlsplit(self.path)
             if args.worker and p.path.startswith('/session/'):
-                if not secrets.compare_digest(p.path,'/session/'+TOKEN):
+                if not token_matches(p.path,'/session/'+TOKEN):
                     return self.send_data({'error':'Access denied.'},status=403)
                 return self.send_data(b'',status=303,extra={'Location':'/','Set-Cookie':self.cookie_name()+'='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict'})
             if not self.session_authorized(): return self.send_data({'error':'Access denied.'},status=403)
@@ -207,7 +210,7 @@ def run_workspace(args,selection,active):
             except (BrokenPipeError,ConnectionResetError): pass
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Interna pogreška.'},status=500)
         def do_POST(self):
-            if not self.authorized() or not self.session_authorized() or not secrets.compare_digest(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
+            if not self.authorized() or not self.session_authorized() or not token_matches(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 n=int(self.headers.get('Content-Length','0'))
                 if self.path=='/api/recovery/encrypted-restore':
@@ -219,13 +222,16 @@ def run_workspace(args,selection,active):
                     integrity.start()
                     return self.send_data({'id':identifier})
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
+                self.connection.settimeout(120)
                 raw=self.rfile.read(n)
+                if len(raw)!=n: raise ValueError('Incomplete request body.')
                 if self.path in ('/api/import-json','/api/import'):
                     # A consistent backup precedes every user-initiated import; rejected imports never mutate the directory.
                     protected.before_import()
                     if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
                     return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
+                if not isinstance(data,dict): raise ValueError('Invalid request body.')
                 if self.path=='/api/recovery/encrypt':
                     if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
                     password=data.get('password')
