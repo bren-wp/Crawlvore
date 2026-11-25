@@ -126,11 +126,15 @@ class Registry:
         return {'runs':runs,'categories':categories}
     def browse(self,snapshot,category,page=1,limit=50,q=''):
         with self.store.db() as c:
-            where='snapshot=? AND category=?'; args=[snapshot,category]
-            if q.strip():
-                where+=' AND (instr(lower(payload),lower(?))>0 OR mbs=?)'; args.extend([q.strip()[:200],normalized_id(q.strip(),9)])
-            total=c.execute('SELECT count(*) FROM registry_rows WHERE '+where,args).fetchone()[0]
-            rows=[json.loads(r[0]) for r in c.execute('SELECT payload FROM registry_rows WHERE '+where+' ORDER BY ordinal LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))]
+            query=q.strip()[:200]
+            if query:
+                args=(snapshot,category,query,normalized_id(query,9))
+                total=c.execute('SELECT count(*) FROM registry_rows WHERE snapshot=? AND category=? AND (instr(lower(payload),lower(?))>0 OR mbs=?)',args).fetchone()[0]
+                cursor=c.execute('SELECT payload FROM registry_rows WHERE snapshot=? AND category=? AND (instr(lower(payload),lower(?))>0 OR mbs=?) ORDER BY ordinal LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))
+            else:
+                total=c.execute('SELECT count(*) FROM registry_rows WHERE snapshot=? AND category=?',(snapshot,category)).fetchone()[0]
+                cursor=c.execute('SELECT payload FROM registry_rows WHERE snapshot=? AND category=? ORDER BY ordinal LIMIT ? OFFSET ?',(snapshot,category,limit,(page-1)*limit))
+            rows=[json.loads(r[0]) for r in cursor]
         return {'total':total,'rows':rows}
     def export_rows(self,snapshot,category):
         if not str(snapshot).isdigit() or not NAME.fullmatch(category): raise ValueError('Neispravna kategorija.')

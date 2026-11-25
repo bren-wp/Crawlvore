@@ -42,7 +42,7 @@ def excel(store,**filters):
     headers=['Naziv tvrtke','OIB','MBS','Djelatnost','Grad','Adresa','Poštanski broj','Država','Telefon','E-mail','Web','Godina osnivanja','Zaposleni','Ocjena','Opis','Proizvodi','Fax','Kontakt osoba','Račun','Logo','Društvene mreže','Izvori']
     ws.append(headers); where,args=store.where(**filters)
     with store.db() as c:
-        rows=c.execute('SELECT '+','.join(cols)+",coalesce((SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id),'') FROM companies"+where+' ORDER BY id',args)
+        rows=c.execute('SELECT '+','.join(cols)+",coalesce((SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id),'') FROM companies"+where+' ORDER BY id',args)  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
         for i,row in enumerate(rows,2):
             if i>1048576: raise ValueError('Previše redaka za jedan Excel list.')
             for j,v in enumerate(row,1):

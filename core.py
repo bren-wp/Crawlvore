@@ -131,10 +131,10 @@ class Store:
             vals={k:(vals[k] or old[k]) if provider=='registry' and k in official else (old[k] or vals[k]) for k in cols}
             changes={k:{'before':old[k],'after':v} for k,v in vals.items() if old[k]!=v}
             if changes: c.execute('INSERT INTO company_history(company_id,provider,changes) VALUES (?,?,?)',(old['id'],provider or ('tvrtke' if source else 'csv'),json.dumps(changes,ensure_ascii=False)))
-            c.execute('UPDATE companies SET '+','.join(k+'=?' for k in cols)+',source=?,search_text=? WHERE id=?',(*vals.values(),old['source'] or source,norm(' '.join(vals.values())),old['id']))
+            c.execute('UPDATE companies SET title=?,logo=?,website=?,social=?,address=?,postal=?,city=?,country=?,phone=?,fax=?,person=?,year=?,employees=?,account=?,mbs=?,rating=?,description=?,products=?,oib=?,email=?,industry=?,source=?,search_text=? WHERE id=?',(*vals.values(),old['source'] or source,norm(' '.join(vals.values())),old['id']))
             i=old['id']
         else:
-            i=c.execute('INSERT INTO companies(identity,source,'+','.join(cols)+',search_text) VALUES ('+','.join('?' for _ in range(len(cols)+3))+')',(identity,source,*vals.values(),norm(' '.join(vals.values())))).lastrowid
+            i=c.execute('INSERT INTO companies(identity,source,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry,search_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(identity,source,*vals.values(),norm(' '.join(vals.values())))).lastrowid
         c.execute("INSERT INTO origins(company_id,provider,url) VALUES (?,?,?) ON CONFLICT(company_id,provider,url) DO UPDATE SET updated=CURRENT_TIMESTAMP",(i,provider or ('tvrtke' if source else 'csv'),origin or source or ''))
         return not bool(old)
     def history(self,i):
@@ -149,7 +149,7 @@ class Store:
     def export_json(self,**filters):
         where,args=self.where(**filters)
         with self.db() as c:
-            rows=[dict(r) for r in c.execute('SELECT id,'+','.join(COLS+['oib','email','industry'])+' FROM companies'+where+' ORDER BY id',args)]
+            rows=[dict(r) for r in c.execute('SELECT id,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry FROM companies'+where+' ORDER BY id',args)]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             origins={}
             for r in c.execute('SELECT * FROM origins'): origins.setdefault(r['company_id'],[]).append({k:r[k] for k in ('provider','url','updated')})
             for r in rows: r['sources']=origins.get(r['id'],[])
@@ -174,6 +174,7 @@ class Store:
             cities=[dict(x) for x in c.execute("SELECT city,count(*) n FROM companies WHERE city<>'' GROUP BY city ORDER BY n DESC,city LIMIT 6")]
             return dict(r,top_cities=cities)
     def where(self,q='',city='',contact='',provider=''):
+        # SQL fragments below are fixed literals; user input is only bound as parameters.
         clauses=[]; args=[]
         if q: clauses.append('instr(search_text,?)>0'); args.append(norm(q))
         if city: clauses.append('city=?'); args.append(city)
@@ -186,8 +187,8 @@ class Store:
         where,args=self.where(q,city,contact,provider)
         order={'title':'title COLLATE NOCASE ASC,id','title_desc':'title COLLATE NOCASE DESC,id','city':'city COLLATE NOCASE,title COLLATE NOCASE,id','new':'id DESC'}.get(sort,'id')
         with self.db() as c:
-            total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]
-            rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))
+            total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
+            rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             return {'total':total,'rows':[dict(r) for r in rows]}
     def cities(self):
         with self.db() as c: return [r[0] for r in c.execute("SELECT DISTINCT city FROM companies WHERE city<>'' ORDER BY city COLLATE NOCASE")]
@@ -198,7 +199,7 @@ class Store:
     def export(self,**filters):
         where,args=self.where(**filters); out=io.StringIO(newline=''); w=csv.writer(out); w.writerow(FIELDS+['OIB','Email','Industry','Sources'])
         with self.db() as c:
-            for r in c.execute('SELECT '+','.join(COLS+['oib','email','industry'])+",coalesce((SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id),'') FROM companies"+where+' ORDER BY id',args): w.writerow([formula_safe(v) for v in r])
+            for r in c.execute('SELECT '+','.join(COLS+['oib','email','industry'])+",coalesce((SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id),'') FROM companies"+where+' ORDER BY id',args): w.writerow([formula_safe(v) for v in r])  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
         return out.getvalue().encode('utf-8-sig')
     def done(self,job,url):
         with self.db() as c: return bool(c.execute('SELECT 1 FROM completed WHERE job=? AND url=?',(job,url)).fetchone())

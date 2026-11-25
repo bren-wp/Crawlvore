@@ -15,10 +15,11 @@ def compare(registry, before, after):
         c.create_function('canonical_digest',1,digest,deterministic=True)
         # Temporary tables keep large comparisons out of Python memory.
         c.execute('CREATE TEMP TABLE diff_counts(category TEXT,mbs TEXT,digest TEXT,old_n INTEGER,new_n INTEGER,PRIMARY KEY(category,mbs,digest)) WITHOUT ROWID')
-        for snapshot, col in [(before,'old_n'),(after,'new_n')]:
-            c.execute(f'''INSERT INTO diff_counts SELECT category,mbs,canonical_digest(payload),
-                {'count(*),0' if col=='old_n' else '0,count(*)'} FROM registry_rows WHERE snapshot=? GROUP BY category,mbs,canonical_digest(payload)
-                ON CONFLICT(category,mbs,digest) DO UPDATE SET {col}=excluded.{col}''',(snapshot,))
+        c.execute('''INSERT INTO diff_counts SELECT category,mbs,canonical_digest(payload),count(*),0
+            FROM registry_rows WHERE snapshot=? GROUP BY category,mbs,canonical_digest(payload)''',(before,))
+        c.execute('''INSERT INTO diff_counts SELECT category,mbs,canonical_digest(payload),0,count(*)
+            FROM registry_rows WHERE snapshot=? GROUP BY category,mbs,canonical_digest(payload)
+            ON CONFLICT(category,mbs,digest) DO UPDATE SET new_n=excluded.new_n''',(after,))
         counts={r['category']:dict(r) for r in c.execute('''SELECT category,
           sum(max(new_n-old_n,0)) AS added, sum(max(old_n-new_n,0)) AS removed,
           count(DISTINCT CASE WHEN old_n<>new_n AND mbs<>'' THEN mbs END) AS affected_subjects
