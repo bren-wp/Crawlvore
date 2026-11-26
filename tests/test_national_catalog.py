@@ -37,6 +37,17 @@ class NationalCatalogTests(unittest.TestCase):
             self.assertEqual(catalog.detail('00000001')['CompanyName'],'Alpha Ltd')
             self.assertEqual(original.read_bytes(),b'unchanged')
             self.assertEqual(set(catalog.status()),{'HR','GB'})
+            # Switch to an Online or HR-only package after using GB once.
+            offline=NationalCatalog(root/'no-bundled-data',workspace)
+            self.assertTrue(offline.status()['GB']['available'])
+            self.assertEqual(offline.search('sc000002')['rows'][0]['name'],'Beta Ltd')
+            self.assertEqual(offline.detail('00000001')['CompanyName'],'Alpha Ltd')
+            self.assertEqual(original.read_bytes(),b'unchanged')
+            cached=workspace/'national-data'/'GB'/(report['database_sha256']+'.sqlite3')
+            with cached.open('r+b') as out:out.seek(100);out.write(b'corrupted')
+            with self.assertRaisesRegex(ValueError,'checksum mismatch'):
+                NationalCatalog(root/'no-bundled-data',workspace).search('Al')
+            self.assertTrue(cached.exists())
             with self.assertRaises(ValueError): catalog.detail('../secret')
 
     def test_downloaded_onefile_catalog_is_isolated(self):

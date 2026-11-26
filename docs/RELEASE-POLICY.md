@@ -41,3 +41,7 @@ Process-death regression tests terminate a real child process after a durable UK
 ## Packaged worker recovery gate
 
 Native CI must force-terminate the actual packaged worker after committing an isolated synthetic record and preference, reopen the same workspace, verify SQLite integrity, confirm exact record and settings preservation and test graceful shutdown. This gate uses non-distribution fixtures and never touches a real user workspace. It does not simulate power failure or kill the GUI during a live national download; those remain separate acceptance requirements.
+
+## Edition switch retention
+
+After successful GB catalog verification, persist its manifest next to the content-addressed SQLite cache. A later HR or Online edition can reopen the same previously used GB catalog without the embedded archive or a network request. Do not remove any previous snapshot or cached database. A changed/corrupted cached database is rejected on reopen, not deleted. Unopened embedded catalogs are still lazily extracted on first use.
