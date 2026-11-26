@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Add isolated partial-registry preview preparation with checkpoint verification and explicit incomplete manifest; retain strict production acceptance.
+
 - Require verified offline registry seed and matching manifest in native package smoke tests; guard GitHub asset size.
 
 - Harden native Secret Service executable selection and preserve browser smoke checks under optimized Python; document five low-severity static findings.

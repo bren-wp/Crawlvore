@@ -65,3 +65,14 @@ class BundleTests(unittest.TestCase):
             db.execute("UPDATE companies SET mbs='' WHERE mbs='000000001'")
         with self.assertRaises(ValueError):
             verify_bundle(self.path,min_categories=2)
+
+    def test_partial_preview_is_explicit_and_not_production(self):
+        with self.store.db() as db:
+            db.execute('UPDATE registry_runs SET complete=0')
+        with self.assertRaisesRegex(ValueError,'completed isolated'):
+            verify_bundle(self.path,min_categories=2)
+        report=verify_bundle(self.path,min_categories=2,allow_partial=True)
+        self.assertFalse(report['complete'])
+        self.assertEqual(report['subjects'],2)
+        self.assertEqual(report['completed_categories'],2)
+        self.assertTrue(report['registry_bundle_included'])

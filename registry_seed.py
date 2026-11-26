@@ -46,6 +46,8 @@ def accept_packaged_seed(root, database, installed, expected_sha):
     if not installed:
         raise ValueError('Complete packaged registry seed was not installed.')
     report=json.loads((root/'registry-seed.json').read_text(encoding='utf-8'))
+    if report.get('complete') is False:
+        raise ValueError('Incomplete preview cannot pass complete registry acceptance.')
     declared=(root/'registry-seed.sha256').read_text(encoding='ascii').strip()
     if not expected_sha or expected_sha!=declared or report.get('database_sha256')!=expected_sha:
         raise ValueError('Packaged registry SHA-256 does not match accepted snapshot.')
