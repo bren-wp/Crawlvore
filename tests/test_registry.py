@@ -36,6 +36,37 @@ class RegistryTests(unittest.TestCase):
                 return super().get(name,q)
         with self.assertRaises(ValueError): self.reg.sync(self.bot,Fail(),1)
         f=Fake(); self.reg.sync(self.bot,f,1); self.assertNotIn(('subjekti',{'snapshot_id':'21','offset':0,'limit':1}),f.calls); self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
+    def test_reference_schema_projects_official_names_addresses_and_emails(self):
+        class Reference(Fake):
+            def spec(self):
+                s=spec()
+                for category in ('tvrtke','skracene_tvrtke','email_adrese'):
+                    s['paths']['/'+category]={'get':{'parameters':[{'in':'query','name':'snapshot_id'}]}}
+                return s
+            def get(self,name,q=None):
+                if name=='snapshots': return {},[{'id':21,'staleness':1}]
+                h={'X-Snapshot-Id':'21'}
+                if name=='subjekti':
+                    h.update({'X-Total-Count':'3','X-Rows-Returned':'1'})
+                    offset=q['offset']
+                    return h,[{'mbs':offset+1,'status':0 if offset==2 else 1,'datum_osnivanja':'2001-01-01','tvrtka_kod_brisanja':'Deleted Example' if offset==2 else None}]
+                rows={'tvrtke':[{'mbs':1,'ime':'Official Full Name'}],
+                      'skracene_tvrtke':[{'mbs':1,'ime':'Short name'},{'mbs':2,'ime':'Second Example'}],
+                      'sjedista':[{'mbs':1,'naziv_naselja':'Rijeka','ulica':'Test Street','kucni_broj':12,'kucni_podbroj':'A','postanski_broj':51000,'drzava_id':None}],
+                      'email_adrese':[{'mbs':1,'adresa':'first@example.invalid'},{'mbs':1,'adresa':'second@example.invalid'}]}
+                return h,rows[name]
+        self.reg.sync(self.bot,Reference(),1)
+        self.assertEqual(self.store.stats()['total'],3)
+        row=self.store.detail(1)
+        self.assertEqual(row['title'],'Official Full Name')
+        self.assertEqual(row['city'],'Rijeka')
+        self.assertEqual(row['address'],'Test Street 12A')
+        self.assertEqual(row['postal'],'51000')
+        self.assertEqual(row['email'],'first@example.invalid')
+        self.assertEqual(row['year'],'2001')
+        self.assertEqual(self.reg.browse('21','email_adrese')['total'],2)
+        self.assertEqual(self.store.query(q='Deleted Example')['total'],1)
+
     def test_shape(self):
         self.assertEqual(rows_of({'items':[{'a':1}]}),[{'a':1}]); self.assertRaises(ValueError,rows_of,{'a':[],'b':[]})
 
