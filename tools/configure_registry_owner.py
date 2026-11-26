@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from native_vault import NativeVault, VaultUnavailable
 from registry import RegistryAccess
-from live_registry_check import check
+from tools.live_registry_check import check
 
 
 def gh_call(args, payload=None):
