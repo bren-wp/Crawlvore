@@ -117,10 +117,11 @@ jobs:
         run: |
           set -euo pipefail
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
+          python -c 'import pathlib,zipfile; root=pathlib.Path("wordpress"); folder=root/"crawlvora-business-directory"; z=zipfile.ZipFile("release/Crawlvora-WordPress.zip","w",zipfile.ZIP_DEFLATED); [z.write(p,p.relative_to(root)) for p in sorted(folder.rglob("*")) if p.is_file()]; z.close()'
           cd release
           (cd registry && sha256sum -c SHA256SUMS.txt)
           python -c 'import json; json.dump({"HR":json.load(open("registry/registry-seed.json")),"GB":json.load(open("gb/manifest.json")),"windows_editions":{"Full":["HR","GB"],"HR":["HR"],"GB":["GB"],"Online":[]}},open("REGISTRY-MANIFEST.json","w"),indent=2)'
-          files=(Portable.exe Setup.exe Portable-HR.exe Setup-HR.exe Portable-GB.exe Setup-GB.exe Portable-Online.exe Setup-Online.exe Crawlvora-Linux-x86_64.tar.gz Crawlvora-Linux-amd64.deb Crawlvora-source.zip REGISTRY-MANIFEST.json)
+          files=(Portable.exe Setup.exe Portable-HR.exe Setup-HR.exe Portable-GB.exe Setup-GB.exe Portable-Online.exe Setup-Online.exe Crawlvora-Linux-x86_64.tar.gz Crawlvora-Linux-amd64.deb Crawlvora-source.zip REGISTRY-MANIFEST.json Crawlvora-WordPress.zip)
           for file in "${files[@]}"; do
             test -s "$file"
             test "$(stat -c %s "$file")" -lt 2147483648 || { echo "Release asset exceeds GitHub limit: $file"; exit 1; }
@@ -132,4 +133,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           test "$(gh repo view "$GITHUB_REPOSITORY" --json visibility --jq .visibility)" = PRIVATE
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Crawlvora $GITHUB_REF_NAME" --generate-notes release/Portable.exe release/Setup.exe release/Portable-HR.exe release/Setup-HR.exe release/Portable-GB.exe release/Setup-GB.exe release/Portable-Online.exe release/Setup-Online.exe release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-Linux-amd64.deb release/Crawlvora-source.zip release/REGISTRY-MANIFEST.json release/SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Crawlvora $GITHUB_REF_NAME" --generate-notes release/Portable.exe release/Setup.exe release/Portable-HR.exe release/Setup-HR.exe release/Portable-GB.exe release/Setup-GB.exe release/Portable-Online.exe release/Setup-Online.exe release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-Linux-amd64.deb release/Crawlvora-source.zip release/REGISTRY-MANIFEST.json release/Crawlvora-WordPress.zip release/SHA256SUMS.txt

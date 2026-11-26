@@ -31,6 +31,11 @@ jobs:
           php -l webstranica/catalog.php
           python -m unittest discover -s tests -p test_web_catalog.py -v
           python tools/web_http_acceptance.py
+      - name: Validate WordPress plugin
+        run: |
+          find wordpress -name '*.php' -print0 | xargs -0 -n1 php -l
+          php tests/wordpress_catalog.php
+          bash tools/wordpress_acceptance.sh
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
       - run: npm audit --audit-level=moderate
       - run: npm run typecheck

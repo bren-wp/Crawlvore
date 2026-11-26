@@ -1,6 +1,6 @@
 # Production release policy
 
-Every production GitHub Release must contain all seven assets:
+The original seven desktop release assets are:
 
 - Portable.exe: standalone Windows Tauri executable with an embedded registry worker.
 - Setup.exe: Windows installer with a native Tauri host and packaged worker.
@@ -8,7 +8,7 @@ Every production GitHub Release must contain all seven assets:
 - Crawlvora-Linux-amd64.deb: installable desktop package with system dependencies and application-menu entry.
 - Crawlvora-source.zip: source from the exact release tag.
 - REGISTRY-MANIFEST.json: verified registry snapshot identity and coverage.
-- SHA256SUMS.txt: SHA-256 checksums for the other six assets.
+- SHA256SUMS.txt: SHA-256 checksums for every other published asset.
 
 The production workflow requires an immutable version tag on main, matching version metadata, committed npm and Cargo locks, a successful quality/security workflow, native builds and smoke tests on Windows and Linux, a successful million-record performance benchmark and a completed four-hour endurance test. It refuses to publish an incomplete asset set. The native workflow is the only active desktop packaging pipeline; legacy scripts are retained for historical development only.
 
@@ -23,3 +23,7 @@ An explicitly labeled prerelease candidate may be published from the data-safety
 ## Windows edition matrix
 
 Production requires 13 assets: the original seven plus Portable-HR.exe, Setup-HR.exe, Portable-GB.exe, Setup-GB.exe, Portable-Online.exe and Setup-Online.exe. Full embeds both reviewed catalogs, HR only Croatia, GB only UK, and Online embeds neither registry nor legacy CSV. Existing data is preserved on upgrade. HR acquisition uses authorized Crawlvora Connect/Sync; UK supports explicit download of the official monthly snapshot. The private release gate remains mandatory. Local preview uses `windows/package-native.ps1 -Edition HR` (or Full, GB, Online) with CRAWLVORA_PRIVATE_PREVIEW=1 and staged snapshots; compile frontend first. Each pair is promoted after isolated native smoke, install, payload verification and uninstall. No public upload of raw data until reviewed.
+
+## WordPress distribution
+
+Keep all 13 desktop release assets and add Crawlvora-WordPress.zip as the fourteenth required asset. The plugin contains code only, consumes reviewed JSON catalogs, and must pass PHP syntax, catalog unit checks and disposable WordPress integration before publication.
