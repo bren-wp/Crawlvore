@@ -69,17 +69,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
           cd registry-bundle
           sha256sum -c SHA256SUMS.txt
+          cd ..
+          python -c "import json; from pathlib import Path; from registry_bundle import verify_bundle; root=Path('registry-bundle'); report=verify_bundle(root/'registry-seed.sqlite3'); expected=json.loads((root/'registry-seed.json').read_text(encoding='utf-8')); report==expected or __import__('sys').exit('Registry manifest mismatch'); print(report)"
+          cd registry-bundle
           sha256sum registry-seed.sqlite3 | cut -d ' ' -f 1 > registry-seed.sha256
           echo 'CRAWLVORA_REGISTRY_BUNDLE=1' >> "$GITHUB_ENV"
+          echo "CRAWLVORA_EXPECTED_REGISTRY_SHA256=$(cat registry-seed.sha256)" >> "$GITHUB_ENV"
       - name: Build worker and assemble preview
         shell: bash
         run: |
           extra=()
           if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" = 1 ]; then
-            extra=(--add-data "registry-bundle/registry-seed.sqlite3:." --add-data "registry-bundle/registry-seed.sha256:.")
+            extra=(--add-data "registry-bundle/registry-seed.sqlite3:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
           fi
           python -m PyInstaller "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
           mkdir -p native-preview

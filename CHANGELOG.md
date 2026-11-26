@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Require verified offline registry seed and matching manifest in native package smoke tests; guard GitHub asset size.
+
 - Harden native Secret Service executable selection and preserve browser smoke checks under optimized Python; document five low-severity static findings.
 
 - Add explicit, backed-up transactional import of verified registry snapshots into existing workspaces, with conflict detection, rollback and idempotency tests.

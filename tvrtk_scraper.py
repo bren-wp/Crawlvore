@@ -14,7 +14,7 @@ from core import Store, Collector
 from sources import NAMES
 from studio import excel
 from registry import Registry, RegistryAccess, start_registry
-from registry_seed import install_seed
+from registry_seed import accept_packaged_seed, install_seed
 import os
 import threading
 import tempfile
@@ -81,17 +81,21 @@ def main():
 
 def run_workspace(args,selection,active):
     database=args.data_dir/'companies.sqlite3'
-    if active=='primary': install_seed(ROOT,database)
+    installed=active=='primary' and install_seed(ROOT,database)
+    expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and expected:
+        accept_packaged_seed(ROOT,database,installed,expected)
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
-    verified_backup(database)
+    if not installed: verified_backup(database)
     store=Store(database); collector=Collector(store); registry=Registry(store)
     recovery=RecoveryCenter(database,root=selection.root)
     transfers=BackupTransfer(recovery)
     protected=ProtectedBackups(database,recovery)
     integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
-    if active=='primary' and seed.exists(): store.seed(seed)
+    # Full registry distributions use the verified snapshot, not the legacy CSV.
+    if active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
     registry_access=RegistryAccess(ROOT,args.data_dir)
