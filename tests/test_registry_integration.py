@@ -21,6 +21,10 @@ class IntegrationTests(unittest.TestCase):
         self.source=root/'seed.sqlite3'
         seed=Store(self.source)
         Registry(seed).sync(Collector(seed),AllStatus(),1)
+        # Match the production bundle builder: flush and close WAL before hashing.
+        with closing(sqlite3.connect(self.source)) as db:
+            self.assertEqual(db.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0],0)
+            self.assertEqual(db.execute('PRAGMA journal_mode=DELETE').fetchone()[0],'delete')
         self.manifest=root/'manifest.json'
         self.manifest.write_text(json.dumps(verify_bundle(self.source,min_categories=2)),encoding='utf-8')
         self.target=Store(root/'workspace.sqlite3')
@@ -42,8 +46,14 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT complete FROM registry_runs').fetchone()[0],1)
 
     def test_projection_failure_rolls_back(self):
-        with patch.object(self.registry,'merge',side_effect=ValueError('synthetic failure')):
-            with self.assertRaises(ValueError):
+        def fail_after_projection(snap,bot,connection=None):
+            original_merge(snap,bot,connection=connection)
+            self.assertEqual(connection.execute('SELECT count(*) FROM companies').fetchone()[0],3)
+            raise ValueError('synthetic failure after projection')
+
+        original_merge=self.registry.merge
+        with patch.object(self.registry,'merge',side_effect=fail_after_projection):
+            with self.assertRaisesRegex(ValueError,'after projection'):
                 self.integrate()
         with self.target.db() as db:
             self.assertEqual(db.execute('SELECT count(*) FROM companies').fetchone()[0],1)
@@ -82,3 +92,15 @@ class IntegrationTests(unittest.TestCase):
         with self.target.db() as db:
             self.assertEqual(db.execute('SELECT payload FROM registry_rows').fetchone()[0],'{}')
             self.assertEqual(db.execute('SELECT complete FROM registry_runs').fetchone()[0],0)
+
+    def test_unfinalized_bundle_is_rejected(self):
+        with closing(sqlite3.connect(self.source)) as db:
+            self.assertEqual(db.execute('PRAGMA journal_mode=WAL').fetchone()[0],'wal')
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('UPDATE registry_runs SET complete=0')
+            db.commit()
+            with self.assertRaisesRegex(ValueError,'finalized and closed'):
+                self.integrate()
+        with self.target.db() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM companies').fetchone()[0],1)
+            self.assertEqual(db.execute('SELECT count(*) FROM registry_runs').fetchone()[0],0)
