@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Force the existing MBS lookup index for related registry rows to avoid category-wide scans during high-volume projection; correct the browser E2E JSON import.
+
 - Enable arbitrary combinations of export fields, test actual browser download, and skip unavailable related registry categories during directory projection. Document the reviewed allowlisted SQL construction.
 
 - Add local field-specific CSV, JSON and Excel export with optional deduplication and directory filters. Default registry page size to the supported maximum of 1000.

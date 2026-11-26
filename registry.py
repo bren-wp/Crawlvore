@@ -354,7 +354,7 @@ class Registry:
         def related(c,mbs,category):
             if category not in available:
                 return
-            for rr in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND mbs=? AND category=? ORDER BY ordinal",(snap,mbs,category)):
+            for rr in c.execute("SELECT payload FROM registry_rows INDEXED BY registry_mbs WHERE snapshot=? AND mbs=? AND category=? ORDER BY ordinal",(snap,mbs,category)):
                 yield json.loads(rr[0])
         with (self.store.db() if connection is None else nullcontext(connection)) as c:
             # Avoid millions of empty index probes in partial/offline snapshots.
