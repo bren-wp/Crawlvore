@@ -198,3 +198,42 @@ class RegistryAccessTests(unittest.TestCase):
             self.assertFalse(reopened.status()['configured'])
         with patch('registry.time.monotonic',return_value=131.0):
             self.assertEqual(reopened.status(),{'configured':True,'authorized':True})
+
+
+    def test_managed_provisioning_enrolls_and_consumes_environment(self):
+        access=self.access()
+        with patch.dict(os.environ,{'CRAWLVORA_REGISTRY_PROVISION':'1',
+                                    'SUDREG_CLIENT_ID':'managed-id',
+                                    'SUDREG_CLIENT_SECRET':'managed-secret'}):
+            self.assertTrue(access.provision_from_environment())
+            self.assertNotIn('SUDREG_CLIENT_ID',os.environ)
+            self.assertNotIn('SUDREG_CLIENT_SECRET',os.environ)
+            self.assertNotIn('CRAWLVORA_REGISTRY_PROVISION',os.environ)
+            self.assertFalse(access.provision_from_environment())
+        self.assertEqual(self.access().current(),(('managed-id','managed-secret'),True))
+        self.assertFalse((self.root/'sudreg.private.json').exists())
+        self.access().forget()
+        self.assertFalse(self.access().status()['configured'])
+
+    def test_managed_provisioning_rejects_partial_pair(self):
+        access=self.access()
+        with patch.dict(os.environ,{'CRAWLVORA_REGISTRY_PROVISION':'1','SUDREG_CLIENT_ID':'incomplete'}):
+            with self.assertRaises(ValueError):
+                access.provision_from_environment()
+            self.assertNotIn('SUDREG_CLIENT_ID',os.environ)
+        self.assertIsNone(self.vault.record)
+
+    def test_managed_provisioning_requires_explicit_opt_in(self):
+        with patch.dict(os.environ,{'SUDREG_CLIENT_ID':'external-id','SUDREG_CLIENT_SECRET':'external-secret'}):
+            self.assertFalse(self.access().provision_from_environment())
+        self.assertIsNone(self.vault.record)
+
+    def test_managed_provisioning_fails_closed_without_vault(self):
+        self.vault.unavailable=True
+        access=self.access()
+        with patch.dict(os.environ,{'CRAWLVORA_REGISTRY_PROVISION':'1','SUDREG_CLIENT_ID':'id','SUDREG_CLIENT_SECRET':'secret'}):
+            with self.assertRaises(ValueError):
+                access.provision_from_environment()
+            self.assertNotIn('SUDREG_CLIENT_SECRET',os.environ)
+            self.assertFalse(access.status()['configured'])
+        self.assertFalse((self.root/'sudreg.private.json').exists())

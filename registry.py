@@ -111,6 +111,17 @@ class RegistryAccess:
             self.session=(pair,persist)
             return self.status()
 
+    def provision_from_environment(self):
+        """Explicit, per-user managed deployment enrollment; never embed a shared secret."""
+        if os.environ.pop('CRAWLVORA_REGISTRY_PROVISION','')!='1':
+            return False
+        # Consume the deployment pair before launching any vault subprocess.
+        data={'client_id':os.environ.pop('SUDREG_CLIENT_ID',''),
+              'client_secret':os.environ.pop('SUDREG_CLIENT_SECRET',''),
+              'persist':True,'permission':True}
+        self.apply(data)
+        return True
+
     def forget(self):
         with self.lock:
             try:
