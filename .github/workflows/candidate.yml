@@ -1,6 +1,9 @@
 name: Verified desktop release candidate
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [VERSION]
 permissions:
   contents: read
 concurrency:
@@ -8,21 +11,21 @@ concurrency:
   cancel-in-progress: false
 jobs:
   quality:
-    if: github.ref == 'refs/heads/data-safety-release'
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/quality.yml
     with:
       retain_evidence: true
   native:
-    if: github.ref == 'refs/heads/data-safety-release'
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/native.yml
     with:
       publish_artifacts: true
   vault:
-    if: github.ref == 'refs/heads/data-safety-release'
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/vault-acceptance.yml
   publish:
     needs: [quality, native, vault]
-    if: github.ref == 'refs/heads/data-safety-release'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -46,7 +49,8 @@ jobs:
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
           cd release
-          files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip)
+          printf '%s\n' '{"registry_bundle_included":false,"complete":false,"snapshot":null,"scope":null,"category_count":null,"subjects":null,"reason":"Public preview; complete registry snapshot not included or verified."}' > REGISTRY-MANIFEST.json
+          files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json)
           for file in "${files[@]}"; do test -s "$file"; done
           sha256sum "${files[@]}" > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
@@ -62,4 +66,4 @@ jobs:
             echo 'Candidate already published; immutable assets retained.'
             exit 0
           fi
-          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Release Candidate" --notes "Native Windows and Linux packaging, quality and secure vault CI passed for $GITHUB_SHA. Non-production candidate: exact design parity, authorized live registry access, million-record and endurance acceptance, and independent recovery drills remain outstanding. Back up your workspace independently before testing. No credentials included." release/Portable.exe release/Setup.exe release/Crawlvora-Linux-amd64.deb release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-source.zip release/SHA256SUMS.txt
+          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Release Candidate" --notes "Native Windows and Linux packaging, quality and secure vault CI passed for $GITHUB_SHA. Non-production candidate: exact design parity, authorized live registry access, million-record and endurance acceptance, and independent recovery drills remain outstanding. Back up your workspace independently before testing. No credentials included." release/Portable.exe release/Setup.exe release/Crawlvora-Linux-amd64.deb release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-source.zip release/REGISTRY-MANIFEST.json release/SHA256SUMS.txt

@@ -1,6 +1,5 @@
 name: Complete public registry snapshot
 on:
-  workflow_dispatch:
   workflow_call:
     secrets:
       SUDREG_CLIENT_ID:
@@ -14,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/data-safety-release'
+    if: github.event.repository.private && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 360
     environment: production-api

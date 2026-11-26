@@ -65,6 +65,7 @@ jobs:
           tag="registry-preview-${version}-${snapshot}-${GITHUB_SHA:0:12}"
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
           cd release
+          (cd registry && sha256sum -c SHA256SUMS.txt)
           cp registry/registry-seed.json REGISTRY-MANIFEST.json
           files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json)
           for file in "${files[@]}"; do test -s "$file"; done
