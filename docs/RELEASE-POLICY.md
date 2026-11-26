@@ -31,3 +31,7 @@ Keep all 13 desktop release assets and add Crawlvora-WordPress.zip as the fourte
 ## Durable acquisition
 
 Retain original UK archive bytes in the workspace downloads directory. Resume with HTTP Range and If-Range only with a matching strong ETag, exact Content-Range and declared total. If the server returns a new full response, stage separately and retain the earlier partial. Completed archives are reused for retrying indexing. Only derived scratch files may be discarded. Existing installed catalogs and user databases are never replaced by download operations. HR sync commits each validated page and checkpoint in the same transaction. A changed or unavailable remote snapshot cannot be resumed by mixing data. Fault-injection and actual native interruption/restart tests remain separate acceptance gates.
+
+## Credential durability
+
+Secure persistence is selected by default in Crawlvora Connect. Windows DPAPI and Linux Secret Service protect credentials per OS profile and workspace; successful save requires vault read-back. Explicit session-only mode remains available. Restarting or upgrading editions must retain authorized access when using the same workspace and OS profile. If the secure vault is unavailable, never silently store plaintext. Uninstall must not destroy national catalogs or user databases. Explicit removal of saved access is available in Connect; portable editions have no OS uninstall event. Automatic vault cleanup on installer uninstall is not yet verified and must not delete other workspace credentials or backup-vault records.

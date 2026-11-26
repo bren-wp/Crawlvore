@@ -146,7 +146,11 @@ def run():
                 expect(page.locator('#settings-api')).to_have_text('Access not enabled')
                 page.locator('#registry-client-id').fill('synthetic-id')
                 page.locator('#registry-client-secret').fill('synthetic-secret')
+                expect(page.locator('#registry-credentials-persist')).to_be_checked()
+                # Headless CI may not have an unlocked native vault; test explicit session mode here.
+                page.locator('#registry-credentials-persist').uncheck()
                 page.locator('#registry-credentials-apply').click()
+                expect(page.locator('#registry-credentials-persist')).to_be_checked()
                 expect(page.locator('#settings-api')).to_have_text('Access enabled')
                 expect(page.locator('#registry-client-secret')).to_have_value('')
                 with page.expect_response(lambda response: response.url.endswith('/api/registry/forget') and response.ok) as revocation:
