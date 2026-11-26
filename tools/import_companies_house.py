@@ -15,7 +15,7 @@ SOURCE = 'https://download.companieshouse.gov.uk/en_output.html'
 ONE = re.compile(r'BasicCompanyDataAsOneFile-(\d{4}-\d{2}-\d{2})\.zip')
 
 
-def build(archives, destination):
+def build(archives, destination,check=lambda:None):
     archives=list(map(Path,archives))
     parts = {}; dates = set()
     one=ONE.fullmatch(archives[0].name) if len(archives)==1 else None
@@ -32,6 +32,10 @@ def build(archives, destination):
     counts=[]; headers=None
     with closing(sqlite3.connect(pending)) as db:
         db.execute('PRAGMA synchronous=NORMAL')
+        def sqlite_progress():
+            try: check(); return 0
+            except Exception: return 1
+        db.set_progress_handler(sqlite_progress,100000)
         db.execute('CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)')
         for part, archive in sorted(parts.items()):
             with zipfile.ZipFile(archive) as z:
@@ -51,11 +55,12 @@ def build(archives, destination):
                         if not row: blank+=1; continue
                         if len(row)!=55 or not row[0].strip() or not re.fullmatch(r'[A-Z0-9]{8}',row[1]): raise ValueError(f'Invalid record in part {part}, row {count+1}')
                         batch.append(row); count+=1
-                        if len(batch)>=5000: db.executemany(statement,batch); batch.clear()
+                        if len(batch)>=5000: check();db.executemany(statement,batch);batch.clear()
                     if batch: db.executemany(statement,batch)
                     db.commit()
                 with archive.open('rb') as raw: digest=hashlib.file_digest(raw,'sha256').hexdigest()
                 counts.append({'part':part,'rows':count,'blank_lines':blank,'sha256':digest}); print(json.dumps(counts[-1]),flush=True)
+        check()
         db.execute('CREATE UNIQUE INDEX company_number ON companies(registration_number)')
         db.execute('CREATE INDEX company_name ON companies(name COLLATE NOCASE)')
         total=sum(item['rows'] for item in counts)

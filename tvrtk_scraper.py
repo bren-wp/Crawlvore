@@ -414,7 +414,7 @@ def run_workspace(args,selection,active):
         threading.Thread(target=parent_watch,daemon=True).start()
         try: server.serve_forever()
         finally:
-            queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
+            gb_download.close(); queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
@@ -425,10 +425,10 @@ def run_workspace(args,selection,active):
             webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
             webview.start(gui='edgechromium')
         finally:
-            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
+            gb_download.close(); queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
         return 0
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
+    finally: gb_download.close(); queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
 if __name__=='__main__': sys.exit(main())

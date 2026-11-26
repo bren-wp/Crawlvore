@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+import shutil
 import tempfile
 import threading
 from contextlib import closing
@@ -52,6 +53,7 @@ class NationalCatalog:
             self.root.mkdir(parents=True,exist_ok=True)
             destination=self.root/(digest+'.sqlite3')
             if not destination.exists():
+                if shutil.disk_usage(self.root).free<report['database_bytes']+64*1024**2: raise ValueError('Insufficient free disk space for UK catalog.')
                 source=self.package/(GB_FILE+'.gz')
                 fd,tmp=tempfile.mkstemp(dir=self.root,prefix='extract-')
                 try:
