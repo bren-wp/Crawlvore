@@ -112,6 +112,12 @@ jobs:
           else
             cp desktop/src-tauri/target/release/crawlvora-desktop native-preview/Crawlvora
           fi
+      - name: Packaged worker forced-restart acceptance (Windows)
+        if: runner.os == 'Windows' && inputs.registry_bundle != true && inputs.national_bundle != true
+        run: python tools/native_worker_recovery.py --worker native-preview/worker/CrawlvoraWorker.exe
+      - name: Packaged worker forced-restart acceptance (Linux)
+        if: runner.os == 'Linux' && inputs.registry_bundle != true && inputs.national_bundle != true
+        run: python tools/native_worker_recovery.py --worker native-preview/worker/CrawlvoraWorker
       - name: Native window smoke test (Linux)
         if: runner.os == 'Linux'
         run: WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a native-preview/Crawlvora --native-smoke
