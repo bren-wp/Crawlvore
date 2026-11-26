@@ -23,6 +23,7 @@ class CompaniesHouseTests(unittest.TestCase):
                 stream=io.StringIO()
                 writer=csv.writer(stream)
                 writer.writerow(headers)
+                if n==4: writer.writerow([])
                 writer.writerow(['Synthetic organization',f'{n:08d}']+['']*53)
                 with zipfile.ZipFile(path,'w') as archive:
                     archive.writestr(name+'.csv',stream.getvalue())
@@ -31,5 +32,6 @@ class CompaniesHouseTests(unittest.TestCase):
                 module.build(archives[:-1],root/'missing')
             report=module.build(archives,root/'GB')
             self.assertEqual(report['rows'],7)
+            self.assertEqual(report['parts'][3]['blank_lines'],1)
             self.assertEqual(report['country'],'GB')
             self.assertTrue((root/'GB/united-kingdom.sqlite3').exists())

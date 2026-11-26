@@ -41,15 +41,16 @@ def build(archives, destination):
                         db.execute('CREATE TABLE companies ('+','.join(col+' TEXT NOT NULL' for col in columns)+')')  # nosec B608 -- generated identifiers
                         statement='INSERT INTO companies VALUES ('+','.join('?' for _ in columns)+')'  # nosec B608 -- placeholders only
                     elif current!=headers: raise ValueError('Schema mismatch')
-                    count=0; batch=[]
+                    count=0; blank=0; batch=[]
                     for row in reader:
+                        if not row: blank+=1; continue
                         if len(row)!=55 or not row[0].strip() or not re.fullmatch(r'[A-Z0-9]{8}',row[1]): raise ValueError(f'Invalid record in part {part}, row {count+1}')
                         batch.append(row); count+=1
                         if len(batch)>=5000: db.executemany(statement,batch); batch.clear()
                     if batch: db.executemany(statement,batch)
                     db.commit()
                 with archive.open('rb') as raw: digest=hashlib.file_digest(raw,'sha256').hexdigest()
-                counts.append({'part':part,'rows':count,'sha256':digest}); print(json.dumps(counts[-1]),flush=True)
+                counts.append({'part':part,'rows':count,'blank_lines':blank,'sha256':digest}); print(json.dumps(counts[-1]),flush=True)
         db.execute('CREATE UNIQUE INDEX company_number ON companies(registration_number)')
         db.execute('CREATE INDEX company_name ON companies(name COLLATE NOCASE)')
         total=sum(item['rows'] for item in counts)
