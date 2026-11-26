@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Add read-only national catalog, GB indexed offline search and details, compressed snapshot staging and optional native packaging; preserve Croatian workspace isolation.
+
 - Isolate website catalogs by country and add separate Companies House bulk importer and APR download staging.
 
 - Add explicit legal-entity classification and filtering; preserve unclassified records until source evidence is available. Fix the identifier-search browser assertion.

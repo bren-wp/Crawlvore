@@ -84,6 +84,11 @@ jobs:
           if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" = 1 ]; then
             extra=(--add-data "registry-bundle/registry-seed.sqlite3:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
           fi
+          if [ "${CRAWLVORA_NATIONAL_BUNDLE:-}" = 1 ]; then
+            test -s national-data/GB/manifest.json
+            test -s national-data/GB/united-kingdom.sqlite3.gz
+            extra+=(--add-data "national-data:national-data")
+          fi
           python -m PyInstaller "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
           mkdir -p native-preview
           cp -R dist/CrawlvoraWorker native-preview/worker

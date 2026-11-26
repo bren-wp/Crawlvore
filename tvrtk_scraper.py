@@ -24,6 +24,7 @@ from snapshot_diff import compare
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
+from national_catalog import NationalCatalog
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
@@ -81,6 +82,7 @@ def main():
             return run_workspace(args,selection,active)
 
 def run_workspace(args,selection,active):
+    national=NationalCatalog(ROOT,args.data_dir)
     database=args.data_dir/'companies.sqlite3'
     installed=active=='primary' and install_seed(ROOT,database)
     expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
@@ -220,6 +222,11 @@ def run_workspace(args,selection,active):
                         self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(os.fstat(stream.fileno()).st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         shutil.copyfileobj(stream,self.wfile)
                     return
+                if p.path=='/api/national/status': return self.send_data(national.status())
+                if p.path=='/api/national/gb/search': return self.send_data(national.search(get('q'),int(get('page','1'))))
+                if p.path=='/api/national/gb/detail':
+                    record=national.detail(get('number'))
+                    return self.send_data(record if record else {'error':'Record not found.'},status=200 if record else 404)
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])

@@ -9,6 +9,10 @@ if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
     (Get-FileHash registry-bundle/registry-seed.sqlite3 -Algorithm SHA256).Hash.ToLower() | Set-Content registry-bundle/registry-seed.sha256 -Encoding ascii
     $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3;.','--add-data','registry-bundle/registry-seed.sha256;.','--add-data','registry-bundle/registry-seed.json;.')
 }
+if ($env:CRAWLVORA_NATIONAL_BUNDLE -eq '1') {
+    if (!(Test-Path national-data/GB/manifest.json) -or !(Test-Path national-data/GB/united-kingdom.sqlite3.gz)) { throw 'National snapshot missing' }
+    $registryArgs += @('--add-data','national-data;national-data')
+}
 python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --exclude-module playwright --exclude-module webview tvrtk_scraper.py
 if ($LASTEXITCODE) { throw 'Embedded worker build failed' }
 $env:CRAWLVORA_EMBEDDED_WORKER = (Resolve-Path dist/embedded/CrawlvoraWorker.exe).Path

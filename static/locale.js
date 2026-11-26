@@ -1,6 +1,12 @@
 "use strict";
 const UI_LANGUAGE = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES = {
+  "Međunarodni registri":"International registries",
+  "Odvojene nacionalne baze dostupne lokalno.":"Separate national catalogs available locally.",
+  "Naziv tvrtke ili registracijski broj…":"Company name or registration number…",
+  "Registracijski broj":"Registration number",
+  "Nacionalna baza nije ugrađena u ovo izdanje.":"National database is not included in this edition.",
+  "Pretraži":"Search",
   "Vrsta subjekta": "Entity type",
   "Sve vrste": "All entity types",
   "Trgovačka društva": "Companies",
