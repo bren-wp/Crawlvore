@@ -9,7 +9,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
-import io
 from core import Store, Collector
 from sources import NAMES
 from bulk_io import MAX_IMPORT, receive, import_file, export_file, company_registry

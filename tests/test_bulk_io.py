@@ -43,3 +43,12 @@ class BulkIOTests(unittest.TestCase):
             self.assertEqual(len(company_registry(store,i)['rows']),25)
             self.assertEqual(len(company_registry(store,i,'1',25)['rows']),2)
             self.assertFalse(company_registry(store,i,'1',25)['next'])
+
+    def test_csv_roundtrip_keeps_entity_classification(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); original=Store(root/'original.db')
+            original.import_json('[{"title":"Synthetic institution","entity_kind":"institution"}]')
+            out=root/'out.csv'; export_file(original,out,'csv')
+            restored=Store(root/'restored.db')
+            self.assertEqual(import_file(restored,out,'csv')['read'],1)
+            self.assertEqual(restored.query(entity_kind='institution')['total'],1)
