@@ -2,6 +2,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from core import Store
 from registry import Registry
@@ -52,3 +53,18 @@ class BulkIOTests(unittest.TestCase):
             restored=Store(root/'restored.db')
             self.assertEqual(import_file(restored,out,'csv')['read'],1)
             self.assertEqual(restored.query(entity_kind='institution')['total'],1)
+
+    def test_insufficient_disk_rejected_before_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'upload'
+            with patch('bulk_io.shutil.disk_usage',return_value=type('Usage',(),{'free':1})()):
+                with self.assertRaisesRegex(ValueError,'Insufficient free disk'):
+                    receive(io.BytesIO(b'a'),path,1)
+            self.assertFalse(path.exists())
+
+    def test_json_many_records_and_boundary_whitespace(self):
+        count=50000
+        raw='[ '+','.join('{"title":"Synthetic","index":'+str(i)+'}' for i in range(count))+' ]\r\n'
+        self.assertEqual(sum(1 for _ in json_records(io.StringIO(raw))),count)
+        with self.assertRaises(ValueError):
+            list(json_records(io.StringIO('[{"title":"Synthetic"}, ]')))

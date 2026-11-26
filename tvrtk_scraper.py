@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 from core import Store, Collector
 from sources import NAMES
-from bulk_io import MAX_IMPORT, receive, import_file, export_file, company_registry
+from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import Registry, RegistryAccess, start_registry
 from registry_seed import accept_packaged_seed, accept_preview_seed, install_seed
 import os
@@ -130,6 +130,7 @@ def run_workspace(args,selection,active):
             collector.stop()
             while collector.snapshot()['status']=='stopping': time.sleep(0.2)
             return 130
+    import_lock=threading.Lock()
     ui_ready=threading.Event()
     ui_ready_lock=threading.Lock()
     queue=Queue(store,collector,registry,registry_access.credentials); queue.start()
@@ -272,12 +273,21 @@ def run_workspace(args,selection,active):
                     return self.send_data({'id':identifier})
                 if self.path in ('/api/import-json','/api/import'):
                     if not 0<n<=MAX_IMPORT: return self.send_data({'error':'Datoteka je prevelika (2 GiB).'},status=413)
-                    self.connection.settimeout(120)
-                    with tempfile.TemporaryDirectory() as directory:
-                        staged=Path(directory)/'upload'
-                        receive(self.rfile,staged,n)
-                        protected.before_import()
-                        return self.send_data(import_file(store,staged,'json' if self.path=='/api/import-json' else 'csv'))
+                    if not import_lock.acquire(blocking=False):
+                        self.close_connection=True
+                        return self.send_data({'error':'Another import is already running.'},status=409)
+                    try:
+                        self.connection.settimeout(120)
+                        # Conservative preflight for backup, transaction and SQLite growth.
+                        require_free_space(database.parent,database.stat().st_size+n+64*1024**2)
+                        with tempfile.TemporaryDirectory() as directory:
+                            staged=Path(directory)/'upload'
+                            receive(self.rfile,staged,n)
+                            require_free_space(database.parent,database.stat().st_size+n+64*1024**2)
+                            protected.before_import()
+                            return self.send_data(import_file(store,staged,'json' if self.path=='/api/import-json' else 'csv'))
+                    finally:
+                        import_lock.release()
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 self.connection.settimeout(120)
                 raw=self.rfile.read(n)

@@ -1,6 +1,7 @@
 """Disk-backed bulk directory I/O; bounded memory and transactional imports."""
 import csv
 import json
+import shutil
 from pathlib import Path
 from core import COLS, FIELDS, formula_safe
 
@@ -9,8 +10,14 @@ CHUNK=1024*1024
 MAX_RECORD=8*CHUNK
 COLUMNS=COLS+['oib','email','industry','entity_kind']
 
+def require_free_space(directory, required):
+    if shutil.disk_usage(directory).free<required:
+        raise ValueError('Insufficient free disk space for import.')
+
+
 def receive(stream,path,size):
     if not 0<size<=MAX_IMPORT: raise ValueError('Invalid import size (maximum 2 GiB).')
+    require_free_space(Path(path).parent,size+64*CHUNK)
     with Path(path).open('xb') as out:
         remaining=size
         while remaining:
@@ -19,46 +26,47 @@ def receive(stream,path,size):
             out.write(data); remaining-=len(data)
 
 def json_records(stream):
+    """Parse a JSON array incrementally; compact only when more data is required."""
     decoder=json.JSONDecoder()
-    buf=''; eof=False
+    buf=''; pos=0; eof=False
     def more():
-        nonlocal buf,eof
+        nonlocal buf,pos,eof
         data=stream.read(CHUNK)
         if not data: eof=True
-        buf+=data
+        buf=buf[pos:]+data; pos=0
     def trim():
-        nonlocal buf
+        nonlocal pos
         while True:
-            buf=buf.lstrip()
-            if buf or eof: return
+            while pos<len(buf) and buf[pos] in ' \t\r\n': pos+=1
+            if pos<len(buf) or eof: return
             more()
     trim()
-    if not buf.startswith('['): raise ValueError('Expected JSON array.')
-    buf=buf[1:]; trim()
-    if buf.startswith(']'):
-        buf=buf[1:]
+    if not buf.startswith('[',pos): raise ValueError('Expected JSON array.')
+    pos+=1; trim()
+    if buf.startswith(']',pos):
+        pos+=1
     else:
         while True:
             trim()
-            if not buf.startswith('{'): raise ValueError('Expected JSON object.')
+            if not buf.startswith('{',pos): raise ValueError('Expected JSON object.')
             while True:
                 try:
-                    obj,end=decoder.raw_decode(buf)
+                    obj,end=decoder.raw_decode(buf,pos)
                     break
                 except json.JSONDecodeError:
-                    if eof or len(buf)>MAX_RECORD: raise ValueError('Invalid or oversized JSON record.') from None
+                    if eof or len(buf)-pos>MAX_RECORD: raise ValueError('Invalid or oversized JSON record.') from None
                     more()
-            if end>MAX_RECORD: raise ValueError('JSON record exceeds size limit.')
+            if end-pos>MAX_RECORD: raise ValueError('JSON record exceeds size limit.')
             if not isinstance(obj,dict) or not isinstance(obj.get('title'),str) or not obj['title'].strip():
                 raise ValueError('JSON records require title.')
             yield obj
-            buf=buf[end:]; trim()
-            if buf.startswith(']'):
-                buf=buf[1:]; break
-            if not buf.startswith(','): raise ValueError('Invalid JSON array separator.')
-            buf=buf[1:]
+            pos=end; trim()
+            if buf.startswith(']',pos):
+                pos+=1; break
+            if not buf.startswith(',',pos): raise ValueError('Invalid JSON array separator.')
+            pos+=1
     trim()
-    if buf: raise ValueError('Unexpected data after JSON array.')
+    if pos<len(buf): raise ValueError('Unexpected data after JSON array.')
 
 def import_file(store,path,kind):
     with Path(path).open(encoding='utf-8-sig',newline='') as stream:
