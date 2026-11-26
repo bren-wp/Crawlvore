@@ -64,7 +64,8 @@ def main():
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(headless=True,executable_path=None if getattr(sys,'frozen',False) else os.getenv('CRAWLVORA_TEST_CHROMIUM'))
                 try:
-                    page=browser.new_page(); page.set_content('<h1>Crawlvora</h1>'); assert page.locator('h1').inner_text()=='Crawlvora'
+                    page=browser.new_page(); page.set_content('<h1>Crawlvora</h1>')
+                    if page.locator('h1').inner_text()!='Crawlvora': raise RuntimeError('Browser smoke test failed.')
                 finally: browser.close()
             Workbook().close(); result={'ok':True,'records':26261,'browser':True}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
