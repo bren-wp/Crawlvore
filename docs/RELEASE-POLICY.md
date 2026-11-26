@@ -27,3 +27,7 @@ Production requires 13 assets: the original seven plus Portable-HR.exe, Setup-HR
 ## WordPress distribution
 
 Keep all 13 desktop release assets and add Crawlvora-WordPress.zip as the fourteenth required asset. The plugin contains code only, consumes reviewed JSON catalogs, and must pass PHP syntax, catalog unit checks and disposable WordPress integration before publication.
+
+## Durable acquisition
+
+Retain original UK archive bytes in the workspace downloads directory. Resume with HTTP Range and If-Range only with a matching strong ETag, exact Content-Range and declared total. If the server returns a new full response, stage separately and retain the earlier partial. Completed archives are reused for retrying indexing. Only derived scratch files may be discarded. Existing installed catalogs and user databases are never replaced by download operations. HR sync commits each validated page and checkpoint in the same transaction. A changed or unavailable remote snapshot cannot be resumed by mixing data. Fault-injection and actual native interruption/restart tests remain separate acceptance gates.
