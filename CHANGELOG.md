@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Isolate website catalogs by country and add separate Companies House bulk importer and APR download staging.
+
 - Add explicit legal-entity classification and filtering; preserve unclassified records until source evidence is available. Fix the identifier-search browser assertion.
 
 - Automatically recognize OIB and MBS in the directory search without prefixes, retain company-name search and exact indexed identifier matching, and test all three search modes.

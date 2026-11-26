@@ -33,13 +33,14 @@ def publish_record(raw):
     return record
 
 
-def build(source,destination):
+def build(source,destination,country=None):
     destination=Path(destination)
     destination.mkdir(mode=0o700)
     buckets={}
     counters={}
     shards=[]
     count=0
+    selected=country
     def flush(key):
         bucket=buckets[key]
         if not bucket: return
@@ -53,13 +54,15 @@ def build(source,destination):
         for line in stream:
             if not line.strip(): continue
             record=publish_record(json.loads(line))
+            if selected is None: selected=record['country']
+            if record['country']!=selected: raise ValueError('Mixed-country catalog rejected')
             key=record['country']+'-'+record['kind']
             bucket=buckets.setdefault(key,[])
             bucket.append(record)
             count+=1
             if len(bucket)>=500: flush(key)
     for key in buckets: flush(key)
-    manifest={'version':1,'count':count,'published_at':datetime.now(timezone.utc).date().isoformat(),'shards':sorted(shards)}
+    manifest={'version':1,'country':selected,'count':count,'published_at':datetime.now(timezone.utc).date().isoformat(),'shards':sorted(shards)}
     (destination/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     return manifest
 
@@ -68,6 +71,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input_jsonl',type=Path)
     parser.add_argument('new_data_directory',type=Path)
+    parser.add_argument('--country',choices=sorted(SOURCES),required=True)
     parser.add_argument('--publication-reviewed',action='store_true',required=True)
     args=parser.parse_args()
-    print(json.dumps(build(args.input_jsonl,args.new_data_directory)))
+    print(json.dumps(build(args.input_jsonl,args.new_data_directory,args.country)))

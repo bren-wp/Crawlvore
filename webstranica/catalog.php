@@ -19,6 +19,7 @@ function fold(string $value): string {
     return function_exists('mb_strtolower') ? mb_strtolower($value,'UTF-8') : strtolower(strtr($value,['Č'=>'č','Ć'=>'ć','Ž'=>'ž','Š'=>'š','Đ'=>'đ','Á'=>'á','É'=>'é','Í'=>'í','Ó'=>'ó','Ö'=>'ö','Ő'=>'ő','Ú'=>'ú','Ü'=>'ü','Ű'=>'ű']));
 }
 function search_catalog(array $manifest,string $q,string $country,string $kind,int $page): array {
+    if (!in_array($country,['HR','GB','RS','SI','BA','ME','HU'],true)) throw new RuntimeException('Country required');
     $query=fold($q); $digits=preg_replace('/[ -]/','',$q);
     $numeric=preg_match('/^[0-9]{1,11}$/D',$digits)===1;
     $skip=($page-1)*25; $results=[]; $seen=0;
@@ -26,7 +27,7 @@ function search_catalog(array $manifest,string $q,string $country,string $kind,i
         if (!is_string($shard) || !preg_match('/^[A-Z]{2}-(company|entrepreneur|institution|nonprofit|unknown)-[0-9]{6}\.json$/D',$shard)) throw new RuntimeException('Invalid shard');
         if ($country!=='' && !str_starts_with($shard,$country.'-')) continue;
         if ($kind!=='' && !str_contains($shard,'-'.$kind.'-')) continue;
-        foreach (read_json(DATA.'/'.$shard) as $record) {
+        foreach (read_json(DATA.'/'.$country.'/'.$shard) as $record) {
             if ($query!=='') {
                 $found=str_contains(fold($record['name']),$query);
                 if ($numeric) {

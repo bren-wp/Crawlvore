@@ -26,3 +26,13 @@ class WebCatalogTests(unittest.TestCase):
             with self.assertRaises(ValueError): builder.publish_record(record)
             record.update(publication_reviewed=True,country='HU')
             with self.assertRaises(ValueError): builder.publish_record(record)
+
+    def test_mixed_country_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source=root/'records.jsonl'
+            base={'kind':'company','name':'Synthetic business','as_of':'2026-01-01','publication_reviewed':True}
+            source.write_text('\n'.join(json.dumps(dict(base,country=country)) for country in ('HR','GB')),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'Mixed-country'):
+                builder.build(source,root/'mixed','HR')
+            self.assertFalse((root/'mixed/manifest.json').exists())
