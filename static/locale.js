@@ -1,6 +1,13 @@
 "use strict";
 const UI_LANGUAGE = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES = {
+  "Vrsta subjekta": "Entity type",
+  "Sve vrste": "All entity types",
+  "Trgovačka društva": "Companies",
+  "Poduzetnici i obrti": "Entrepreneurs",
+  "Institucije": "Institutions",
+  "Neprofitne organizacije": "Nonprofit organizations",
+  "Neklasificirani subjekti": "Unclassified entities",
   "Izvoz odabranih polja": "Selected field export",
   "Polja za izvoz": "Fields to export",
   "Odaberi sve": "Select all",

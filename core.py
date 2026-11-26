@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 
 FIELDS = ['Title','Logo URL','Website URL','Social URL','Street Address','Postal Code','City','Country','Phone Number','Phone/Fax','Responsible Person','Year of Establishment','Number of Employees','Account Number','Mbs Number','Rating Value','Description','Product/Company Description']
 COLS = ['title','logo','website','social','address','postal','city','country','phone','fax','person','year','employees','account','mbs','rating','description','products']
+ENTITY_KINDS = ('company','entrepreneur','institution','nonprofit','unknown')
 BASE = 'https://www.tvrtke.hr/'
 UA = 'Crawlvora/7.0 (local directory tool)'
 
@@ -82,8 +83,9 @@ class Store:
             c.execute('CREATE TABLE IF NOT EXISTS completed (job TEXT, url TEXT, PRIMARY KEY(job,url))')
             c.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
             existing={r[1] for r in c.execute('PRAGMA table_info(companies)')}
-            for col in ('oib','email','industry'):
+            for col in ('oib','email','industry','entity_kind'):
                 if col not in existing: c.execute(f"ALTER TABLE companies ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_entity_kind ON companies(entity_kind)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_oib ON companies(oib)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_mbs ON companies(mbs)")
             c.execute("CREATE TABLE IF NOT EXISTS origins (company_id INTEGER NOT NULL, provider TEXT NOT NULL, url TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,provider,url), FOREIGN KEY(company_id) REFERENCES companies(id))")
@@ -131,6 +133,8 @@ class Store:
         cols=COLS+['oib','email','industry']
         vals={k:str(row.get(k) or '').strip() for k in cols}
         if not vals['title']: return False
+        entity_kind=str(row.get('entity_kind') or '')
+        if entity_kind and entity_kind not in ENTITY_KINDS: raise ValueError('Invalid entity classification.')
         # An OIB must be a valid 11-digit identifier with the ISO 7064 checksum.
         oib=re.sub(r'\s','',vals['oib'])
         if re.fullmatch(r'[0-9]{11}',oib):
@@ -183,6 +187,10 @@ class Store:
             i=old['id']
         else:
             i=c.execute('INSERT INTO companies(identity,source,title,logo,website,social,address,postal,city,country,phone,fax,person,year,employees,account,mbs,rating,description,products,oib,email,industry,search_text) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(identity,source,*vals.values(),norm(' '.join(vals.values())))).lastrowid
+        if entity_kind and entity_kind!='unknown':
+            current=c.execute('SELECT entity_kind FROM companies WHERE id=?',(i,)).fetchone()[0]
+            if current not in ('','unknown',entity_kind): raise ValueError('Conflicting entity classification; existing data preserved.')
+            c.execute('UPDATE companies SET entity_kind=? WHERE id=?',(entity_kind,i))
         c.execute("INSERT INTO origins(company_id,provider,url) VALUES (?,?,?) ON CONFLICT(company_id,provider,url) DO UPDATE SET updated=CURRENT_TIMESTAMP",(i,provider or ('tvrtke' if source else 'csv'),origin or source or ''))
         return not bool(old)
     def history(self,i):
@@ -244,7 +252,7 @@ class Store:
             r=c.execute("SELECT count(*) total,count(DISTINCT NULLIF(city,'')) cities,count(NULLIF(phone,'')) phones,count(NULLIF(website,'')) websites FROM companies").fetchone()
             cities=[dict(x) for x in c.execute("SELECT city,count(*) n FROM companies WHERE city<>'' GROUP BY city ORDER BY n DESC,city LIMIT 6")]
             return dict(r,top_cities=cities)
-    def where(self,q='',city='',contact='',provider=''):
+    def where(self,q='',city='',contact='',provider='',entity_kind=''):
         # SQL fragments below are fixed literals; user input is only bound as parameters.
         clauses=[]; args=[]
         # Recognize plain identifiers automatically; retain explicit legacy prefixes.
@@ -268,19 +276,23 @@ class Store:
             else:
                 clauses.append('instr(search_text,?)>0'); args.append(phrase)
         elif q: clauses.append('instr(search_text,?)>0'); args.append(text)
+        if entity_kind:
+            if entity_kind not in ENTITY_KINDS: raise ValueError('Invalid entity classification.')
+            if entity_kind=='unknown': clauses.append("entity_kind IN ('','unknown')")
+            else: clauses.append('entity_kind=?'); args.append(entity_kind)
         if city: clauses.append('city=?'); args.append(city)
         if provider: clauses.append('EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider=?)'); args.append(provider)
         if contact=='phone': clauses.append("phone<>''")
         elif contact=='web': clauses.append("website<>''")
         elif contact=='missing': clauses.append("phone='' AND website=''")
         return (' WHERE '+' AND '.join(clauses) if clauses else ''),args
-    def query(self,q='',city='',contact='',page=1,limit=25,sort='title',provider=''):
-        where,args=self.where(q,city,contact,provider)
+    def query(self,q='',city='',contact='',page=1,limit=25,sort='title',provider='',entity_kind=''):
+        where,args=self.where(q,city,contact,provider,entity_kind)
         order={'title':'title COLLATE NOCASE ASC,id','title_desc':'title COLLATE NOCASE DESC,id','city':'city COLLATE NOCASE,title COLLATE NOCASE,id','new':'id DESC'}.get(sort,'id')
         with self.db() as c:
             c.execute('BEGIN')
             total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
-            rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
+            rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,entity_kind,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             return {'total':total,'rows':[dict(r) for r in rows]}
     def cities(self):
         with self.db() as c: return [r[0] for r in c.execute("SELECT DISTINCT city FROM companies WHERE city<>'' ORDER BY city COLLATE NOCASE")]
@@ -291,7 +303,7 @@ class Store:
             if not r: return None
             sources=[dict(x) for x in c.execute('SELECT provider,url,updated FROM origins WHERE company_id=? ORDER BY provider,url',(i,))]
             alternatives=[dict(x) for x in c.execute('SELECT field,value,provider,observed_at FROM alternate_values WHERE company_id=? ORDER BY field,provider,value',(i,))]
-            return dict({k:r[k] for k in ['id','source',*COLS,'oib','email','industry']},sources=sources,alternate_values=alternatives)
+            return dict({k:r[k] for k in ['id','source',*COLS,'oib','email','industry','entity_kind']},sources=sources,alternate_values=alternatives)
     def export(self,**filters):
         where,args=self.where(**filters); out=io.StringIO(newline=''); w=csv.writer(out); w.writerow(FIELDS+['OIB','Email','Industry','Sources'])
         with self.db() as c:

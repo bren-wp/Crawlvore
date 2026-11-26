@@ -153,7 +153,7 @@ def run_workspace(args,selection,active):
                 return self.send_data(b'',status=303,extra={'Location':'/','Set-Cookie':self.cookie_name()+'='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict'})
             if not self.session_authorized(): return self.send_data({'error':'Access denied.'},status=403)
             params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
-            filters={k:get(k) for k in ('q','city','contact','provider')}
+            filters={k:get(k) for k in ('q','city','contact','provider','entity_kind')}
             try:
                 if p.path=='/':
                     with store.db() as db:

@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Add explicit legal-entity classification and filtering; preserve unclassified records until source evidence is available. Fix the identifier-search browser assertion.
+
 - Automatically recognize OIB and MBS in the directory search without prefixes, retain company-name search and exact indexed identifier matching, and test all three search modes.
 
 - Force the existing MBS lookup index for related registry rows to avoid category-wide scans during high-volume projection; correct the browser E2E JSON import.
