@@ -6,10 +6,10 @@ $version = (Get-Content VERSION -Raw).Trim()
 $output = Join-Path (Get-Location).Path 'dist\private-release'
 $staging = Join-Path (Get-Location).Path ('dist\private-build-' + [guid]::NewGuid().ToString('N'))
 if (Test-Path $output) { throw 'Private output already exists. Move it to private storage before rebuilding.' }
-New-Item -ItemType Directory -Path $staging -Force | Out-Null
 $capsule = Join-Path $staging 'registry-private.dpapi'
 $bootstrapper = Join-Path (Resolve-Path windows).Path 'MicrosoftEdgeWebview2Setup.exe'
 if (Test-Path $bootstrapper) { throw 'An existing WebView2 build file is present. Do not overwrite it.' }
+New-Item -ItemType Directory -Path $staging -Force | Out-Null
 try {
     python tools/create_private_registry_capsule.py $capsule
     if ($LASTEXITCODE) { throw 'Private credential capsule failed.' }
@@ -38,9 +38,24 @@ try {
     foreach ($file in @($portable,(Join-Path $staging 'Setup.exe'))) {
         if (!(Test-Path $file) -or (Get-Item $file).Length -eq 0) { throw 'Missing private package.' }
     }
-    $p = Start-Process -FilePath $portable -ArgumentList '--native-smoke' -PassThru
-    if (!$p.WaitForExit(240000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Private native smoke timed out.' }
-    if ($p.ExitCode -ne 0) { throw 'Private native smoke failed.' }
+    function Test-PrivateWindow($exe) {
+        $p = Start-Process -FilePath $exe -ArgumentList '--native-smoke' -PassThru
+        if (!$p.WaitForExit(240000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Private native smoke timed out.' }
+        if ($p.ExitCode -ne 0) { throw 'Private native smoke failed.' }
+    }
+    Test-PrivateWindow $portable
+    # Setup has a different smoke AppId to avoid changing a real existing installation.
+    # Its payload and installer code are identical to the final private Setup.
+    $acceptance = Join-Path $staging 'acceptance'
+    New-Item -ItemType Directory -Path $acceptance | Out-Null
+    & $iscc "/DAppVersion=$version" "/DPrivatePortable=$portable" "/DPrivateOutput=$acceptance" '/DPrivateSmoke=1' windows/Crawlvora-native.iss
+    if ($LASTEXITCODE) { throw 'Private acceptance installer build failed.' }
+    $install = Join-Path $acceptance 'installed'
+    $p = Start-Process -FilePath (Join-Path $acceptance 'Setup.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $install + '"')) -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw 'Private acceptance installation failed.' }
+    Test-PrivateWindow (Join-Path $install 'Crawlvora.exe')
+    $p = Start-Process -FilePath (Join-Path $install 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw 'Private acceptance uninstallation failed.' }
     New-Item -ItemType Directory -Path $output | Out-Null
     Copy-Item $portable,(Join-Path $staging 'Setup.exe') $output
     Get-ChildItem $output -Filter '*.exe' | Sort-Object Name | ForEach-Object {

@@ -14,9 +14,10 @@ class Pace:
         if seconds>0:
             time.sleep(seconds)
 
-def check():
-    root=Path(__file__).resolve().parents[1]
-    creds=credentials(root,Path(os.environ.get('CRAWLVORA_DATA_DIR',str(root/'data'))))
+def check(creds=None):
+    if creds is None:
+        root=Path(__file__).resolve().parents[1]
+        creds=credentials(root,Path(os.environ.get('CRAWLVORA_DATA_DIR',str(root/'data'))))
     if not all(creds):
         raise SystemExit('Production registry check blocked: configure private SUDREG_CLIENT_ID and SUDREG_CLIENT_SECRET.')
     client=Client(Pace(),creds,delay=3)

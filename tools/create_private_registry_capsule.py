@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from native_vault import NativeVault
 from registry import RegistryAccess
+from live_registry_check import check
 
 
 def main():
@@ -21,6 +22,11 @@ def main():
     else:
         pair=(getpass.getpass('Authorized Client ID: '),getpass.getpass('Authorized Client Secret: '))
     client_id,client_secret=RegistryAccess._pair(dict(zip(('client_id','client_secret'),pair)))
+    # A private build must verify the actual pair before sealing it.
+    try:
+        check((client_id,client_secret))
+    except Exception as error:
+        raise SystemExit('Private registry authorization check failed: '+type(error).__name__) from None
     raw=json.dumps({'version':1,'client_id':client_id,'client_secret':client_secret},separators=(',',':')).encode()
     vault=NativeVault(Path.home()/'.crawlvora-private-package-v1',purpose='registry')
     sealed=vault.crypt(raw)
