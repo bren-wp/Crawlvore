@@ -57,7 +57,7 @@ fn worker_path() -> io::Result<PathBuf> {
     Ok(dir.join("worker").join(name))
 }
 
-fn spawn_worker(data: &Path, primary: bool) -> Result<(Worker, Url, mpsc::Receiver<String>), io::Error> {
+fn spawn_worker(data: &Path, primary: bool, smoke: bool) -> Result<(Worker, Url, mpsc::Receiver<String>), io::Error> {
     #[cfg(not(feature = "portable"))]
     let binary = worker_path()?;
     #[cfg(all(feature = "portable", windows))]
@@ -78,6 +78,12 @@ fn spawn_worker(data: &Path, primary: bool) -> Result<(Worker, Url, mpsc::Receiv
     command.args(["--worker", "--port", "0", "--data-dir"]).arg(data)
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
     if primary { command.arg("--primary-workspace"); }
+    if smoke {
+        command.env("CRAWLVORA_NATIVE_SMOKE", "1");
+        for key in ["CRAWLVORA_REGISTRY_PROVISION", "SUDREG_CLIENT_ID", "SUDREG_CLIENT_SECRET"] {
+            command.env_remove(key);
+        }
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -128,7 +134,7 @@ fn main() {
             } else {
                 app.path().local_data_dir()?.join("Crawlvora")
             };
-            let (worker, url, ui_ready) = spawn_worker(&data, primary)?;
+            let (worker, url, ui_ready) = spawn_worker(&data, primary, smoke)?;
             let port = url.port();
             *app.state::<Mutex<Option<Worker>>>().lock().map_err(|_| invalid("Worker state unavailable"))? = Some(worker);
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))

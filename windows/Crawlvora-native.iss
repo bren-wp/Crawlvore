@@ -2,13 +2,26 @@
 #define AppVersion "8.1.1"
 #endif
 [Setup]
+#ifdef PrivateSmoke
+AppId=Crawlvora.BusinessData.PrivateAcceptance
+AppName=Crawlvora Private Acceptance
+#else
 AppId=Crawlvora.BusinessData
 AppName=Crawlvora
+#endif
 AppVersion={#AppVersion}
 DefaultDirName={localappdata}\Programs\Crawlvora
 DefaultGroupName=Crawlvora
+#ifdef PrivateSmoke
+DisableProgramGroupPage=yes
+CreateUninstallRegKey=no
+#endif
 PrivilegesRequired=lowest
+#ifdef PrivateOutput
+OutputDir={#PrivateOutput}
+#else
 OutputDir=..\release-assets
+#endif
 OutputBaseFilename=Setup
 Compression=lzma2
 SolidCompression=yes
@@ -19,13 +32,19 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 [Files]
 Source: "MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
+#ifdef PrivatePortable
+Source: "{#PrivatePortable}"; DestDir: "{app}"; DestName: "Crawlvora.exe"; Flags: ignoreversion
+#else
 Source: "..\native-preview\Crawlvora.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\native-preview\worker\*"; DestDir: "{app}\worker"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 [Icons]
+#ifndef PrivateSmoke
 Name: "{autodesktop}\Crawlvora"; Filename: "{app}\Crawlvora.exe"; Tasks: desktopicon
 Name: "{group}\Crawlvora"; Filename: "{app}\Crawlvora.exe"
+#endif
 [Run]
 Filename: "{app}\Crawlvora.exe"; Description: "Launch Crawlvora"; Flags: nowait postinstall skipifsilent
 

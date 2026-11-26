@@ -9,3 +9,7 @@ build/
 dist/
 
 node_modules/
+
+registry-private.dpapi
+release-assets/
+native-preview/

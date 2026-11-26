@@ -201,7 +201,7 @@ async function registryRefresh(){
  const active=['running','stopping'].includes(s.status), ours=['registry','registry-check'].includes(s.kind);
  $('reg-config').textContent=r.configured?translate('API konfiguriran'):translate('API nije konfiguriran');
  $('reg-config').dataset.state=r.configured?'ready':'warning';
- if(!!r.authorized!==previousRegistryAuthorization){$('reg-permission').checked=!!r.authorized;previousRegistryAuthorization=!!r.authorized;}
+ if(!!r.authorized!==previousRegistryAuthorization){$('reg-permission').checked=!!r.authorized;previousRegistryAuthorization=!!r.authorized;} $('reg-permission').disabled=!!r.authorized;
  $('reg-start').disabled=!r.configured||active; $('reg-check').disabled=!r.configured||active; $('reg-stop').disabled=!ours||s.status!=='running';
  $('reg-status').textContent=active&&!ours?translate('Aktivan je drugi web bot'):ours?(({running:translate('Aktivno'),stopping:translate('Zaustavljanje'),completed:translate('Završeno'),failed:translate('Pogreška'),stopped:translate('Zaustavljeno')})[s.status]||s.status):translate('Spremno');
  $('reg-logs').textContent=ours?s.logs.slice(-12).join('\n')||translate('Čekanje na API…'):translate('Nema aktivnosti registra.');

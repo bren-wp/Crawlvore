@@ -111,6 +111,38 @@ class RegistryAccess:
             self.session=(pair,persist)
             return self.status()
 
+    def provision_from_environment(self):
+        """Explicit, per-user managed deployment enrollment; never embed a shared secret."""
+        if os.environ.pop('CRAWLVORA_REGISTRY_PROVISION','')!='1':
+            return False
+        # Consume the deployment pair before launching any vault subprocess.
+        data={'client_id':os.environ.pop('SUDREG_CLIENT_ID',''),
+              'client_secret':os.environ.pop('SUDREG_CLIENT_SECRET',''),
+              'persist':True,'permission':True}
+        self.apply(data)
+        return True
+
+    def provision_from_package(self):
+        # Only a frozen private Windows worker can carry an embedded DPAPI capsule.
+        if sys.platform!='win32' or not getattr(sys,'frozen',False) or os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
+            return False
+        capsule=Path(self.root)/'registry-private.dpapi'
+        if not capsule.is_file(): return False
+        with self.lock:
+            try:
+                # Any existing record (including a revocation tombstone) wins.
+                if self.vault.load() is not None: return False
+                if capsule.is_symlink() or not 0<capsule.stat().st_size<=65536:
+                    raise ValueError('Invalid private registry package.')
+                protector=NativeVault(Path.home()/'.crawlvora-private-package-v1',purpose='registry')
+                data=json.loads(protector.crypt(capsule.read_bytes(),decrypt=True))
+                if not isinstance(data,dict) or data.get('version')!=1:
+                    raise ValueError('Invalid private registry package.')
+                self.apply(dict(data,persist=True,permission=True))
+                return True
+            except (VaultUnavailable,OSError,ValueError,TypeError):
+                raise ValueError('Private registry package cannot be authorized on this Windows profile.') from None
+
     def forget(self):
         with self.lock:
             try:
@@ -307,28 +339,55 @@ class Registry:
         self.merge(snap,bot)
         with self.store.db() as c: c.execute('UPDATE registry_runs SET complete=1 WHERE snapshot=?',(snap,))
     def merge(self,snap,bot):
-        # Keep original registry records intact. Add only named business entities to directory.
+        # Keep original payloads; project documented v3 fields into the directory.
+        def value(record,*keys):
+            for key in keys:
+                v=record.get(key)
+                if isinstance(v,(str,int)) and not isinstance(v,bool) and str(v).strip():
+                    return str(v).strip()
+                if isinstance(v,dict):
+                    nested=value(v,'naziv','ime')
+                    if nested: return nested
+            return ''
+        def related(c,mbs,category):
+            for rr in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND mbs=? AND category=? ORDER BY ordinal",(snap,mbs,category)):
+                yield json.loads(rr[0])
         with self.store.db() as c:
             for r in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND category='subjekti' ORDER BY ordinal",(snap,)):
-                bot.wait(0); d=json.loads(r[0]); mbs=normalized_id(d.get('mbs'),9); oib=normalized_id(d.get('oib'),11)
-                title=next((d[k] for k in ('tvrtka_naziv','naziv','tvrtka','skracena_tvrtka') if isinstance(d.get(k),str) and d[k].strip()),'')
-                if not title and mbs:
-                    for rr in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND mbs=? AND category IN ('tvrtke','nazivi','skracene_tvrtke')",(snap,mbs)):
-                        x=json.loads(rr[0]); title=next((x[k] for k in ('naziv','tvrtka','tvrtka_naziv') if isinstance(x.get(k),str) and x[k].strip()),'')
+                bot.wait(0)
+                d=json.loads(r[0]); mbs=normalized_id(d.get('mbs'),9); oib=normalized_id(d.get('oib'),11)
+                if not mbs:
+                    bot.inc('skipped')
+                    continue
+                title=value(d,'tvrtka_naziv','naziv','tvrtka','skracena_tvrtka')
+                if not title:
+                    for category in ('tvrtke','nazivi','skracene_tvrtke'):
+                        title=next((name for x in related(c,mbs,category)
+                                    if (name:=value(x,'ime','naziv','tvrtka','tvrtka_naziv'))),'')
                         if title: break
-                if not title or not mbs: continue
+                if not title:
+                    title=value(d,'tvrtka_kod_brisanja')
+                if not title:
+                    bot.inc('skipped')
+                    continue
                 row={'title':title,'mbs':mbs,'oib':oib}
-                for rr in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND mbs=? AND category='sjedista'",(snap,mbs)):
-                    a=json.loads(rr[0]); status=a.get('status',1)
-                    if str(status)!='1': continue
-                    def val(*keys):
-                        for k in keys:
-                            v=a.get(k)
-                            if isinstance(v,(str,int)) and str(v).strip(): return str(v)
-                            if isinstance(v,dict) and isinstance(v.get('naziv'),str): return v['naziv']
-                        return ''
-                    row.update(city=val('naselje_naziv','naselje','grad'),country=val('drzava_naziv','drzava'),address=' '.join(filter(None,[val('ulica','ulica_naziv','adresa'),val('kucni_broj')]))); break
-                # Use public registry MBS for stable identity; avoid merging distinct legal entities by name.
+                founded=value(d,'datum_osnivanja')
+                if re.match(r'^\d{4}(?:-|$)',founded): row['year']=founded[:4]
+                for a in related(c,mbs,'sjedista'):
+                    if str(a.get('status',1))!='1': continue
+                    number=value(a,'kucni_broj')
+                    suffix=value(a,'kucni_podbroj')
+                    row.update(city=value(a,'naziv_naselja','naselje_naziv','naselje','grad','naselje_van_sifrarnika'),
+                               country=value(a,'drzava_naziv','drzava'),
+                               address=' '.join(filter(None,[value(a,'ulica','ulica_naziv','adresa'),number+suffix])),
+                               postal=normalized_id(a.get('postanski_broj'),5))
+                    if not row['country'] and 'drzava_id' in a and a['drzava_id'] is None:
+                        row['country']='Hrvatska'
+                    break
+                # Keep all public e-mail rows in the raw snapshot; directory uses the first.
+                email=next((address for e in related(c,mbs,'email_adrese')
+                            if str(e.get('status',1))=='1' and (address:=value(e,'adresa'))),'')
+                if email: row['email']=email
                 if self.store.upsert(c,row,provider='registry',origin=BASE+'/subjekti'): bot.inc('added')
 
 def start_registry(bot,registry,creds,limit=500,check=False):

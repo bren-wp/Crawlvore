@@ -92,6 +92,12 @@ def run_workspace(args,selection,active):
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
     registry_access=RegistryAccess(ROOT,args.data_dir)
+    try:
+        if not registry_access.provision_from_environment():
+            registry_access.provision_from_package()
+    except ValueError:
+        # Preserve offline workspace availability without accepting an invalid pair.
+        print('Registry provisioning failed; authorized secure storage required.',file=sys.stderr)
     if args.registry_sync:
         if not 1 <= args.registry_limit <= 1000: raise ValueError('Invalid registry page size.')
         start_registry(collector,registry,registry_access.credentials(),args.registry_limit)
@@ -308,8 +314,12 @@ def run_workspace(args,selection,active):
                     if data.get('enabled') and data.get('permission') is not True: raise ValueError('Potvrdite dopuštenje API-ja.')
                     return self.send_data(queue.schedule(data.get('enabled'),int(data.get('hour',3))))
                 if self.path in ('/api/registry/start','/api/registry/check'):
-                    if data.get('permission') is not True: raise ValueError('Potvrdite korištenje javnog API-ja.')
-                    queue.direct(lambda: start_registry(collector,registry,registry_access.credentials(),int(data.get('limit',500)),check=self.path.endswith('/check'))); return self.send_data({'ok':True})
+                    def synchronize():
+                        pair,authorized=registry_access.current()
+                        if not authorized and data.get('permission') is not True:
+                            raise ValueError('Potvrdite korištenje javnog API-ja.')
+                        return start_registry(collector,registry,pair,int(data.get('limit',500)),check=self.path.endswith('/check'))
+                    queue.direct(synchronize); return self.send_data({'ok':True})
                 if self.path=='/api/stop': collector.stop(); return self.send_data({'ok':True})
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)
             except (ValueError,TypeError,UnicodeError) as e: self.send_data({'error':str(e)},status=400)
