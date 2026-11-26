@@ -45,3 +45,5 @@ Native CI must force-terminate the actual packaged worker after committing an is
 ## Edition switch retention
 
 After successful GB catalog verification, persist its manifest next to the content-addressed SQLite cache. A later HR or Online edition can reopen the same previously used GB catalog without the embedded archive or a network request. Do not remove any previous snapshot or cached database. A changed/corrupted cached database is rejected on reopen, not deleted. Unopened embedded catalogs are still lazily extracted on first use.
+
+The packaged worker recovery gate now interrupts an actual authenticated 2 MiB-declared HTTP upload after observing the exclusive import lock, verifies that no partially uploaded record was committed, and checks prior committed records and preferences after restart. The input is synthetic; it is not a live registry download or a power-failure test.
