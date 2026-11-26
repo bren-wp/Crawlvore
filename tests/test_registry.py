@@ -67,6 +67,23 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.reg.browse('21','email_adrese')['total'],2)
         self.assertEqual(self.store.query(q='Deleted Example')['total'],1)
 
+    def test_all_subjects_explicit_scope(self):
+        class AllSubjects(Fake):
+            def spec(self):
+                s=spec()
+                s['paths']['/subjekti']['get']['parameters'].append({'in':'query','name':'only_active'})
+                return s
+            def get(self,name,q=None):
+                if name=='subjekti':
+                    if q.get('only_active')!='false': raise AssertionError('All statuses must be explicitly requested')
+                return super().get(name,q)
+        client=AllSubjects()
+        self.reg.sync(self.bot,client,1)
+        self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
+        with self.store.db() as c:
+            manifest=json.loads(c.execute('SELECT manifest FROM registry_runs WHERE snapshot=?',('21',)).fetchone()[0])
+        self.assertIn('scope:all',manifest['subjekti'])
+
     def test_shape(self):
         self.assertEqual(rows_of({'items':[{'a':1}]}),[{'a':1}]); self.assertRaises(ValueError,rows_of,{'a':[],'b':[]})
 
