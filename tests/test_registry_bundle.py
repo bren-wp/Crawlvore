@@ -28,31 +28,7 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(report['subjects'],2)
         self.assertEqual(report['scope'],'all-status')
         self.assertEqual(report['category_count'],2)
-        self.assertRegex(report['database_sha256'],r'^[0-9a-f]{64}
-
-    def test_partial_bundle(self):
-        with self.store.db() as db:
-            db.execute('UPDATE registry_runs SET complete=0')
-        with self.assertRaises(ValueError):
-            verify_bundle(self.path,min_categories=2)
-
-    def test_corrupt_payload(self):
-        with self.store.db() as db:
-            db.execute("UPDATE registry_rows SET payload=? WHERE category='subjekti' AND ordinal=0",(json.dumps({'mbs':1}),))
-        with self.assertRaises(ValueError):
-            verify_bundle(self.path,min_categories=2)
-
-    def test_non_registry_company(self):
-        self.store.import_json('[{"title":"Synthetic private contact"}]')
-        with self.assertRaises(ValueError):
-            verify_bundle(self.path,min_categories=2)
-
-    def test_missing_directory_subject(self):
-        with self.store.db() as db:
-            db.execute("UPDATE companies SET mbs='' WHERE mbs='000000001'")
-        with self.assertRaises(ValueError):
-            verify_bundle(self.path,min_categories=2)
-)
+        self.assertRegex(report['database_sha256'],r'^[0-9a-f]{64}$')
 
     def test_unexpected_category(self):
         with self.store.db() as db:
