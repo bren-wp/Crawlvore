@@ -1,6 +1,5 @@
 """Prepare an explicitly incomplete offline registry preview; never modify the source."""
 import argparse
-import hashlib
 import json
 import sqlite3
 import sys

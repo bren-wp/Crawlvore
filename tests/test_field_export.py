@@ -31,3 +31,19 @@ class FieldExportTests(unittest.TestCase):
     def test_allowlist(self):
         for value in ('','email,email','password','email FROM companies'):
             with self.assertRaises(ValueError): selected_fields(value)
+
+    def test_arbitrary_order_and_bound_filter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            store=Store(root/'data.sqlite3')
+            store.import_json('[{"title":"Alpha","city":"Rijeka","phone":"00123","website":"https://example.test"}]')
+            path=root/'out.json'
+            export_selected(store,path,['website','title','phone'],'json')
+            record=json.loads(path.read_text())[0]
+            self.assertEqual(list(record),['website','title','phone'])
+            self.assertEqual(record['phone'],'00123')
+            export_selected(store,path,['title'],'json',city="Rijeka' OR 1=1 --")
+            self.assertEqual(json.loads(path.read_text()),[])
+            with self.assertRaises(ValueError):
+                export_selected(store,path,['title','email) FROM companies; --'],'csv')
+            self.assertEqual(store.stats()['total'],1)

@@ -24,11 +24,13 @@ def export_selected(store, path, fields, kind, omit_empty=True, distinct=False, 
     if omit_empty:
         predicate='('+' OR '.join(f"coalesce({f},'')<>''" for f in fields)+')'
         where+=(' AND ' if where else ' WHERE ')+predicate
-    sql='SELECT '+('DISTINCT ' if distinct else '')+','.join(fields)+' FROM companies'+where
+    # All identifiers are validated against FIELDS; Store.where returns fixed SQL clauses.
+    # User-supplied filter values are bound, never interpolated into the query.
+    sql='SELECT '+('DISTINCT ' if distinct else '')+','.join(fields)+' FROM companies'+where  # nosec B608
     sql+=' ORDER BY '+(','.join(fields) if distinct else 'id')
     with store.db() as db:
         db.execute('BEGIN')
-        rows=db.execute(sql,args)  # nosec B608 -- fields allowlisted, fixed filter clauses, bound values.
+        rows=db.execute(sql,args)
         if kind=='csv':
             with open(path,'w',encoding='utf-8-sig',newline='') as out:
                 writer=csv.writer(out)

@@ -2,7 +2,9 @@
 const UI_LANGUAGE = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES = {
   "Izvoz odabranih polja": "Selected field export",
-  "Polje za izvoz": "Field to export",
+  "Polja za izvoz": "Fields to export",
+  "Odaberi sve": "Select all",
+  "Poništi odabir": "Clear selection",
   "Naziv tvrtke": "Company name",
   "Naziv, e-mail, telefon i OIB": "Name, email, phone and OIB",
   "Ukloni duplikate": "Remove duplicates",

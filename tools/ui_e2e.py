@@ -66,6 +66,20 @@ def run():
                 expect(page.locator('.alternate-values')).to_contain_text('222')
                 page.locator('#close-detail').click()
                 page.locator('[data-view="data"]').click()
+                page.locator('#export-clear-all').click()
+                expect(page.locator('#export-selected')).to_be_disabled()
+                page.locator('input[name="export-field"][value="title"]').check()
+                page.locator('input[name="export-field"][value="oib"]').check()
+                expect(page.locator('#export-selected')).to_be_enabled()
+                page.locator('#export-format').select_option('json')
+                with page.expect_download(timeout=60000) as selected_download:
+                    page.locator('#export-selected').click()
+                import json
+                with selected_download.value.path().open(encoding='utf-8') as stream:
+                    records=json.load(stream)
+                assert records and all(set(record)=={'title','oib'} for record in records)
+                page.locator('#export-select-all').click()
+                assert page.locator('input[name="export-field"]:checked').count()==11
                 for selector,ext in [('#all-export','.csv'),('#json-export','.json'),('#xlsx-export','.xlsx')]:
                     with page.expect_download(timeout=60000) as download:
                         page.locator(selector).click()

@@ -21,7 +21,13 @@ document.querySelectorAll('[data-view]').forEach(e=>e.addEventListener('click',(
 const providerNames={tvrtke:'Tvrtke.hr',companywall:'CompanyWall.hr',registry:translate('Sudski registar'),company:'Company.hr',html:translate('Prilagođeni web'),json:translate('Prilagođeni API'),csv:translate('CSV / postojeći podaci')};
 async function providers(){const list=await api('/api/providers'),select=$('source-filter'),old=select.value;select.replaceChildren(new Option(translate('Svi izvori'),''));$('source-summary').replaceChildren();for(const p of list){select.append(new Option(p.label,p.provider));const r=make('div',undefined,'source-row');r.append(make('span',p.label),make('strong',n(p.n)));$('source-summary').append(r)}select.value=old;}
 $('json-export').onclick=()=>location.href='/api/export-json';
-$('export-selected').onclick=()=>{const p=$('export-filtered').checked?filters():new URLSearchParams();p.set('fields',$('export-field').value);p.set('format',$('export-format').value);p.set('distinct',$('export-distinct').checked?'1':'0');p.set('omit_empty','1');location.href='/api/export-fields?'+p;};
+const exportFields=[...document.querySelectorAll('input[name="export-field"]')];
+function syncExportFields(){$('export-selected').disabled=!exportFields.some(field=>field.checked);}
+for(const field of exportFields)field.addEventListener('change',syncExportFields);
+$('export-select-all').onclick=()=>{for(const field of exportFields)field.checked=true;syncExportFields();};
+$('export-clear-all').onclick=()=>{for(const field of exportFields)field.checked=false;syncExportFields();};
+$('export-selected').onclick=()=>{const selected=exportFields.filter(field=>field.checked).map(field=>field.value);if(!selected.length)return;const p=$('export-filtered').checked?filters():new URLSearchParams();p.set('fields',selected.join(','));p.set('format',$('export-format').value);p.set('distinct',$('export-distinct').checked?'1':'0');p.set('omit_empty','1');location.href='/api/export-fields?'+p;};
+syncExportFields();
 let themeWrite=Promise.resolve();
 $('theme').onclick=()=>{const t=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=t;themeWrite=themeWrite.then(async()=>{await post('/api/preferences/theme',{theme:t})}).catch(fail);};cities().catch(fail);providers().catch(fail);go('overview');
 
