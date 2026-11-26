@@ -47,3 +47,7 @@ Native CI must force-terminate the actual packaged worker after committing an is
 After successful GB catalog verification, persist its manifest next to the content-addressed SQLite cache. A later HR or Online edition can reopen the same previously used GB catalog without the embedded archive or a network request. Do not remove any previous snapshot or cached database. A changed/corrupted cached database is rejected on reopen, not deleted. Unopened embedded catalogs are still lazily extracted on first use.
 
 The packaged worker recovery gate now interrupts an actual authenticated 2 MiB-declared HTTP upload after observing the exclusive import lock, verifies that no partially uploaded record was committed, and checks prior committed records and preferences after restart. The input is synthetic; it is not a live registry download or a power-failure test.
+
+## Atomic fourteen-asset promotion
+
+Every completed change on main builds a verified non-distribution candidate; its artifacts are archived in Actions rather than published as an incomplete GitHub Release. Production remains restricted to an explicitly reviewed private distribution. Validate all 14 files, checksums, edition manifest, and ZIP integrity before creating a draft release. Compare every uploaded asset size and server-reported SHA-256 with the local verified bytes; only then publish the draft. A failed upload or missing server digest leaves the draft unpublished. Do not silently substitute database-free executables for the HR or GB packages.
