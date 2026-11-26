@@ -1,13 +1,14 @@
 # Production release policy
 
-Every production GitHub Release must contain all six assets:
+Every production GitHub Release must contain all seven assets:
 
 - Portable.exe: standalone Windows Tauri executable with an embedded registry worker.
 - Setup.exe: Windows installer with a native Tauri host and packaged worker.
 - Crawlvora-Linux-x86_64.tar.gz: tested native Linux distribution (Ubuntu 24.04 baseline; system WebKitGTK runtime libraries are required).
 - Crawlvora-Linux-amd64.deb: installable desktop package with system dependencies and application-menu entry.
 - Crawlvora-source.zip: source from the exact release tag.
-- SHA256SUMS.txt: SHA-256 checksums for the other five assets.
+- REGISTRY-MANIFEST.json: verified registry snapshot identity and coverage.
+- SHA256SUMS.txt: SHA-256 checksums for the other six assets.
 
 The production workflow requires an immutable version tag on main, matching version metadata, committed npm and Cargo locks, a successful quality/security workflow, native builds and smoke tests on Windows and Linux, a successful million-record performance benchmark and a completed four-hour endurance test. It refuses to publish an incomplete asset set. The native workflow is the only active desktop packaging pipeline; legacy scripts are retained for historical development only.
 

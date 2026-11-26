@@ -10,8 +10,15 @@ AppId=Crawlvora.BusinessData
 AppName=Crawlvora
 #endif
 AppVersion={#AppVersion}
+#ifdef PrivateSmoke
+DefaultDirName={tmp}\Crawlvora-Private-Acceptance
+DefaultGroupName=Crawlvora Private Acceptance
+DisableDirPage=no
+UsePreviousAppDir=no
+#else
 DefaultDirName={localappdata}\Programs\Crawlvora
 DefaultGroupName=Crawlvora
+#endif
 #ifdef PrivateSmoke
 DisableProgramGroupPage=yes
 CreateUninstallRegKey=no
@@ -46,7 +53,9 @@ Name: "{autodesktop}\Crawlvora"; Filename: "{app}\Crawlvora.exe"; Tasks: desktop
 Name: "{group}\Crawlvora"; Filename: "{app}\Crawlvora.exe"
 #endif
 [Run]
+#ifndef PrivateSmoke
 Filename: "{app}\Crawlvora.exe"; Description: "Launch Crawlvora"; Flags: nowait postinstall skipifsilent
+#endif
 
 [Code]
 function HasWebView2: Boolean;
