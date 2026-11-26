@@ -4,13 +4,19 @@ $version = (Get-Content VERSION -Raw).Trim()
 New-Item -ItemType Directory -Force release-assets | Out-Null
 $registryArgs = @()
 if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
-    python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
+    if ($env:CRAWLVORA_PRIVATE_PREVIEW -eq '1') {
+        python -c "from pathlib import Path; import json; from registry_bundle import verify_bundle; p=Path('registry-bundle'); r=verify_bundle(p/'registry-seed.sqlite3',allow_partial=True); m=json.loads((p/'registry-seed.json').read_text(encoding='utf-8')); assert r.get('complete') is False and all(m.get(k)==v for k,v in r.items())"
+    } else {
+        python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
+    }
     if ($LASTEXITCODE) { throw 'Registry bundle acceptance failed' }
     (Get-FileHash registry-bundle/registry-seed.sqlite3 -Algorithm SHA256).Hash.ToLower() | Set-Content registry-bundle/registry-seed.sha256 -Encoding ascii
+    $env:CRAWLVORA_EXPECTED_REGISTRY_SHA256 = (Get-Content registry-bundle/registry-seed.sha256 -Raw).Trim()
     $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3;.','--add-data','registry-bundle/registry-seed.sha256;.','--add-data','registry-bundle/registry-seed.json;.')
 }
 if ($env:CRAWLVORA_NATIONAL_BUNDLE -eq '1') {
     if (!(Test-Path national-data/GB/manifest.json) -or !(Test-Path national-data/GB/united-kingdom.sqlite3.gz)) { throw 'National snapshot missing' }
+    $env:CRAWLVORA_EXPECTED_GB_SHA256 = (Get-Content national-data/GB/manifest.json -Raw | ConvertFrom-Json).database_sha256
     $registryArgs += @('--add-data','national-data;national-data')
 }
 python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --exclude-module playwright --exclude-module webview tvrtk_scraper.py

@@ -14,7 +14,7 @@ from core import Store, Collector
 from sources import NAMES
 from studio import excel
 from registry import Registry, RegistryAccess, start_registry
-from registry_seed import accept_packaged_seed, install_seed
+from registry_seed import accept_packaged_seed, accept_preview_seed, install_seed
 import os
 import threading
 import tempfile
@@ -87,7 +87,16 @@ def run_workspace(args,selection,active):
     installed=active=='primary' and install_seed(ROOT,database)
     expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
     if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and expected:
-        accept_packaged_seed(ROOT,database,installed,expected)
+        if os.environ.get('CRAWLVORA_PRIVATE_PREVIEW')=='1':
+            accept_preview_seed(ROOT,database,installed,expected)
+        else:
+            accept_packaged_seed(ROOT,database,installed,expected)
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and os.environ.get('CRAWLVORA_EXPECTED_GB_SHA256'):
+        _,gb_report=national.database()
+        if gb_report['database_sha256']!=os.environ['CRAWLVORA_EXPECTED_GB_SHA256']:
+            raise ValueError('Embedded GB snapshot mismatch.')
+        if not national.search()['rows']:
+            raise ValueError('Embedded GB catalog is empty.')
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
     if not installed: verified_backup(database)

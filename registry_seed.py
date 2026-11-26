@@ -62,3 +62,26 @@ def accept_packaged_seed(root, database, installed, expected_sha):
         if report.get('scope')!='all-status' or progress.get('subjekti')!=report['subjects'] or sum(progress.values())!=report['rows']:
             raise ValueError('Packaged registry counts do not match manifest.')
     return report
+
+
+def accept_preview_seed(root, database, installed, expected_sha):
+    """Validate captured partial snapshot without claiming full registry coverage."""
+    root=Path(root)
+    if not installed:
+        raise ValueError('Preview registry seed not installed.')
+    report=json.loads((root/'registry-seed.json').read_text(encoding='utf-8'))
+    if report.get('complete') is not False or report.get('scope')!='all-status':
+        raise ValueError('Expected explicitly incomplete registry snapshot.')
+    if report.get('database_sha256')!=expected_sha or (root/'registry-seed.sha256').read_text(encoding='ascii').strip()!=expected_sha:
+        raise ValueError('Preview registry checksum mismatch.')
+    with closing(sqlite3.connect(Path(database).resolve().as_uri()+'?mode=ro',uri=True)) as db:
+        if db.execute('SELECT snapshot,complete FROM registry_runs').fetchall()!=[(report['snapshot'],0)]:
+            raise ValueError('Preview snapshot identity mismatch.')
+        progress={name:{'rows':offset,'done':bool(done),'total':total} for name,offset,done,total in db.execute('SELECT category,next_offset,done,total FROM registry_progress WHERE snapshot=?',(report['snapshot'],))}
+        if progress!=report['progress'] or sum(p['rows'] for p in progress.values())!=report['rows']:
+            raise ValueError('Preview category checkpoint mismatch.')
+        if db.execute('SELECT count(*) FROM registry_rows').fetchone()[0]!=report['rows']:
+            raise ValueError('Preview row count mismatch.')
+        if db.execute('SELECT count(*) FROM companies').fetchone()[0]!=report['directory_companies']:
+            raise ValueError('Preview directory count mismatch.')
+    return report
