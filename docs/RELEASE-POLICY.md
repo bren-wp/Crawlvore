@@ -51,3 +51,5 @@ The packaged worker recovery gate now interrupts an actual authenticated 2 MiB-d
 ## Atomic fourteen-asset promotion
 
 Every completed change on main builds a verified non-distribution candidate; its artifacts are archived in Actions rather than published as an incomplete GitHub Release. Production remains restricted to an explicitly reviewed private distribution. Validate all 14 files, checksums, edition manifest, and ZIP integrity before creating a draft release. Compare every uploaded asset size and server-reported SHA-256 with the local verified bytes; only then publish the draft. A failed upload or missing server digest leaves the draft unpublished. Do not silently substitute database-free executables for the HR or GB packages.
+
+Registry seed installation and transactional integration now preflight destination free space. Existing workspaces and source files remain unchanged when that check rejects an operation. On POSIX, the published seed directory entry is flushed before successful return. Actual power-loss durability remains filesystem and hardware dependent.

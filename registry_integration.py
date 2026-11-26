@@ -19,7 +19,17 @@ def integrate_snapshot(store, registry, source, manifest, min_categories=36):
         raise ValueError('Source and workspace must be separate.')
     if any(Path(str(source)+suffix).exists() for suffix in ('-wal','-shm','-journal')):
         raise ValueError('Registry bundle must be finalized and closed.')
-    expected=json.loads(Path(manifest).read_text(encoding='utf-8'))
+    manifest=Path(manifest)
+    if manifest.is_symlink() or not manifest.is_file() or manifest.stat().st_size>1024*1024:
+        raise ValueError('Invalid registry manifest file.')
+    expected=json.loads(manifest.read_text(encoding='utf-8'))
+    if not isinstance(expected,dict):raise ValueError('Invalid registry manifest.')
+    # Account for the staged input, SQLite transaction growth and indexes.
+    # This is a conservative preflight, not a guarantee against later disk exhaustion.
+    workspace=Path(store.path)
+    required=3*source.stat().st_size+workspace.stat().st_size+64*1024**2
+    if shutil.disk_usage(workspace.parent).free<required:
+        raise ValueError('Insufficient free disk space for registry integration.')
     # Stage a private copy; never attach the mutable original or modify it.
     with tempfile.TemporaryDirectory(prefix='registry-import-',dir=Path(store.path).parent) as temporary:
         staged=Path(temporary)/'registry.sqlite3'
