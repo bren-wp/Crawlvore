@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Add local-only Linux dual-database packaging and extracted DEB/TAR smoke acceptance; ignore national data staging in Git.
+
 - Stage verified partial HR and complete GB snapshots for private local preview packaging, with separate smoke acceptance and no relaxation of production release requirements.
 
 - Restore entity filtering, selective exports and national directory handlers in the canonical TypeScript sources so native builds do not overwrite working controls.

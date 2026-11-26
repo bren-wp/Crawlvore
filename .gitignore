@@ -17,3 +17,6 @@ native-preview/
 registry-bundle/
 registry-seed.sqlite3*
 registry-seed.json
+
+# Local national snapshots and private staging must never enter Git history.
+national-data/
