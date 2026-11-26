@@ -103,5 +103,14 @@ if ($Edition -ne 'Legacy') {
     foreach($name in @('Portable','Setup')){
         Copy-Item (Join-Path $output ($name+'.exe')) (Join-Path 'release-assets' ($name+$suffix+'.exe'))
     }
+    # CI source identity is supplied by GitHub; local archive builds need an explicit source identity.
+    $source = if($env:GITHUB_SHA){$env:GITHUB_SHA}else{$env:CRAWLVORA_BUILD_SOURCE_SHA}
+    if ($source) {
+        $receiptArgs=@('release-assets','--edition',$Edition,'--source',$source)
+        if($env:CRAWLVORA_EXPECTED_REGISTRY_SHA256){$receiptArgs+=@('--hr',$env:CRAWLVORA_EXPECTED_REGISTRY_SHA256)}
+        if($env:CRAWLVORA_EXPECTED_GB_SHA256){$receiptArgs+=@('--gb',$env:CRAWLVORA_EXPECTED_GB_SHA256)}
+        python tools/edition_acceptance.py @receiptArgs
+        if($LASTEXITCODE){throw 'Edition acceptance evidence failed'}
+    }
 }
 Get-FileHash (Join-Path $output 'Portable.exe'),(Join-Path $output 'Setup.exe') -Algorithm SHA256

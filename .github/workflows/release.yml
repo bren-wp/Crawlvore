@@ -128,8 +128,10 @@ jobs:
           done
           sha256sum "${files[@]}" > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
-      - name: Verify exact release matrix
-        run: python tools/verify_release_assets.py release
+      - name: Verify exact release matrix and source provenance
+        run: |
+          python tools/edition_acceptance.py release --source "$GITHUB_SHA" --manifest release/REGISTRY-MANIFEST.json
+          python tools/verify_release_assets.py release
       - name: Publish complete tested release
         env:
           GH_TOKEN: ${{ github.token }}
