@@ -30,6 +30,12 @@ jobs:
           php -l webstranica/index.php
           php -l webstranica/catalog.php
           python -m unittest discover -s tests -p test_web_catalog.py -v
+          python tools/web_http_acceptance.py
+      - name: Validate WordPress plugin
+        run: |
+          find wordpress -name '*.php' -print0 | xargs -0 -n1 php -l
+          php tests/wordpress_catalog.php
+          bash tools/wordpress_acceptance.sh
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
       - run: npm audit --audit-level=moderate
       - run: npm run typecheck
@@ -43,6 +49,10 @@ jobs:
           python tools/source_audit.py --strict-deps | tee source-audit.json
           python tools/clone_review.py | tee clone-review.json
       - run: python -m vulture . --exclude tests,tools --min-confidence 90
+      - name: Extended static audit evidence (review candidates)
+        run: |
+          python -m bandit -r . -x ./tests -f json -o bandit-extended.json --exit-zero
+          python -m vulture . --exclude tests --min-confidence 60 > dead-code-candidates.txt || test "$?" -eq 3
       - run: python -m playwright install --with-deps chromium
       - run: python tools/ui_e2e.py
       - run: python tools/visual_check.py
@@ -68,6 +78,8 @@ jobs:
           path: |
             package-lock.json
             source-audit.json
+            bandit-extended.json
+            dead-code-candidates.txt
             clone-review.json
             pixel-diff.json
             performance.json

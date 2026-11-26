@@ -9,12 +9,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
-import io
 from core import Store, Collector
 from sources import NAMES
-from studio import excel
+from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import Registry, RegistryAccess, start_registry
-from registry_seed import accept_packaged_seed, install_seed
+from registry_seed import accept_packaged_seed, accept_preview_seed, install_seed
 import os
 import threading
 import tempfile
@@ -25,6 +24,7 @@ from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
 from national_catalog import NationalCatalog
+from gb_download import GBDownload
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
@@ -83,11 +83,29 @@ def main():
 
 def run_workspace(args,selection,active):
     national=NationalCatalog(ROOT,args.data_dir)
+    gb_download=GBDownload(national.downloaded)
     database=args.data_dir/'companies.sqlite3'
+    edition=None
+    edition_path=ROOT/'edition.json'
+    if edition_path.is_file():
+        edition=json.loads(edition_path.read_text(encoding='utf-8'))['edition']
+        if edition not in ('Full','HR','GB','Online'): raise ValueError('Invalid edition.')
+        if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
+            if (ROOT/'registry-seed.sqlite3').is_file()!=(edition in ('Full','HR')) or (ROOT/'national-data/GB/manifest.json').is_file()!=(edition in ('Full','GB')) or (ROOT/'tvrtk_output.csv').exists():
+                raise ValueError('Edition payload mismatch.')
     installed=active=='primary' and install_seed(ROOT,database)
     expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
     if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and expected:
-        accept_packaged_seed(ROOT,database,installed,expected)
+        if os.environ.get('CRAWLVORA_PRIVATE_PREVIEW')=='1':
+            accept_preview_seed(ROOT,database,installed,expected)
+        else:
+            accept_packaged_seed(ROOT,database,installed,expected)
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and os.environ.get('CRAWLVORA_EXPECTED_GB_SHA256'):
+        _,gb_report=national.database()
+        if gb_report['database_sha256']!=os.environ['CRAWLVORA_EXPECTED_GB_SHA256']:
+            raise ValueError('Embedded GB snapshot mismatch.')
+        if not national.search()['rows']:
+            raise ValueError('Embedded GB catalog is empty.')
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
     if not installed: verified_backup(database)
@@ -98,7 +116,9 @@ def run_workspace(args,selection,active):
     integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
     # Full registry distributions use the verified snapshot, not the legacy CSV.
-    if active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
+    if edition is None and active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and edition in ('GB','Online') and store.stats()['total']!=0:
+        raise ValueError('Database-free Croatian workspace was not empty.')
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
     registry_access=RegistryAccess(ROOT,args.data_dir)
@@ -122,6 +142,7 @@ def run_workspace(args,selection,active):
             collector.stop()
             while collector.snapshot()['status']=='stopping': time.sleep(0.2)
             return 130
+    import_lock=threading.Lock()
     ui_ready=threading.Event()
     ui_ready_lock=threading.Lock()
     queue=Queue(store,collector,registry,registry_access.credentials); queue.start()
@@ -197,7 +218,15 @@ def run_workspace(args,selection,active):
                         self.send_response(200); self.send_header('Content-Type',types[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="crawlvora-selected.{kind}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
                     return
-                if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
+                if p.path in ('/api/export','/api/export-json','/api/export-xlsx'):
+                    kind={'/api/export':'csv','/api/export-json':'json','/api/export-xlsx':'xlsx'}[p.path]
+                    types={'csv':'text/csv; charset=utf-8','json':'application/json; charset=utf-8','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+                    with tempfile.TemporaryDirectory() as directory:
+                        out=Path(directory)/('crawlvora_export.'+kind)
+                        export_file(store,out,kind,**filters)
+                        self.send_response(200); self.send_header('Content-Type',types[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{out.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
                 if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())
                 if p.path=='/api/recovery/protected-manifest':
@@ -223,6 +252,7 @@ def run_workspace(args,selection,active):
                         shutil.copyfileobj(stream,self.wfile)
                     return
                 if p.path=='/api/national/status': return self.send_data(national.status())
+                if p.path=='/api/national/gb/download': return self.send_data(gb_download.status())
                 if p.path=='/api/national/gb/search': return self.send_data(national.search(get('q'),int(get('page','1'))))
                 if p.path=='/api/national/gb/detail':
                     record=national.detail(get('number'))
@@ -230,13 +260,14 @@ def run_workspace(args,selection,active):
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
-                if p.path=='/api/export-json': return self.send_data(store.export_json(**filters),'application/json; charset=utf-8',extra={'Content-Disposition':'attachment; filename="crawlvora_export.json"'})
                 if p.path=='/api/cities': return self.send_data(store.cities())
                 if p.path=='/api/status': return self.send_data(collector.snapshot())
                 if p.path=='/api/companies': return self.send_data(store.query(**filters,page=max(1,min(100000,int(get('page','1')))),limit=max(1,min(100,int(get('limit','25')))),sort=get('sort','title')))
+                if p.path.startswith('/api/company-registry/'):
+                    result=company_registry(store,int(p.path.rsplit('/',1)[1]),get('snapshot'),int(get('offset','0')))
+                    return self.send_data(result if result is not None else {'error':'Record not found.'},status=200 if result is not None else 404)
                 if p.path.startswith('/api/company/'):
                     item=store.detail(int(p.path.rsplit('/',1)[1])); return self.send_data(item or {'error':'Zapis nije pronađen.'},status=200 if item else 404)
-                if p.path=='/api/export': return self.send_data(store.export(**filters),'text/csv; charset=utf-8',extra={'Content-Disposition':'attachment; filename="crawlvora_export.csv"'})
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)
             except (ValueError,OverflowError): self.send_data({'error':'Neispravan parametar.'},status=400)
             except (BrokenPipeError,ConnectionResetError): pass
@@ -244,7 +275,11 @@ def run_workspace(args,selection,active):
         def do_POST(self):
             if not self.authorized() or not self.session_authorized() or not token_matches(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
-                n=int(self.headers.get('Content-Length','0'))
+                lengths=self.headers.get_all('Content-Length',[])
+                if self.headers.get('Transfer-Encoding') is not None or len(lengths)!=1 or not lengths[0].isascii() or not lengths[0].isdigit() or len(lengths[0])>12:
+                    self.close_connection=True
+                    return self.send_data({'error':'Invalid request framing.'},status=400)
+                n=int(lengths[0])
                 if self.path=='/api/recovery/encrypted-restore':
                     password=unquote(self.headers.get('X-Backup-Passphrase',''),errors='strict')
                     if not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
@@ -253,17 +288,33 @@ def run_workspace(args,selection,active):
                     except InvalidTag: raise ValueError('Incorrect passphrase or damaged encrypted backup.') from None
                     integrity.start()
                     return self.send_data({'id':identifier})
+                if self.path in ('/api/import-json','/api/import'):
+                    if not 0<n<=MAX_IMPORT: return self.send_data({'error':'Datoteka je prevelika (2 GiB).'},status=413)
+                    if not import_lock.acquire(blocking=False):
+                        self.close_connection=True
+                        return self.send_data({'error':'Another import is already running.'},status=409)
+                    try:
+                        self.connection.settimeout(120)
+                        # Conservative preflight for backup, transaction and SQLite growth.
+                        require_free_space(database.parent,database.stat().st_size+n+64*1024**2)
+                        with tempfile.TemporaryDirectory() as directory:
+                            staged=Path(directory)/'upload'
+                            receive(self.rfile,staged,n)
+                            require_free_space(database.parent,database.stat().st_size+n+64*1024**2)
+                            protected.before_import()
+                            return self.send_data(import_file(store,staged,'json' if self.path=='/api/import-json' else 'csv'))
+                    finally:
+                        import_lock.release()
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 self.connection.settimeout(120)
                 raw=self.rfile.read(n)
                 if len(raw)!=n: raise ValueError('Incomplete request body.')
-                if self.path in ('/api/import-json','/api/import'):
-                    # A consistent backup precedes every user-initiated import; rejected imports never mutate the directory.
-                    protected.before_import()
-                    if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
-                    return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
+                if self.path=='/api/national/gb/download':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm UK catalog download.')
+                    if national.status()['GB']['available']: raise ValueError('UK catalog already installed.')
+                    return self.send_data(gb_download.start())
                 if self.path=='/api/recovery/encrypt':
                     if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
                     password=data.get('password')
@@ -363,7 +414,7 @@ def run_workspace(args,selection,active):
         threading.Thread(target=parent_watch,daemon=True).start()
         try: server.serve_forever()
         finally:
-            queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
+            gb_download.close(); queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
@@ -374,10 +425,10 @@ def run_workspace(args,selection,active):
             webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
             webview.start(gui='edgechromium')
         finally:
-            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
+            gb_download.close(); queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
         return 0
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
+    finally: gb_download.close(); queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
 if __name__=='__main__': sys.exit(main())

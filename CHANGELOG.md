@@ -2,6 +2,16 @@
 
 ## 8.1.4 — release candidate
 
+- Brand registry workflows as Crawlvora Sync and Crawlvora Connect, reduce technical UI details, retain data provenance, reject ambiguous HTTP request framing and expand browser click coverage.
+
+- Avoid repeated large buffer copies in JSON imports; add free-space checks, exclusive import admission and browser registry profile regression coverage.
+
+- Support disk-backed 2 GiB CSV/JSON imports, transactional incremental JSON parsing, bounded-memory full CSV/JSON/Excel exports, and paginated original registry records in company profiles.
+
+- Add local-only Linux dual-database packaging and extracted DEB/TAR smoke acceptance; ignore national data staging in Git.
+
+- Stage verified partial HR and complete GB snapshots for private local preview packaging, with separate smoke acceptance and no relaxation of production release requirements.
+
 - Restore entity filtering, selective exports and national directory handlers in the canonical TypeScript sources so native builds do not overwrite working controls.
 
 - Restrict active national catalogs to Croatia and the United Kingdom; hide unverified countries in desktop and public web navigation.

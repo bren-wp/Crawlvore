@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+import shutil
 import tempfile
 import threading
 from contextlib import closing
@@ -18,10 +19,15 @@ MAX_DATABASE=16*1024**3
 
 class NationalCatalog:
     def __init__(self, package_root, workspace_root):
-        self.package=Path(package_root)/'national-data'/'GB'
+        self.embedded=Path(package_root)/'national-data'/'GB'
         self.root=Path(workspace_root)/'national-data'/'GB'
         self.lock=threading.Lock()
         self.ready=None
+        self.downloaded=self.root/'installed'
+
+    @property
+    def package(self):
+        return self.downloaded if (self.downloaded/'manifest.json').is_file() else self.embedded
 
     def manifest(self):
         path=self.package/'manifest.json'
@@ -47,6 +53,7 @@ class NationalCatalog:
             self.root.mkdir(parents=True,exist_ok=True)
             destination=self.root/(digest+'.sqlite3')
             if not destination.exists():
+                if shutil.disk_usage(self.root).free<report['database_bytes']+64*1024**2: raise ValueError('Insufficient free disk space for UK catalog.')
                 source=self.package/(GB_FILE+'.gz')
                 fd,tmp=tempfile.mkstemp(dir=self.root,prefix='extract-')
                 try:

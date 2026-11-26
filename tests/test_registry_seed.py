@@ -5,7 +5,7 @@ from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
-from registry_seed import accept_packaged_seed, install_seed
+from registry_seed import accept_packaged_seed, accept_preview_seed, install_seed
 
 
 class SeedTests(unittest.TestCase):
@@ -57,4 +57,24 @@ class SeedTests(unittest.TestCase):
             db.execute("UPDATE registry_progress SET done=0 WHERE category='subjekti'")
             db.commit()
         with self.assertRaisesRegex(ValueError,'categories'):
+            accept_packaged_seed(self.root,self.dest,True,digest)
+
+    def test_partial_acceptance_is_separate(self):
+        self.source.unlink()
+        with closing(sqlite3.connect(self.source)) as db:
+            db.execute('CREATE TABLE registry_runs(snapshot TEXT,complete INTEGER)')
+            db.execute('CREATE TABLE registry_progress(snapshot TEXT,category TEXT,total INTEGER,done INTEGER,next_offset INTEGER)')
+            db.execute('CREATE TABLE registry_rows(payload TEXT)')
+            db.execute('CREATE TABLE companies(title TEXT)')
+            db.execute("INSERT INTO registry_runs VALUES ('1',0)")
+            db.execute("INSERT INTO registry_progress VALUES ('1','subjekti',2,0,1)")
+            db.execute("INSERT INTO registry_rows VALUES ('{}')")
+            db.commit()
+        digest=hashlib.sha256(self.source.read_bytes()).hexdigest()
+        self.check.write_text(digest,encoding='ascii')
+        manifest={'snapshot':'1','complete':False,'scope':'all-status','database_sha256':digest,'progress':{'subjekti':{'rows':1,'done':False,'total':2}},'rows':1,'directory_companies':0}
+        (self.root/'registry-seed.json').write_text(json.dumps(manifest),encoding='utf-8')
+        self.assertTrue(install_seed(self.root,self.dest))
+        self.assertEqual(accept_preview_seed(self.root,self.dest,True,digest),manifest)
+        with self.assertRaises(ValueError):
             accept_packaged_seed(self.root,self.dest,True,digest)

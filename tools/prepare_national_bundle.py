@@ -3,10 +3,9 @@ import argparse
 import gzip
 import hashlib
 import json
-import shutil
 from pathlib import Path
 
-def prepare(source,destination):
+def prepare(source,destination,check=lambda:None):
     source=Path(source); destination=Path(destination)
     report=json.loads((source/'manifest.json').read_text(encoding='utf-8'))
     database=source/'united-kingdom.sqlite3'
@@ -15,7 +14,8 @@ def prepare(source,destination):
         if hashlib.file_digest(stream,'sha256').hexdigest()!=report['database_sha256']: raise ValueError('Checksum mismatch')
     destination.mkdir(parents=True,exist_ok=False)
     with database.open('rb') as incoming,gzip.open(destination/'united-kingdom.sqlite3.gz','wb',compresslevel=3) as outgoing:
-        shutil.copyfileobj(incoming,outgoing,1024*1024)
+        while chunk:=incoming.read(1024*1024):
+            check();outgoing.write(chunk)
     report['database_bytes']=database.stat().st_size
     (destination/'manifest.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     return {'rows':report['rows'],'database_bytes':report['database_bytes'],'compressed_bytes':(destination/'united-kingdom.sqlite3.gz').stat().st_size}

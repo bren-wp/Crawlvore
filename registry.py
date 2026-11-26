@@ -149,11 +149,16 @@ class RegistryAccess:
             try:
                 self.vault.save({'authorized':False})
             except (VaultUnavailable,OSError):
-                raise ValueError('Sigurna pohrana pristupnih podataka nije dostupna.') from None
+                # Disable access for the current process even when persistent
+                # revocation cannot be confirmed. Never claim the OS record was erased.
+                self.saved=None
+                self.loaded=False
+                self.session=(('', ''),False)
+                return dict(self.status(),revocation_verified=False)
             self.saved=None
             self.loaded=True
-            self.session=None
-            return self.status()
+            self.session=(('', ''),False)
+            return dict(self.status(),revocation_verified=True)
 
 
 def catalog(spec):

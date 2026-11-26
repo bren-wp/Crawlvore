@@ -12,26 +12,35 @@ from pathlib import Path
 
 PART = re.compile(r'BasicCompanyData-(\d{4}-\d{2}-\d{2})-part([1-7])_7(?:\(\d+\))?\.zip')
 SOURCE = 'https://download.companieshouse.gov.uk/en_output.html'
+ONE = re.compile(r'BasicCompanyDataAsOneFile-(\d{4}-\d{2}-\d{2})\.zip')
 
 
-def build(archives, destination):
+def build(archives, destination,check=lambda:None):
+    archives=list(map(Path,archives))
     parts = {}; dates = set()
-    for archive in map(Path, archives):
+    one=ONE.fullmatch(archives[0].name) if len(archives)==1 else None
+    for archive in archives:
+        if one:
+            dates.add(one[1]); parts[1]=archive; continue
         match = PART.fullmatch(archive.name)
         if not match or int(match[2]) in parts: raise ValueError('Invalid or duplicate archive')
         dates.add(match[1]); parts[int(match[2])] = archive
-    if set(parts) != set(range(1, 8)) or len(dates) != 1: raise ValueError('Require seven parts of one snapshot')
+    if (not one and set(parts) != set(range(1, 8))) or len(dates) != 1: raise ValueError('Require seven parts of one snapshot')
     snapshot = dates.pop(); destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=False)
     pending = destination/'united-kingdom.sqlite3.incomplete'; final = destination/'united-kingdom.sqlite3'
     counts=[]; headers=None
     with closing(sqlite3.connect(pending)) as db:
         db.execute('PRAGMA synchronous=NORMAL')
+        def sqlite_progress():
+            try: check(); return 0
+            except Exception: return 1
+        db.set_progress_handler(sqlite_progress,100000)
         db.execute('CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)')
         for part, archive in sorted(parts.items()):
             with zipfile.ZipFile(archive) as z:
-                expected=f'BasicCompanyData-{snapshot}-part{part}_7.csv'
-                if z.namelist()!=[expected]: raise ValueError('Unexpected archive content')
+                expected=f'BasicCompanyDataAsOneFile-{snapshot}.csv' if one else f'BasicCompanyData-{snapshot}-part{part}_7.csv'
+                if z.namelist()!=[expected] or z.getinfo(expected).file_size>16*1024**3: raise ValueError('Unexpected archive content or size')
                 with io.TextIOWrapper(z.open(expected),encoding='utf-8-sig',newline='') as stream:
                     reader=csv.reader(stream); current=[field.strip() for field in next(reader)]
                     if headers is None:
@@ -46,11 +55,12 @@ def build(archives, destination):
                         if not row: blank+=1; continue
                         if len(row)!=55 or not row[0].strip() or not re.fullmatch(r'[A-Z0-9]{8}',row[1]): raise ValueError(f'Invalid record in part {part}, row {count+1}')
                         batch.append(row); count+=1
-                        if len(batch)>=5000: db.executemany(statement,batch); batch.clear()
+                        if len(batch)>=5000: check();db.executemany(statement,batch);batch.clear()
                     if batch: db.executemany(statement,batch)
                     db.commit()
                 with archive.open('rb') as raw: digest=hashlib.file_digest(raw,'sha256').hexdigest()
                 counts.append({'part':part,'rows':count,'blank_lines':blank,'sha256':digest}); print(json.dumps(counts[-1]),flush=True)
+        check()
         db.execute('CREATE UNIQUE INDEX company_number ON companies(registration_number)')
         db.execute('CREATE INDEX company_name ON companies(name COLLATE NOCASE)')
         total=sum(item['rows'] for item in counts)
@@ -67,5 +77,5 @@ def build(archives, destination):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('destination',type=Path); parser.add_argument('archives',nargs=7,type=Path)
+    parser.add_argument('destination',type=Path); parser.add_argument('archives',nargs='+',type=Path)
     args=parser.parse_args(); build(args.archives,args.destination)

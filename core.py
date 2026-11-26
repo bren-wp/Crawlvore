@@ -233,7 +233,7 @@ class Store:
         count=added=0
         for row in reader:
             if None in row or any(row.get(k) is None for k in FIELDS): raise ValueError(f'Neispravan CSV redak {reader.line_num}.')
-            count+=1; added+=self.upsert(c,dict(zip(COLS,(row[k] for k in FIELDS)),oib=row.get('OIB',''),email=row.get('Email',''),industry=row.get('Industry','')))
+            count+=1; added+=self.upsert(c,dict(zip(COLS,(row[k] for k in FIELDS)),oib=row.get('OIB',''),email=row.get('Email',''),industry=row.get('Industry',''),entity_kind=row.get('Entity Type','')))
         return {'read':count,'added':added}
     def seed(self,path):
         with self.db() as c:
