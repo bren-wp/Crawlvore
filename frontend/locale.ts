@@ -1,6 +1,7 @@
 "use strict";
 const UI_LANGUAGE: 'en' | 'hr' = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES: Readonly<Record<string,string>> = {
+  "Pristup je isključen za ovu sesiju. Trajno uklanjanje nije potvrđeno.": "Access disabled for this session. Permanent removal could not be verified.",
   "Crawlvora Connect": "Crawlvora Connect",
   "UTF-8 · najviše 2 GiB": "UTF-8 · up to 2 GiB",
   "CSV izvornog formata ili JSON lista poslovnih zapisa do 2 GiB.": "Original-format CSV or a JSON array of business records up to 2 GiB.",

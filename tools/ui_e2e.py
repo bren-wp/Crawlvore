@@ -149,7 +149,10 @@ def run():
                 page.locator('#registry-credentials-apply').click()
                 expect(page.locator('#settings-api')).to_have_text('Access enabled')
                 expect(page.locator('#registry-client-secret')).to_have_value('')
-                page.locator('#registry-credentials-forget').click()
+                with page.expect_response(lambda response: response.url.endswith('/api/registry/forget') and response.ok) as revocation:
+                    page.locator('#registry-credentials-forget').click()
+                result=revocation.value.json()
+                assert result['configured'] is False and type(result['revocation_verified']) is bool
                 expect(page.locator('#settings-api')).to_have_text('Access not enabled')
                 page.locator('#recovery-refresh').click()
                 expect(page.locator('#recovery-create')).to_be_enabled()

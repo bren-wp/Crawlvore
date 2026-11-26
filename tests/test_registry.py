@@ -215,6 +215,27 @@ class RegistryAccessTests(unittest.TestCase):
         self.assertEqual(self.vault.record,{'authorized':False})
         self.assertFalse(self.access().status()['configured'])
 
+    def test_forget_disables_session_when_vault_unavailable(self):
+        access=self.access()
+        access.apply(self.data)
+        self.vault.unavailable=True
+        result=access.forget()
+        self.assertEqual(result,{'configured':False,'authorized':False,'revocation_verified':False})
+        self.assertEqual(access.credentials(),('', ''))
+        self.assertTrue(access.apply(self.data)['configured'])
+
+    def test_forget_does_not_claim_saved_revocation_when_vault_fails(self):
+        access=self.access()
+        access.apply(dict(self.data,persist=True,permission=True))
+        self.vault.unavailable=True
+        self.assertFalse(access.forget()['revocation_verified'])
+        self.assertFalse(access.status()['configured'])
+        self.assertTrue(self.vault.record['authorized'])
+        self.vault.unavailable=False
+        self.assertTrue(self.access().status()['configured'])
+        self.assertTrue(access.forget()['revocation_verified'])
+        self.assertEqual(self.vault.record,{'authorized':False})
+
     def test_unavailable_vault_does_not_save_plaintext_or_apply_session(self):
         self.vault.unavailable=True
         access=self.access()
