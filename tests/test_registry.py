@@ -84,6 +84,21 @@ class RegistryTests(unittest.TestCase):
             manifest=json.loads(c.execute('SELECT manifest FROM registry_runs WHERE snapshot=?',('21',)).fetchone()[0])
         self.assertIn('scope:all',manifest['subjekti'])
 
+    def test_pinned_distribution_never_switches_snapshot(self):
+        class Interrupted(Fake):
+            def get(self,name,q=None):
+                if name=='subjekti' and q['offset']==1:raise ValueError('interrupt')
+                return super().get(name,q)
+        with self.assertRaises(ValueError):self.reg.sync(self.bot,Interrupted(),1)
+        class New(Fake):
+            def get(self,name,q=None):
+                if name=='snapshots':return {},[{'id':22,'staleness':1}]
+                return super().get(name,q)
+        with self.assertRaisesRegex(ValueError,'no longer available'):
+            self.reg.sync(self.bot,New(),1,pinned_snapshot='21')
+        self.assertEqual(self.reg.browse('21','subjekti')['total'],1)
+        self.assertEqual(self.reg.summary()['runs'],[{'snapshot':'21','complete':0}])
+
     def test_shape(self):
         self.assertEqual(rows_of({'items':[{'a':1}]}),[{'a':1}]); self.assertRaises(ValueError,rows_of,{'a':[],'b':[]})
 

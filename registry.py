@@ -294,7 +294,7 @@ class Registry:
                     if isinstance(v,(list,dict)): v=json.dumps(v,ensure_ascii=False)
                     values.append(formula_safe(str(v) if v is not None else ''))
                 yield line(values)
-    def sync(self,bot,client,limit=500):
+    def sync(self,bot,client,limit=500,*,pinned_snapshot=None):
         spec=client.spec(); cats=catalog(spec)
         _,payload=client.get('snapshots'); snaps=rows_of(payload)
         latest=next((x for x in snaps if str(x.get('staleness'))=='1'),None)
@@ -306,7 +306,11 @@ class Registry:
         available={str(x.get('snapshot_id',x.get('id',''))) for x in snaps}
         with self.store.db() as c:
             pending=c.execute('SELECT snapshot FROM registry_runs WHERE complete=0 AND manifest=? ORDER BY CAST(snapshot AS INTEGER) DESC',(manifest,)).fetchall()
-        snap=next((r[0] for r in pending if r[0] in available),snap)
+        if pinned_snapshot is not None:
+            if pinned_snapshot not in available: raise ValueError('Saved distribution snapshot is no longer available. Existing data retained.')
+            snap=pinned_snapshot
+        else:
+            snap=next((r[0] for r in pending if r[0] in available),snap)
         with self.store.db() as c:
             old=c.execute('SELECT * FROM registry_runs WHERE snapshot=?',(snap,)).fetchone()
             if old and old['manifest']!=manifest: raise ValueError('Specifikacija se promijenila tijekom snimke; potreban je novi snapshot.')
@@ -401,7 +405,7 @@ class Registry:
                 if email: row['email']=email
                 if self.store.upsert(c,row,provider='registry',origin=BASE+'/subjekti'): bot.inc('added')
 
-def start_registry(bot,registry,creds,limit=500,check=False):
+def start_registry(bot,registry,creds,limit=500,check=False,*,pinned_snapshot=None):
     if not all(creds): raise ValueError('Nedostaje privatna konfiguracija Sudskog registra.')
     if not 1<=limit<=1000: raise ValueError('Veličina stranice mora biti 1–1000.')
     with bot.lock:
@@ -415,7 +419,7 @@ def start_registry(bot,registry,creds,limit=500,check=False):
                 cats=catalog(client.spec()); _,data=client.get('snapshots'); snaps=rows_of(data)
                 if not snaps: raise ValueError('API nije vratio dostupne snimke.')
                 bot.log(f'API dostupan · {len(cats)} kategorija · {len(snaps)} snimki.')
-            else: registry.sync(bot,client,limit); bot.log('Sinkronizacija završena.')
+            else: registry.sync(bot,client,limit,pinned_snapshot=pinned_snapshot); bot.log('Sinkronizacija završena.')
             bot.update(status='completed')
         except Stopped: bot.update(status='stopped'); bot.log('Zaustavljeno. Spremljene stranice ostaju dostupne.')
         except Exception as e: bot.inc('errors'); bot.update(status='failed',retryable=isinstance(e,TransientRegistryError)); bot.log(str(e) if isinstance(e,(ValueError,PermissionError)) else 'Pogreška: '+type(e).__name__)
