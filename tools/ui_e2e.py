@@ -74,7 +74,6 @@ def run():
                 page.locator('#export-format').select_option('json')
                 with page.expect_download(timeout=60000) as selected_download:
                     page.locator('#export-selected').click()
-                import json
                 with selected_download.value.path().open(encoding='utf-8') as stream:
                     records=json.load(stream)
                 assert records and all(set(record)=={'title','oib'} for record in records)
