@@ -1,6 +1,12 @@
 name: Complete public registry snapshot
 on:
   workflow_dispatch:
+  workflow_call:
+    secrets:
+      SUDREG_CLIENT_ID:
+        required: true
+      SUDREG_CLIENT_SECRET:
+        required: true
 permissions:
   contents: read
 concurrency:

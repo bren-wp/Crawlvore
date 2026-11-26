@@ -14,6 +14,7 @@ from core import Store, Collector
 from sources import NAMES
 from studio import excel
 from registry import Registry, RegistryAccess, start_registry
+from registry_seed import install_seed
 import os
 import threading
 import tempfile
@@ -79,6 +80,7 @@ def main():
 
 def run_workspace(args,selection,active):
     database=args.data_dir/'companies.sqlite3'
+    if active=='primary': install_seed(ROOT,database)
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
     verified_backup(database)
