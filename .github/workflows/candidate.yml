@@ -15,8 +15,11 @@ jobs:
   native:
     if: github.ref == 'refs/heads/data-safety-release'
     uses: ./.github/workflows/native.yml
+  vault:
+    if: github.ref == 'refs/heads/data-safety-release'
+    uses: ./.github/workflows/vault-acceptance.yml
   publish:
-    needs: [quality, native]
+    needs: [quality, native, vault]
     if: github.ref == 'refs/heads/data-safety-release'
     runs-on: ubuntu-latest
     permissions:
@@ -57,4 +60,4 @@ jobs:
             echo 'Candidate already published; immutable assets retained.'
             exit 0
           fi
-          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Release Candidate" --notes "Native Windows and Linux packaging and quality CI passed for $GITHUB_SHA. Non-production candidate: exact design parity, committed dependency locks, live registry access and endurance acceptance are outstanding. Back up your workspace independently before testing. No credentials included." release/Portable.exe release/Setup.exe release/Crawlvora-Linux-amd64.deb release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-source.zip release/SHA256SUMS.txt
+          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Release Candidate" --notes "Native Windows and Linux packaging, quality and secure vault CI passed for $GITHUB_SHA. Non-production candidate: exact design parity, authorized live registry access, million-record and endurance acceptance, and independent recovery drills remain outstanding. Back up your workspace independently before testing. No credentials included." release/Portable.exe release/Setup.exe release/Crawlvora-Linux-amd64.deb release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-source.zip release/SHA256SUMS.txt
