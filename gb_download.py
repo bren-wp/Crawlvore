@@ -10,7 +10,7 @@ import requests
 from tools.import_companies_house import build, SOURCE
 from tools.prepare_national_bundle import prepare
 
-from durable_download import transfer, candidates
+from durable_download import transfer, candidates, completed_archive
 
 ORIGIN='https://download.companieshouse.gov.uk/'
 PATTERN=re.compile(r'BasicCompanyDataAsOneFile-(\d{4}-\d{2}-\d{2})\.zip')
@@ -29,7 +29,7 @@ def fetch_snapshot(destination,check=lambda:None,progress=lambda **kw:None):
     saved_names={p.name for p in downloads.glob('transfer-*/*.zip') if PATTERN.fullmatch(p.name)}
     saved=None
     for name in sorted(saved_names,reverse=True):
-        saved=next((p for p,m,n in candidates(downloads,name) if m.get('complete') is True and n==m['total']),None)
+        saved=next((p for p,m,n in candidates(downloads,name) if completed_archive(p,m,n)),None)
         if saved is not None:break
     if saved is not None:
         archive=saved

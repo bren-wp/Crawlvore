@@ -1,5 +1,6 @@
 """Persistent, identity-checked UK download staging. Never truncate a saved partial."""
 import json
+import hashlib
 import os
 import re
 import tempfile
@@ -32,11 +33,19 @@ def candidates(root,name):
         except (OSError,ValueError,KeyError,TypeError):continue
         yield path,record,size
 
+def completed_archive(path,record,size):
+    if record.get('complete') is not True or size!=record['total']:return False
+    expected=record.get('sha256','')
+    if not isinstance(expected,str) or not re.fullmatch(r'[a-f0-9]{64}',expected):return False
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream,'sha256').hexdigest()==expected
+
+
 def transfer(session,url,root,name,check,progress):
     root.mkdir(parents=True,exist_ok=True)
     partial=None
     for path,record,size in candidates(root,name):
-        if record.get('complete') is True and size==record['total']:return path
+        if completed_archive(path,record,size):return path
         if strong_etag(record.get('etag')) and size<record['total']:
             if partial is None or size>partial[2]:partial=(path,record,size)
     headers={'Accept-Encoding':'identity'}
@@ -79,6 +88,8 @@ def transfer(session,url,root,name,check,progress):
             finally:
                 output.flush();os.fsync(output.fileno())
         if count!=total:raise ValueError('Incomplete download. Saved bytes retained.')
+        with path.open('rb') as stream:
+            record['sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
         record['complete']=True
         save_meta(path.parent/'transfer.json',record)
         return path
