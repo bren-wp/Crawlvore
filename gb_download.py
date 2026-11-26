@@ -74,9 +74,20 @@ def fetch_snapshot(destination,check=lambda:None,progress=lambda **kw:None):
     return {'rows':report['rows'],'snapshot':report['snapshot']}
 
 
+def saved_progress(destination):
+    root=Path(destination).parent/'downloads'
+    names={p.name for p in root.glob('transfer-*/*.zip') if PATTERN.fullmatch(p.name)}
+    for name in sorted(names,reverse=True):
+        matches=list(candidates(root,name))
+        if matches:
+            _,record,size=max(matches,key=lambda item:item[2])
+            return {'bytes':size,'saved_bytes':size,'total':record['total']}
+    return {}
+
+
 class GBDownload:
     def __init__(self,destination):
-        self.destination=Path(destination);self.lock=threading.Lock();self.state={'status':'paused' if (self.destination.parent/'downloads').is_dir() else 'idle'};self.cancel=threading.Event();self.thread=None
+        self.destination=Path(destination);self.lock=threading.Lock();saved=saved_progress(self.destination);self.state={'status':'paused' if saved else 'idle',**saved};self.cancel=threading.Event();self.thread=None
     def status(self):
         with self.lock:return dict(self.state)
     def start(self):
@@ -84,7 +95,7 @@ class GBDownload:
             if self.state['status']=='running':return dict(self.state)
             if self.destination.exists():raise ValueError('UK catalog already installed.')
             self.cancel.clear()
-            self.state={'status':'running','phase':'listing'}
+            self.state={'status':'running','phase':'listing',**saved_progress(self.destination)}
             self.thread=threading.Thread(target=self.run,daemon=True)
             self.thread.start()
             return dict(self.state)
@@ -98,8 +109,8 @@ class GBDownload:
     def run(self):
         try:result=fetch_snapshot(self.destination,self.check,self.progress)
         except DownloadCancelled:
-            with self.lock:self.state={'status':'cancelled'}
+            with self.lock:self.state={'status':'cancelled',**saved_progress(self.destination)}
         except Exception:
-            with self.lock:self.state={'status':'failed'}
+            with self.lock:self.state={'status':'failed',**saved_progress(self.destination)}
         else:
             with self.lock:self.state={'status':'complete',**result}

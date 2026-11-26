@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from core import Collector, Store
+from data_safety import workspace_lock
 from native_vault import NativeVault, VaultUnavailable
 from registry import Registry, RegistryAccess, start_registry
 from registry_bundle import verify_bundle
@@ -24,6 +25,11 @@ def main():
     args=parser.parse_args()
     root=args.workspace.resolve()
     root.mkdir(parents=True,exist_ok=True)
+    with workspace_lock(root):
+        collect(args,root)
+
+
+def collect(args,root):
     path=root/'registry-seed.sqlite3'
     if (root/'registry-seed.json').exists():
         report=verify_bundle(path)
@@ -48,7 +54,10 @@ def main():
     store=Store(path)
     bot=Collector(store)
     registry=Registry(store)
-    start_registry(bot,registry,pair,args.limit)
+    with store.db() as db:
+        snapshots=[row[0] for row in db.execute('SELECT snapshot FROM registry_runs')]
+    if len(snapshots)>1:raise ValueError('Mixed distribution snapshots; originals retained.')
+    start_registry(bot,registry,pair,args.limit,pinned_snapshot=snapshots[0] if snapshots else None)
     try:
         while True:
             status=bot.snapshot()

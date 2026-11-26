@@ -31,3 +31,17 @@ class DownloadSafetyTests(unittest.TestCase):
                 job.cancel.set();release.set();job.thread.join(5)
             self.assertEqual(job.status()['status'],'cancelled')
             self.assertFalse(job.destination.exists())
+
+    def test_restart_reports_saved_bytes_without_network(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);folder=root/'downloads'/'transfer-1';folder.mkdir(parents=True)
+            name='BasicCompanyDataAsOneFile-2026-11-01.zip'
+            (folder/name).write_bytes(b'abcd')
+            (folder/'transfer.json').write_text(json.dumps({'name':name,'total':8,'etag':'"one"','complete':False}),encoding='utf-8')
+            job=GBDownload(root/'installed')
+            self.assertEqual(job.status(),{'status':'paused','bytes':4,'saved_bytes':4,'total':8})
+            with patch('gb_download.fetch_snapshot',side_effect=OSError('offline')):
+                job.start();job.thread.join(5)
+            self.assertEqual(job.status()['saved_bytes'],4)
+            self.assertEqual((folder/name).read_bytes(),b'abcd')

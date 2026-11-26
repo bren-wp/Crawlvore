@@ -60,6 +60,18 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM registry_runs').fetchone()[0],0)
             self.assertEqual(db.execute('SELECT count(*) FROM registry_rows').fetchone()[0],0)
 
+    def test_low_disk_space_preserves_workspace_and_source(self):
+        from collections import namedtuple
+        usage=namedtuple('Usage','total used free')
+        before=self.source.read_bytes()
+        with patch('registry_integration.shutil.disk_usage',return_value=usage(100,100,0)):
+            with self.assertRaisesRegex(ValueError,'Insufficient free disk space'):
+                self.integrate()
+        self.assertEqual(self.source.read_bytes(),before)
+        with self.target.db() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM companies').fetchone()[0],1)
+            self.assertEqual(db.execute('SELECT count(*) FROM registry_runs').fetchone()[0],0)
+
     def test_manifest_mismatch_is_rejected(self):
         self.manifest.write_text('{}',encoding='utf-8')
         with self.assertRaisesRegex(ValueError,'manifest'):

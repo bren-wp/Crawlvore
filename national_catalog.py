@@ -31,18 +31,52 @@ class NationalCatalog:
 
     def manifest(self):
         path=self.package/'manifest.json'
-        if not path.is_file(): return None
+        if path.is_file(): return self.read_manifest(path)
+        # An edition switch must not hide a previously extracted GB database.
+        retained=[]
+        for path in self.root.glob('*.manifest.json'):
+            try:
+                report=self.read_manifest(path)
+                if path.name!=report['database_sha256']+'.manifest.json' or not self.cached_file(report):continue
+                retained.append(report)
+            except (OSError,ValueError,TypeError):continue
+        return max(retained,key=lambda r:r['snapshot'],default=None)
+
+    @staticmethod
+    def read_manifest(path):
+        if path.is_symlink() or path.stat().st_size>1024*1024:raise ValueError('Invalid national snapshot manifest.')
         report=json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(report,dict):raise ValueError('Invalid national snapshot manifest.')
         digest=report.get('database_sha256','')
         size=report.get('database_bytes')
         if report.get('country')!='GB' or report.get('complete') is not True or not isinstance(digest,str) or not re.fullmatch(r'[a-f0-9]{64}',digest) or type(size) is not int or not 0<size<=MAX_DATABASE or type(report.get('rows')) is not int or report['rows']<1:
             raise ValueError('Invalid national snapshot manifest.')
         if report.get('source')!=GB_SOURCE: raise ValueError('Invalid national source.')
+        snapshot=report.get('snapshot')
+        if not isinstance(snapshot,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',snapshot):raise ValueError('Invalid national snapshot date.')
         return report
+
+    def cached_file(self,report):
+        path=self.root/(report['database_sha256']+'.sqlite3')
+        return path.is_file() and not path.is_symlink() and path.stat().st_size==report['database_bytes']
+
+    def retain_manifest(self,report):
+        path=self.root/(report['database_sha256']+'.manifest.json')
+        if path.exists():
+            if self.read_manifest(path)!=report:raise ValueError('Retained national manifest mismatch.')
+            return
+        fd,name=tempfile.mkstemp(dir=self.root,prefix='manifest-')
+        try:
+            with os.fdopen(fd,'w',encoding='utf-8') as output:
+                json.dump(report,output,ensure_ascii=False);output.flush();os.fsync(output.fileno())
+            try:os.link(name,path)
+            except FileExistsError:
+                if self.read_manifest(path)!=report:raise ValueError('Retained national manifest mismatch.')
+        finally:Path(name).unlink(missing_ok=True)
 
     def status(self):
         report=self.manifest()
-        return {'HR':{'available':True},'GB':{'available':bool(report and (self.package/(GB_FILE+'.gz')).is_file()),'rows':report['rows'] if report else None,'snapshot':report['snapshot'] if report else None}}
+        return {'HR':{'available':True},'GB':{'available':bool(report and ((self.package/(GB_FILE+'.gz')).is_file() or self.cached_file(report))),'rows':report['rows'] if report else None,'snapshot':report['snapshot'] if report else None}}
 
     def database(self):
         with self.lock:
@@ -75,6 +109,7 @@ class NationalCatalog:
             with closing(sqlite3.connect(destination.resolve().as_uri()+'?mode=ro&immutable=1',uri=True)) as db:
                 metadata=dict(db.execute('SELECT key,value FROM metadata'))
                 if json.loads(metadata['country'])!='GB' or json.loads(metadata['rows'])!=report['rows'] or json.loads(metadata['snapshot'])!=report['snapshot']: raise ValueError('National snapshot identity mismatch.')
+            self.retain_manifest(report)
             self.ready=(digest,destination)
             return destination,report
 

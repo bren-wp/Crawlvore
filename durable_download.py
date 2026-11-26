@@ -106,7 +106,7 @@ def transfer(session,url,root,name,check,progress):
                     output.write(chunk);count+=len(chunk)
                     if count-durable>=16*1024**2:
                         output.flush();os.fsync(output.fileno());durable=count
-                    progress(phase='download',bytes=count,total=total)
+                    progress(phase='download',bytes=count,saved_bytes=durable,total=total)
             finally:
                 output.flush();os.fsync(output.fileno())
         if count!=total:raise ValueError('Incomplete download. Saved bytes retained.')

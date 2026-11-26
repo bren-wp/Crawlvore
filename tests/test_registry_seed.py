@@ -4,6 +4,7 @@ import sqlite3
 from contextlib import closing
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from registry_seed import accept_packaged_seed, accept_preview_seed, install_seed
 
@@ -22,6 +23,15 @@ class SeedTests(unittest.TestCase):
     def test_fresh_seed(self):
         self.assertTrue(install_seed(self.root,self.dest))
         self.assertEqual(self.dest.read_bytes(),self.source.read_bytes())
+
+    def test_insufficient_space_preserves_seed(self):
+        from collections import namedtuple
+        usage=namedtuple('Usage','total used free')
+        with patch('registry_seed.shutil.disk_usage',return_value=usage(100,100,0)):
+            with self.assertRaisesRegex(ValueError,'Insufficient free disk space'):
+                install_seed(self.root,self.dest)
+        self.assertFalse(self.dest.exists())
+        self.assertEqual(self.source.read_bytes(),b'synthetic test data')
 
     def test_existing_workspace_preserved(self):
         self.dest.write_bytes(b'existing user database')

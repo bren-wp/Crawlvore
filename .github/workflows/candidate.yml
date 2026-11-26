@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [VERSION]
+
 permissions:
   contents: read
 concurrency:
@@ -27,8 +27,6 @@ jobs:
     needs: [quality, native, vault]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,29 +39,24 @@ jobs:
         with:
           name: Crawlvora-native-Linux
           path: release
-      - name: Validate complete candidate assets
+      - name: Validate non-distribution candidate assets
         shell: bash
         run: |
           set -euo pipefail
           version="$(tr -d '\r\n' < VERSION)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
+          python -c 'import pathlib,zipfile; root=pathlib.Path("wordpress"); folder=root/"crawlvora-business-directory"; z=zipfile.ZipFile("release/Crawlvora-WordPress.zip","w",zipfile.ZIP_DEFLATED); [z.write(p,p.relative_to(root)) for p in sorted(folder.rglob("*")) if p.is_file()]; z.close()'
           cd release
           printf '%s\n' '{"registry_bundle_included":false,"complete":false,"snapshot":null,"scope":null,"category_count":null,"subjects":null,"reason":"Public preview; complete registry snapshot not included or verified."}' > REGISTRY-MANIFEST.json
-          files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json)
+          files=(Portable.exe Setup.exe Portable-Online.exe Setup-Online.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json Crawlvora-WordPress.zip)
           for file in "${files[@]}"; do test -s "$file"; done
           sha256sum "${files[@]}" > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
-      - name: Publish explicitly non-production candidate
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(tr -d '\r\n' < VERSION)"
-          tag="preview-${version}-${GITHUB_SHA:0:12}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo 'Candidate already published; immutable assets retained.'
-            exit 0
-          fi
-          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Release Candidate" --notes "Native Windows and Linux packaging, quality and secure vault CI passed for $GITHUB_SHA. Non-production candidate: exact design parity, authorized live registry access, million-record and endurance acceptance, and independent recovery drills remain outstanding. Back up your workspace independently before testing. No credentials included." release/Portable.exe release/Setup.exe release/Crawlvora-Linux-amd64.deb release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-source.zip release/REGISTRY-MANIFEST.json release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Crawlvora-verified-non-distribution-candidate
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+      - run: echo "Candidate archived; no incomplete GitHub Release will be published." >> "$GITHUB_STEP_SUMMARY"

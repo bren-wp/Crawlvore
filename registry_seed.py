@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sqlite3
+import shutil
 from contextlib import closing
 import os
 import tempfile
@@ -14,6 +15,10 @@ def install_seed(root, destination):
     destination=Path(destination)
     if destination.exists() or not source.exists():
         return False
+    if source.is_symlink() or not source.is_file():
+        raise ValueError('Invalid registry seed file.')
+    if shutil.disk_usage(destination.parent).free < source.stat().st_size + 64*1024**2:
+        raise ValueError('Insufficient free disk space for registry seed.')
     if not checksums.is_file():
         raise ValueError('Registry seed checksum is missing.')
     expected=checksums.read_text(encoding='ascii').strip()
@@ -35,6 +40,10 @@ def install_seed(root, destination):
             os.link(name,destination)
         except FileExistsError:
             return False
+        if os.name!='nt':
+            directory=os.open(destination.parent,os.O_RDONLY)
+            try:os.fsync(directory)
+            finally:os.close(directory)
         return True
     finally:
         os.unlink(name)
