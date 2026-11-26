@@ -18,10 +18,15 @@ MAX_DATABASE=16*1024**3
 
 class NationalCatalog:
     def __init__(self, package_root, workspace_root):
-        self.package=Path(package_root)/'national-data'/'GB'
+        self.embedded=Path(package_root)/'national-data'/'GB'
         self.root=Path(workspace_root)/'national-data'/'GB'
         self.lock=threading.Lock()
         self.ready=None
+        self.downloaded=self.root/'installed'
+
+    @property
+    def package(self):
+        return self.downloaded if (self.downloaded/'manifest.json').is_file() else self.embedded
 
     def manifest(self):
         path=self.package/'manifest.json'

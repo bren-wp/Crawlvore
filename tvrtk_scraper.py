@@ -24,6 +24,7 @@ from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
 from national_catalog import NationalCatalog
+from gb_download import GBDownload
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
@@ -82,7 +83,15 @@ def main():
 
 def run_workspace(args,selection,active):
     national=NationalCatalog(ROOT,args.data_dir)
+    gb_download=GBDownload(national.downloaded)
     database=args.data_dir/'companies.sqlite3'
+    edition_path=ROOT/'edition.json'
+    if edition_path.is_file():
+        edition=json.loads(edition_path.read_text(encoding='utf-8'))['edition']
+        if edition not in ('Full','HR','GB','Online'): raise ValueError('Invalid edition.')
+        if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
+            if (ROOT/'registry-seed.sqlite3').is_file()!=(edition in ('Full','HR')) or (ROOT/'national-data/GB/manifest.json').is_file()!=(edition in ('Full','GB')) or (ROOT/'tvrtk_output.csv').exists():
+                raise ValueError('Edition payload mismatch.')
     installed=active=='primary' and install_seed(ROOT,database)
     expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
     if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and expected:
@@ -240,6 +249,7 @@ def run_workspace(args,selection,active):
                         shutil.copyfileobj(stream,self.wfile)
                     return
                 if p.path=='/api/national/status': return self.send_data(national.status())
+                if p.path=='/api/national/gb/download': return self.send_data(gb_download.status())
                 if p.path=='/api/national/gb/search': return self.send_data(national.search(get('q'),int(get('page','1'))))
                 if p.path=='/api/national/gb/detail':
                     record=national.detail(get('number'))
@@ -298,6 +308,10 @@ def run_workspace(args,selection,active):
                 if len(raw)!=n: raise ValueError('Incomplete request body.')
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
+                if self.path=='/api/national/gb/download':
+                    if data.get('confirmed') is not True: raise ValueError('Confirm UK catalog download.')
+                    if national.status()['GB']['available']: raise ValueError('UK catalog already installed.')
+                    return self.send_data(gb_download.start())
                 if self.path=='/api/recovery/encrypt':
                     if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
                     password=data.get('password')

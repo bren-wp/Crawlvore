@@ -331,6 +331,7 @@ async function nationalSearch(nextPage){
     try{
         const status=await api('/api/national/status');
         if(seq!==nationalSequence)return;
+        $('national-download').hidden=Boolean(status[country]?.available);
         if(!status[country]?.available){$('national-status').textContent=translate('Nacionalna baza nije ugrađena u ovo izdanje.');$('national-page').textContent='';return;}
         const result=await api('/api/national/gb/search?'+new URLSearchParams({q:$('national-query').value,page:String(nextPage)}));
         if(seq!==nationalSequence)return;
@@ -355,6 +356,23 @@ async function nationalDetail(number){
 }
 $('national-country').onchange=()=>nationalSearch(1).catch(fail);
 $('national-search').onclick=()=>nationalSearch(1).catch(fail);
+$('national-download').onclick=async()=>{
+    if(!confirm(translate('Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.')))return;
+    $('national-download').disabled=true;
+    try{
+        await post('/api/national/gb/download',{confirmed:true});
+        $('national-status').textContent=translate('Preuzimanje i priprema baze…');
+        const timer=setInterval(async()=>{
+            try{
+                const state=await api('/api/national/gb/download');
+                if(state.status==='running')return;
+                clearInterval(timer);$('national-download').disabled=false;
+                if(state.status==='complete')await nationalSearch(1);
+                else $('national-status').textContent=translate('Preuzimanje nije uspjelo. Pokušajte ponovno.');
+            }catch(e){clearInterval(timer);$('national-download').disabled=false;fail(e)}
+        },2000);
+    }catch(e){$('national-download').disabled=false;fail(e)}
+};
 $('national-query').onkeydown=event=>{if(event.key==='Enter')nationalSearch(1).catch(fail);};
 $('national-prev').onclick=()=>nationalSearch(nationalPage-1).catch(fail);
 $('national-next').onclick=()=>nationalSearch(nationalPage+1).catch(fail);

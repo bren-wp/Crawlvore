@@ -1,6 +1,10 @@
 "use strict";
 const UI_LANGUAGE: 'en' | 'hr' = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES: Readonly<Record<string,string>> = {
+  "Preuzmi britansku bazu": "Download UK database",
+  "Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.": "Download the UK database? An internet connection and at least 20 GiB of free disk space are required.",
+  "Preuzimanje i priprema baze…": "Downloading and preparing the database…",
+  "Preuzimanje nije uspjelo. Pokušajte ponovno.": "Download failed. Please try again.",
   "Pristup je isključen za ovu sesiju. Trajno uklanjanje nije potvrđeno.": "Access disabled for this session. Permanent removal could not be verified.",
   "Crawlvora Connect": "Crawlvora Connect",
   "UTF-8 · najviše 2 GiB": "UTF-8 · up to 2 GiB",

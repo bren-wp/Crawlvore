@@ -24,6 +24,7 @@ interface InterfaceElements {
   "national-country":HTMLSelectElement;
   "national-query":HTMLInputElement;
   "national-status":HTMLElement;
+  "national-download":HTMLButtonElement;
   "national-rows":HTMLElement;
   "national-page":HTMLElement;
   "national-prev":HTMLButtonElement;
@@ -517,6 +518,7 @@ async function nationalSearch(nextPage:number){
     try{
         const status=await api<Record<string,{available:boolean}>>('/api/national/status');
         if(seq!==nationalSequence)return;
+        $('national-download').hidden=Boolean(status[country]?.available);
         if(!status[country]?.available){$('national-status').textContent=translate('Nacionalna baza nije ugrađena u ovo izdanje.');$('national-page').textContent='';return;}
         const result=await api<{page:number;total_snapshot:number;snapshot:string;rows:{name:string;registration_number:string;city:string;status:string}[];next:boolean}>('/api/national/gb/search?'+new URLSearchParams({q:$('national-query').value,page:String(nextPage)}));
         if(seq!==nationalSequence)return;
@@ -541,6 +543,23 @@ async function nationalDetail(number:string){
 }
 $('national-country').onchange=()=>nationalSearch(1).catch(fail);
 $('national-search').onclick=()=>nationalSearch(1).catch(fail);
+$('national-download').onclick=async()=>{
+    if(!confirm(translate('Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.')))return;
+    $('national-download').disabled=true;
+    try{
+        await post('/api/national/gb/download',{confirmed:true});
+        $('national-status').textContent=translate('Preuzimanje i priprema baze…');
+        const timer=setInterval(async()=>{
+            try{
+                const state=await api<{status:string}>('/api/national/gb/download');
+                if(state.status==='running')return;
+                clearInterval(timer);$('national-download').disabled=false;
+                if(state.status==='complete')await nationalSearch(1);
+                else $('national-status').textContent=translate('Preuzimanje nije uspjelo. Pokušajte ponovno.');
+            }catch(e){clearInterval(timer);$('national-download').disabled=false;fail(e)}
+        },2000);
+    }catch(e){$('national-download').disabled=false;fail(e)}
+};
 $('national-query').onkeydown=event=>{if(event.key==='Enter')nationalSearch(1).catch(fail);};
 $('national-prev').onclick=()=>nationalSearch(nationalPage-1).catch(fail);
 $('national-next').onclick=()=>nationalSearch(nationalPage+1).catch(fail);
