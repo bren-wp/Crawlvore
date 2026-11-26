@@ -33,5 +33,5 @@ class NationalCatalogTests(unittest.TestCase):
             self.assertEqual(catalog.search('%')['rows'],[])
             self.assertEqual(catalog.detail('00000001')['CompanyName'],'Alpha Ltd')
             self.assertEqual(original.read_bytes(),b'unchanged')
-            self.assertFalse(catalog.status()['RS']['available'])
+            self.assertEqual(set(catalog.status()),{'HR','GB'})
             with self.assertRaises(ValueError): catalog.detail('../secret')

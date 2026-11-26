@@ -10,35 +10,5 @@
     "url": "https://www.gov.uk/guidance/companies-house-data-products",
     "status": "bulk",
     "note": "Free Companies House company data files; individual officer information is separate."
-  },
-  "RS": {
-    "name": "Serbia",
-    "url": "https://data.gov.rs/sr/datasets/api-za-registar-privrednikh-drushtava/",
-    "status": "open_api",
-    "note": "APR company registry open-data API; nonprofit data is available separately."
-  },
-  "SI": {
-    "name": "Slovenia",
-    "url": "https://www.ajpes.si/Registri/Poslovni_register/Splosno",
-    "status": "bulk",
-    "note": "AJPES PRS CSV for reuse."
-  },
-  "BA": {
-    "name": "Bosnia and Herzegovina",
-    "url": "https://bizreg.pravosudje.ba/",
-    "status": "lookup_only",
-    "note": "Official electronic registers; bulk reuse not confirmed."
-  },
-  "ME": {
-    "name": "Montenegro",
-    "url": "https://www.crps.me/",
-    "status": "lookup_only",
-    "note": "Official register; bulk reuse not confirmed."
-  },
-  "HU": {
-    "name": "Hungary",
-    "url": "https://www.e-cegjegyzek.hu/",
-    "status": "lookup_only",
-    "note": "Public company lookup; bulk reuse not confirmed."
   }
 }

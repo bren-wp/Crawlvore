@@ -1,6 +1,6 @@
 # National database packaging
 
-GB uses a read-only, independently indexed Companies House database. The Croatian workspace remains separate. The initial international UI supports GB name-prefix / exact company-number search, paging and original fields. RS is explicitly unavailable until the APR schema and import are verified.
+GB uses a read-only, independently indexed Companies House database. The Croatian workspace remains separate. The initial international UI supports GB name-prefix / exact company-number search, paging and original fields. Only Croatia and the United Kingdom are enabled; other countries remain outside the user-facing catalog until verified imports exist.
 
 After documented distribution review, stage a verified GB snapshot using:
 `python tools/prepare_national_bundle.py GB-verified national-data/GB --distribution-reviewed`

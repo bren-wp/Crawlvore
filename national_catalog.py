@@ -36,7 +36,7 @@ class NationalCatalog:
 
     def status(self):
         report=self.manifest()
-        return {'HR':{'available':True},'GB':{'available':bool(report and (self.package/(GB_FILE+'.gz')).is_file()),'rows':report['rows'] if report else None,'snapshot':report['snapshot'] if report else None},'RS':{'available':False}}
+        return {'HR':{'available':True},'GB':{'available':bool(report and (self.package/(GB_FILE+'.gz')).is_file()),'rows':report['rows'] if report else None,'snapshot':report['snapshot'] if report else None}}
 
     def database(self):
         with self.lock:

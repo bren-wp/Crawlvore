@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Restrict active national catalogs to Croatia and the United Kingdom; hide unverified countries in desktop and public web navigation.
+
 - Add read-only national catalog, GB indexed offline search and details, compressed snapshot staging and optional native packaging; preserve Croatian workspace isolation.
 
 - Isolate website catalogs by country and add separate Companies House bulk importer and APR download staging.
