@@ -64,7 +64,9 @@ def run():
                     expect(page.locator('#result-count')).to_have_text('1 results')
                     expect(page.locator('#company-rows tr')).to_contain_text('Crawlvora QA Synthetic Company')
                 page.locator('#search').fill('Crawlvora QA Synthetic Company')
-                page.locator('#entity-kind').select_option('nonprofit')
+                with page.expect_response(lambda response: '/api/companies?' in response.url and 'entity_kind=nonprofit' in response.url) as filtered_response:
+                    page.locator('#entity-kind').select_option('nonprofit')
+                assert filtered_response.value.json()['total']==0
                 expect(page.locator('#result-count')).to_have_text('0 results')
                 page.locator('#entity-kind').select_option('company')
                 expect(page.locator('#company-rows .textbtn')).to_have_count(1)
@@ -73,6 +75,9 @@ def run():
                 page.locator('[data-profile-tab="sources"]').click()
                 expect(page.locator('.alternate-values')).to_contain_text('222')
                 page.locator('#close-detail').click()
+                page.locator('[data-go="national"]').click()
+                expect(page.locator('#national-status')).to_have_text('National database is not included in this edition.')
+                expect(page.locator('#national-country option')).to_have_count(1)
                 page.locator('[data-view="data"]').click()
                 page.locator('#export-clear-all').click()
                 expect(page.locator('#export-selected')).to_be_disabled()

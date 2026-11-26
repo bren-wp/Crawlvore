@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Restore entity filtering, selective exports and national directory handlers in the canonical TypeScript sources so native builds do not overwrite working controls.
+
 - Restrict active national catalogs to Croatia and the United Kingdom; hide unverified countries in desktop and public web navigation.
 
 - Add read-only national catalog, GB indexed offline search and details, compressed snapshot staging and optional native packaging; preserve Croatian workspace isolation.
