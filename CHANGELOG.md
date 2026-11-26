@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Brand registry workflows as Crawlvora Sync and Crawlvora Connect, reduce technical UI details, retain data provenance, reject ambiguous HTTP request framing and expand browser click coverage.
+
 - Avoid repeated large buffer copies in JSON imports; add free-space checks, exclusive import admission and browser registry profile regression coverage.
 
 - Support disk-backed 2 GiB CSV/JSON imports, transactional incremental JSON parsing, bounded-memory full CSV/JSON/Excel exports, and paginated original registry records in company profiles.

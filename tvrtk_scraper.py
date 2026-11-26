@@ -262,7 +262,11 @@ def run_workspace(args,selection,active):
         def do_POST(self):
             if not self.authorized() or not self.session_authorized() or not token_matches(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
-                n=int(self.headers.get('Content-Length','0'))
+                lengths=self.headers.get_all('Content-Length',[])
+                if self.headers.get('Transfer-Encoding') is not None or len(lengths)!=1 or not lengths[0].isascii() or not lengths[0].isdigit() or len(lengths[0])>12:
+                    self.close_connection=True
+                    return self.send_data({'error':'Invalid request framing.'},status=400)
+                n=int(lengths[0])
                 if self.path=='/api/recovery/encrypted-restore':
                     password=unquote(self.headers.get('X-Backup-Passphrase',''),errors='strict')
                     if not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
