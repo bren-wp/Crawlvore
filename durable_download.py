@@ -44,12 +44,17 @@ def completed_archive(path,record,size):
 def transfer(session,url,root,name,check,progress):
     root.mkdir(parents=True,exist_ok=True)
     partial=None
+    finalizing=None
     for path,record,size in candidates(root,name):
         if completed_archive(path,record,size):return path
+        if strong_etag(record.get('etag')) and size==record['total'] and record.get('complete') is not True:
+            finalizing=(path,record,size)
         if strong_etag(record.get('etag')) and size<record['total']:
             if partial is None or size>partial[2]:partial=(path,record,size)
     headers={'Accept-Encoding':'identity'}
-    if partial:
+    if finalizing:
+        headers.update(Range=f'bytes={finalizing[2]-1}-',**{'If-Range':finalizing[1]['etag']})
+    elif partial:
         headers.update(Range=f'bytes={partial[2]}-',**{'If-Range':partial[1]['etag']})
     check()
     with session.get(url,timeout=(15,20),allow_redirects=False,stream=True,headers=headers) as response:
@@ -60,6 +65,23 @@ def transfer(session,url,root,name,check,progress):
         if length is None or not length.isascii() or not length.isdigit() or len(length)>10:
             raise ValueError('Missing or invalid download length.')
         expected=int(length)
+        if response.status_code==206 and finalizing:
+            path,record,total=finalizing
+            if etag!=record['etag'] or response.headers.get('Content-Range')!=f'bytes {total-1}-{total-1}/{total}' or expected!=1:
+                raise ValueError('Remote snapshot identity changed. Saved archive retained.')
+            tail=b''
+            for chunk in response.iter_content(1):
+                check()
+                tail+=chunk
+                if len(tail)>1:raise ValueError('Unexpected response length.')
+            with path.open('rb') as stream:
+                stream.seek(total-1)
+                if len(tail)!=1 or stream.read(1)!=tail:raise ValueError('Local snapshot tail mismatch.')
+                stream.seek(0)
+                record['sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
+            record['complete']=True
+            save_meta(path.parent/'transfer.json',record)
+            return path
         if response.status_code==206 and partial:
             path,record,offset=partial
             total=record['total']

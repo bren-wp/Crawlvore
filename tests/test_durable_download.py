@@ -44,3 +44,27 @@ class DurableDownloadTests(unittest.TestCase):
             c=Session(Reply(200,{'Content-Length':'8','ETag':'"two"'},[b'12345678']))
             new=transfer(c,'https://example.test',root,name,lambda:None,lambda **kw:None)
             self.assertNotEqual(old,new);self.assertEqual(old.read_bytes(),b'abcd');self.assertEqual(new.read_bytes(),b'12345678')
+
+    def test_interruption_after_last_byte_does_not_download_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);name='snapshot.zip'
+            def interrupt(**state):
+                if state['bytes']==8:raise OSError('closed before metadata commit')
+            a=Session(Reply(200,{'Content-Length':'8','ETag':'"one"'},[b'abcdefgh']))
+            with self.assertRaises(OSError):transfer(a,'https://example.test',root,name,lambda:None,interrupt)
+            old=next(root.glob('transfer-*/snapshot.zip'))
+            self.assertEqual(old.read_bytes(),b'abcdefgh')
+            b=Session(Reply(206,{'Content-Length':'1','ETag':'"one"','Content-Range':'bytes 7-7/8'},[b'h']))
+            self.assertEqual(transfer(b,'https://example.test',root,name,lambda:None,lambda **kw:None),old)
+            self.assertEqual(b.headers[0]['Range'],'bytes=7-')
+            self.assertEqual(transfer(Session(),'https://example.test',root,name,lambda:None,lambda **kw:None),old)
+
+    def test_corrupted_completed_archive_is_not_reused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);name='snapshot.zip'
+            old=transfer(Session(Reply(200,{'Content-Length':'8','ETag':'"one"'},[b'abcdefgh'])),'https://example.test',root,name,lambda:None,lambda **kw:None)
+            old.write_bytes(b'xxxxxxxx')
+            new=transfer(Session(Reply(200,{'Content-Length':'8','ETag':'"one"'},[b'abcdefgh'])),'https://example.test',root,name,lambda:None,lambda **kw:None)
+            self.assertNotEqual(old,new)
+            self.assertEqual(old.read_bytes(),b'xxxxxxxx')
+            self.assertEqual(new.read_bytes(),b'abcdefgh')
