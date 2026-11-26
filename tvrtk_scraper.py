@@ -23,6 +23,7 @@ from automation import Queue
 from snapshot_diff import compare
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
+from field_export import export_selected, selected_fields
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
@@ -183,6 +184,17 @@ def run_workspace(args,selection,active):
                     for chunk in (registry.export_csv(snapshot,category) if is_csv else registry.export_rows(snapshot,category)): self.wfile.write(chunk)
                     return
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
+                if p.path=='/api/export-fields':
+                    fields=selected_fields(get('fields'))
+                    kind=get('format','csv')
+                    types={'csv':'text/csv; charset=utf-8','json':'application/json; charset=utf-8','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+                    if kind not in types: raise ValueError('Invalid format.')
+                    with tempfile.TemporaryDirectory() as directory:
+                        out=Path(directory)/('selected.'+kind)
+                        export_selected(store,out,fields,kind,omit_empty=get('omit_empty','1')=='1',distinct=get('distinct')=='1',**filters)
+                        self.send_response(200); self.send_header('Content-Type',types[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="crawlvora-selected.{kind}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
                 if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())

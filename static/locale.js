@@ -1,6 +1,13 @@
 "use strict";
 const UI_LANGUAGE = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES = {
+  "Izvoz odabranih polja": "Selected field export",
+  "Polje za izvoz": "Field to export",
+  "Naziv tvrtke": "Company name",
+  "Naziv, e-mail, telefon i OIB": "Name, email, phone and OIB",
+  "Ukloni duplikate": "Remove duplicates",
+  "Primijeni filtre imenika": "Apply directory filters",
+  "Izvezi odabrana polja": "Export selected fields",
   "Sačuvane alternativne vrijednosti": "Preserved alternative values",
   "Nema alternativnih vrijednosti.": "No alternative values.",
   "RADNI PROSTOR": "WORKSPACE",

@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Add local field-specific CSV, JSON and Excel export with optional deduplication and directory filters. Default registry page size to the supported maximum of 1000.
+
 - Add isolated partial-registry preview preparation with checkpoint verification and explicit incomplete manifest; retain strict production acceptance.
 
 - Require verified offline registry seed and matching manifest in native package smoke tests; guard GitHub asset size.
