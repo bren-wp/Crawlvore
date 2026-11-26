@@ -155,3 +155,31 @@ class NativeVaultTests(unittest.TestCase):
     def test_real_secret_service_registry_namespace(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.registry_vault_roundtrip(Path(tmp)/'workspace')
+
+
+    @unittest.skipUnless(sys.platform=='win32','Windows DPAPI integration')
+    def test_private_package_enrollment_and_revocation(self):
+        import json
+        from registry import RegistryAccess
+        with tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ,{'LOCALAPPDATA':tmp},clear=False):
+            root=Path(tmp)
+            protector=NativeVault(Path.home()/'.crawlvora-private-package-v1',purpose='registry')
+            capsule=root/'registry-private.dpapi'
+            raw=json.dumps({'version':1,'client_id':'synthetic-package-id..','client_secret':'synthetic-package-secret..'}).encode()
+            capsule.write_bytes(protector.crypt(raw))
+            self.assertNotIn(b'synthetic-package-secret',capsule.read_bytes())
+            with patch.object(sys,'frozen',True,create=True):
+                access=RegistryAccess(root,root/'workspace')
+                self.assertTrue(access.provision_from_package())
+                self.assertEqual(access.current(),(('synthetic-package-id..','synthetic-package-secret..'),True))
+                reopened=RegistryAccess(root,root/'workspace')
+                self.assertFalse(reopened.provision_from_package())
+                reopened.forget()
+                self.assertFalse(RegistryAccess(root,root/'workspace').provision_from_package())
+                self.assertFalse(RegistryAccess(root,root/'workspace').status()['configured'])
+                with patch.dict(os.environ,{'CRAWLVORA_NATIVE_SMOKE':'1'}):
+                    self.assertFalse(RegistryAccess(root,root/'smoke-workspace').provision_from_package())
+                capsule.write_bytes(b'invalid capsule')
+                with self.assertRaises(ValueError):
+                    RegistryAccess(root,root/'another-workspace').provision_from_package()
+                self.assertFalse(RegistryAccess(root,root/'another-workspace').status()['configured'])

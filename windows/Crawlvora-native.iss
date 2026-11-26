@@ -8,7 +8,11 @@ AppVersion={#AppVersion}
 DefaultDirName={localappdata}\Programs\Crawlvora
 DefaultGroupName=Crawlvora
 PrivilegesRequired=lowest
+#ifdef PrivateOutput
+OutputDir={#PrivateOutput}
+#else
 OutputDir=..\release-assets
+#endif
 OutputBaseFilename=Setup
 Compression=lzma2
 SolidCompression=yes
@@ -19,8 +23,12 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 [Files]
 Source: "MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
+#ifdef PrivatePortable
+Source: "{#PrivatePortable}"; DestDir: "{app}"; DestName: "Crawlvora.exe"; Flags: ignoreversion
+#else
 Source: "..\native-preview\Crawlvora.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\native-preview\worker\*"; DestDir: "{app}\worker"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 [Icons]

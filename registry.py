@@ -122,6 +122,27 @@ class RegistryAccess:
         self.apply(data)
         return True
 
+    def provision_from_package(self):
+        # Only a frozen private Windows worker can carry an embedded DPAPI capsule.
+        if sys.platform!='win32' or not getattr(sys,'frozen',False) or os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
+            return False
+        capsule=Path(self.root)/'registry-private.dpapi'
+        if not capsule.is_file(): return False
+        with self.lock:
+            try:
+                # Any existing record (including a revocation tombstone) wins.
+                if self.vault.load() is not None: return False
+                if capsule.is_symlink() or not 0<capsule.stat().st_size<=65536:
+                    raise ValueError('Invalid private registry package.')
+                protector=NativeVault(Path.home()/'.crawlvora-private-package-v1',purpose='registry')
+                data=json.loads(protector.crypt(capsule.read_bytes(),decrypt=True))
+                if not isinstance(data,dict) or data.get('version')!=1:
+                    raise ValueError('Invalid private registry package.')
+                self.apply(dict(data,persist=True,permission=True))
+                return True
+            except (VaultUnavailable,OSError,ValueError,TypeError):
+                raise ValueError('Private registry package cannot be authorized on this Windows profile.') from None
+
     def forget(self):
         with self.lock:
             try:

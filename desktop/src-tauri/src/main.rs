@@ -79,6 +79,7 @@ fn spawn_worker(data: &Path, primary: bool, smoke: bool) -> Result<(Worker, Url,
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
     if primary { command.arg("--primary-workspace"); }
     if smoke {
+        command.env("CRAWLVORA_NATIVE_SMOKE", "1");
         for key in ["CRAWLVORA_REGISTRY_PROVISION", "SUDREG_CLIENT_ID", "SUDREG_CLIENT_SECRET"] {
             command.env_remove(key);
         }

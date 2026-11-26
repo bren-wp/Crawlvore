@@ -93,7 +93,8 @@ def run_workspace(args,selection,active):
     integrity.start()
     registry_access=RegistryAccess(ROOT,args.data_dir)
     try:
-        registry_access.provision_from_environment()
+        if not registry_access.provision_from_environment():
+            registry_access.provision_from_package()
     except ValueError:
         # Preserve offline workspace availability without accepting an invalid pair.
         print('Registry provisioning failed; authorized secure storage required.',file=sys.stderr)
