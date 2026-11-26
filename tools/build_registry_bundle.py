@@ -1,5 +1,6 @@
 """Build a standalone, registry-only distribution mirror. No credentials in output."""
 import argparse
+from contextlib import closing
 import getpass
 import json
 import os
@@ -51,7 +52,7 @@ def main():
         while bot.snapshot()['status'] in ('running','stopping'):
             time.sleep(1)
         raise SystemExit(130) from None
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db:
         if db.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0]:
             raise ValueError('Registry checkpoint busy.')
         db.execute('PRAGMA journal_mode=DELETE')

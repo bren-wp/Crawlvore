@@ -1,4 +1,5 @@
 """Verify an isolated official public registry mirror before distribution."""
+from contextlib import closing
 import hashlib
 import json
 import sqlite3
@@ -6,10 +7,11 @@ from pathlib import Path
 
 
 def verify_bundle(path, min_categories=36):
-    path=Path(path).resolve()
+    path=Path(path)
     if not path.is_file() or path.is_symlink():
         raise ValueError('Missing registry bundle.')
-    with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True) as db:
+    path=path.resolve()
+    with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)) as db:
         db.execute('PRAGMA query_only=ON')
         if db.execute('PRAGMA integrity_check').fetchall()!=[('ok',)]:
             raise ValueError('Registry database integrity check failed.')
