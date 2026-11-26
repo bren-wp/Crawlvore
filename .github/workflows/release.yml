@@ -59,12 +59,28 @@ jobs:
     needs: validate
     uses: ./.github/workflows/registry-bundle.yml
     secrets: inherit
+  gb_snapshot:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python -c "from gb_download import fetch_snapshot; print(fetch_snapshot('national-data/GB'))"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verified-gb-registry-snapshot
+          path: national-data/GB/
+          retention-days: 1
   native:
-    needs: snapshot
+    needs: [snapshot, gb_snapshot]
     uses: ./.github/workflows/native.yml
     with:
       publish_artifacts: true
       registry_bundle: true
+      national_bundle: true
   endurance:
     needs: validate
     uses: ./.github/workflows/endurance.yml
@@ -92,6 +108,10 @@ jobs:
         with:
           name: Crawlvora-native-Linux
           path: release
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-gb-registry-snapshot
+          path: release/gb
       - name: Create and verify complete release assets
         shell: bash
         run: |
@@ -99,8 +119,8 @@ jobs:
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
           cd release
           (cd registry && sha256sum -c SHA256SUMS.txt)
-          cp registry/registry-seed.json REGISTRY-MANIFEST.json
-          files=(Portable.exe Setup.exe Crawlvora-Linux-x86_64.tar.gz Crawlvora-Linux-amd64.deb Crawlvora-source.zip REGISTRY-MANIFEST.json)
+          python -c 'import json; json.dump({"HR":json.load(open("registry/registry-seed.json")),"GB":json.load(open("gb/manifest.json")),"windows_editions":{"Full":["HR","GB"],"HR":["HR"],"GB":["GB"],"Online":[]}},open("REGISTRY-MANIFEST.json","w"),indent=2)'
+          files=(Portable.exe Setup.exe Portable-HR.exe Setup-HR.exe Portable-GB.exe Setup-GB.exe Portable-Online.exe Setup-Online.exe Crawlvora-Linux-x86_64.tar.gz Crawlvora-Linux-amd64.deb Crawlvora-source.zip REGISTRY-MANIFEST.json)
           for file in "${files[@]}"; do
             test -s "$file"
             test "$(stat -c %s "$file")" -lt 2147483648 || { echo "Release asset exceeds GitHub limit: $file"; exit 1; }
@@ -112,4 +132,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           test "$(gh repo view "$GITHUB_REPOSITORY" --json visibility --jq .visibility)" = PRIVATE
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Crawlvora $GITHUB_REF_NAME" --generate-notes release/Portable.exe release/Setup.exe release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-Linux-amd64.deb release/Crawlvora-source.zip release/REGISTRY-MANIFEST.json release/SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Crawlvora $GITHUB_REF_NAME" --generate-notes release/Portable.exe release/Setup.exe release/Portable-HR.exe release/Setup-HR.exe release/Portable-GB.exe release/Setup-GB.exe release/Portable-Online.exe release/Setup-Online.exe release/Crawlvora-Linux-x86_64.tar.gz release/Crawlvora-Linux-amd64.deb release/Crawlvora-source.zip release/REGISTRY-MANIFEST.json release/SHA256SUMS.txt

@@ -13,6 +13,9 @@ on:
       registry_bundle:
         type: boolean
         default: false
+      national_bundle:
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -77,6 +80,18 @@ jobs:
           sha256sum registry-seed.sqlite3 | cut -d ' ' -f 1 > registry-seed.sha256
           echo 'CRAWLVORA_REGISTRY_BUNDLE=1' >> "$GITHUB_ENV"
           echo "CRAWLVORA_EXPECTED_REGISTRY_SHA256=$(cat registry-seed.sha256)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v8
+        if: inputs.national_bundle
+        with:
+          name: verified-gb-registry-snapshot
+          path: national-data/GB
+      - name: Accept GB bundle identity
+        if: inputs.national_bundle
+        shell: bash
+        run: |
+          python -c "from national_catalog import NationalCatalog; from pathlib import Path; import tempfile; t=tempfile.TemporaryDirectory(); n=NationalCatalog(Path('.'),Path(t.name)); p,m=n.database(); print(m['rows']); t.cleanup()"
+          echo 'CRAWLVORA_NATIONAL_BUNDLE=1' >> "$GITHUB_ENV"
+          echo "CRAWLVORA_EXPECTED_GB_SHA256=$(python -c 'import json; print(json.load(open("national-data/GB/manifest.json"))["database_sha256"])')" >> "$GITHUB_ENV"
       - name: Build worker and assemble preview
         shell: bash
         run: |
@@ -113,7 +128,9 @@ jobs:
         run: |
           choco install innosetup -y --no-progress
           if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
-          ./windows/package-native.ps1
+          if ('${{ inputs.registry_bundle }}' -eq 'true' -and '${{ inputs.national_bundle }}' -eq 'true') {
+            foreach ($edition in @('Full','HR','GB','Online')) { ./windows/package-native.ps1 -Edition $edition }
+          } else { ./windows/package-native.ps1 }
       - name: Archive tested Linux package
         if: runner.os == 'Linux'
         shell: bash
