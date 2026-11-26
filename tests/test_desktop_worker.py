@@ -1,4 +1,6 @@
 import http.cookiejar
+import http.client
+from urllib.parse import urlsplit
 import json
 import subprocess
 import sys
@@ -47,6 +49,21 @@ class DesktopWorkerTests(unittest.TestCase):
                     with self.assertRaises(urllib.error.HTTPError) as denied:
                         opener.open(req,timeout=5)
                     self.assertEqual(denied.exception.code,403)
+                parsed=urlsplit(base)
+                cookie_name='crawlvora_session_'+str(parsed.port)
+                for headers in ([('Content-Length','2'),('Content-Length','2')],[('Transfer-Encoding','chunked'),('Content-Length','2')],[('Content-Length','-1')],[]):
+                    conn=http.client.HTTPConnection(parsed.hostname,parsed.port,timeout=5)
+                    try:
+                        conn.putrequest('POST','/api/preferences/theme')
+                        conn.putheader('Cookie',cookie_name+'='+token)
+                        conn.putheader('X-Local-Token',token)
+                        conn.putheader('Content-Type','application/json')
+                        for key,value in headers: conn.putheader(key,value)
+                        conn.endheaders()
+                        response=conn.getresponse()
+                        self.assertEqual(response.status,400)
+                        response.read()
+                    finally: conn.close()
                 for payload in ([],None,'invalid'):
                     with self.assertRaises(urllib.error.HTTPError) as rejected:
                         post('/api/preferences/theme',payload)
