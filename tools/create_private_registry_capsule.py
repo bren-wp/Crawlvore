@@ -19,6 +19,11 @@ def main():
     keys=('SUDREG_CLIENT_ID','SUDREG_CLIENT_SECRET')
     if any(k in os.environ for k in keys):
         pair=tuple(os.environ.pop(k,'') for k in keys)
+    elif os.environ.get('CRAWLVORA_PRIVATE_VAULT_DIR'):
+        record=NativeVault(Path(os.environ['CRAWLVORA_PRIVATE_VAULT_DIR']),purpose='registry').load()
+        if not record or record.get('authorized') is not True:
+            raise SystemExit('Authorized local vault record required.')
+        pair=RegistryAccess._pair(record)
     else:
         pair=(getpass.getpass('Authorized Client ID: '),getpass.getpass('Authorized Client Secret: '))
     client_id,client_secret=RegistryAccess._pair(dict(zip(('client_id','client_secret'),pair)))

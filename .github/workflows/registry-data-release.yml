@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       distribution_reviewed:
-        description: Confirm licence attribution and personal-data review for public distribution
+        description: Confirm licence attribution and data review for private distribution
         type: boolean
         required: true
         default: false
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   snapshot:
-    if: inputs.distribution_reviewed && github.ref == 'refs/heads/main'
+    if: inputs.distribution_reviewed && github.event.repository.private && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/registry-bundle.yml
     secrets: inherit
   quality:
@@ -55,6 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$(gh repo view "$GITHUB_REPOSITORY" --json visibility --jq .visibility)" = PRIVATE
           version="$(tr -d '\r\n' < VERSION)"
           snapshot="$(python -c "import json; print(json.load(open('release/registry/registry-seed.json'))['snapshot'])")"
           [[ "$snapshot" =~ ^[0-9]+$ ]]

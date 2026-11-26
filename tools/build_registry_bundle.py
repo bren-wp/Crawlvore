@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from core import Collector, Store
+from native_vault import NativeVault, VaultUnavailable
 from registry import Registry, RegistryAccess, start_registry
 from registry_bundle import verify_bundle
 
@@ -18,6 +19,7 @@ from registry_bundle import verify_bundle
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('workspace',type=Path)
+    parser.add_argument('--authorized-workspace',type=Path)
     parser.add_argument('--limit',type=int,default=1000)
     args=parser.parse_args()
     root=args.workspace.resolve()
@@ -29,6 +31,11 @@ def main():
     keys=('SUDREG_CLIENT_ID','SUDREG_CLIENT_SECRET')
     if any(k in os.environ for k in keys):
         pair=tuple(os.environ.pop(k,'') for k in keys)
+    elif args.authorized_workspace is not None:
+        record=NativeVault(args.authorized_workspace.resolve(),purpose='registry').load()
+        if not record or record.get('authorized') is not True:
+            raise ValueError('Authorized local vault record required.')
+        pair=RegistryAccess._pair(record)
     elif sys.stdin.isatty():
         pair=(getpass.getpass('Authorized Client ID: '),getpass.getpass('Authorized Client Secret: '))
     else:
@@ -64,6 +71,6 @@ def main():
 if __name__=='__main__':
     try:
         main()
-    except (OSError,ValueError,sqlite3.Error) as error:
+    except (OSError,ValueError,sqlite3.Error,VaultUnavailable) as error:
         print('Registry bundle not accepted: '+type(error).__name__,file=sys.stderr)
         raise SystemExit(1) from None

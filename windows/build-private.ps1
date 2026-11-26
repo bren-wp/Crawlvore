@@ -14,11 +14,11 @@ try {
     python tools/create_private_registry_capsule.py $capsule
     if ($LASTEXITCODE) { throw 'Private credential capsule failed.' }
     Remove-Item Env:SUDREG_CLIENT_ID,Env:SUDREG_CLIENT_SECRET -ErrorAction SilentlyContinue
-    npm ci --ignore-scripts --no-audit
+    npm.cmd ci --ignore-scripts --no-audit
     if ($LASTEXITCODE) { throw 'Frontend dependencies failed.' }
-    npm run typecheck
+    npm.cmd run typecheck
     if ($LASTEXITCODE) { throw 'Frontend typecheck failed.' }
-    npm run build:frontend
+    npm.cmd run build:frontend
     if ($LASTEXITCODE) { throw 'Frontend build failed.' }
     $registryArgs = @()
     if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
