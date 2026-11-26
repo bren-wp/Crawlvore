@@ -27,12 +27,15 @@ if ($env:CRAWLVORA_NATIONAL_BUNDLE -eq '1') {
 }
 python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --exclude-module playwright --exclude-module webview tvrtk_scraper.py
 if ($LASTEXITCODE) { throw 'Embedded worker build failed' }
-$env:CRAWLVORA_EMBEDDED_WORKER = (Resolve-Path dist/embedded/CrawlvoraWorker.exe).Path
+$worker = (Resolve-Path dist/embedded/CrawlvoraWorker.exe).Path
+$env:CRAWLVORA_WORKER_SIZE = (Get-Item $worker).Length.ToString()
+$env:CRAWLVORA_WORKER_SHA256 = (Get-FileHash $worker -Algorithm SHA256).Hash.ToLower()
 cargo +stable build --release --locked --features portable --manifest-path desktop/src-tauri/Cargo.toml
 if ($LASTEXITCODE) { throw 'Native portable build failed' }
 $cargoTarget = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { 'desktop/src-tauri/target' }
-Copy-Item (Join-Path $cargoTarget 'release/crawlvora-desktop.exe') release-assets/Portable.exe
-Remove-Item Env:CRAWLVORA_EMBEDDED_WORKER
+python tools/pack_portable.py (Join-Path $cargoTarget 'release/crawlvora-desktop.exe') $worker release-assets/Portable.exe $env:CRAWLVORA_WORKER_SHA256 $env:CRAWLVORA_WORKER_SIZE
+if ($LASTEXITCODE) { throw 'Portable payload assembly failed' }
+Remove-Item Env:CRAWLVORA_WORKER_SIZE,Env:CRAWLVORA_WORKER_SHA256
 $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
 if (!(Test-Path $iscc)) { throw 'Inno Setup 6 is missing' }
 # Bundle Microsoft's signed Evergreen bootstrapper for systems missing WebView2.

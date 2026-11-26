@@ -587,6 +587,7 @@ dependencies = [
 name = "crawlvora-desktop"
 version = "8.1.4"
 dependencies = [
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",

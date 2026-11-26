@@ -29,12 +29,15 @@ try {
     }
     python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath "$staging" --workpath "$staging\work" --specpath "$staging" --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --add-data "$capsule;." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
     if ($LASTEXITCODE) { throw 'Private embedded worker build failed.' }
-    $env:CRAWLVORA_EMBEDDED_WORKER = Join-Path $staging 'CrawlvoraWorker.exe'
+    $worker = Join-Path $staging 'CrawlvoraWorker.exe'
+    $env:CRAWLVORA_WORKER_SIZE = (Get-Item $worker).Length.ToString()
+    $env:CRAWLVORA_WORKER_SHA256 = (Get-FileHash $worker -Algorithm SHA256).Hash.ToLower()
     $env:CARGO_TARGET_DIR = Join-Path $staging 'target'
     cargo +stable build --release --locked --features portable --manifest-path desktop/src-tauri/Cargo.toml
     if ($LASTEXITCODE) { throw 'Private native host build failed.' }
     $portable = Join-Path $staging 'Portable.exe'
-    Copy-Item "$env:CARGO_TARGET_DIR\release\crawlvora-desktop.exe" $portable
+    python tools/pack_portable.py "$env:CARGO_TARGET_DIR\release\crawlvora-desktop.exe" $worker $portable $env:CRAWLVORA_WORKER_SHA256 $env:CRAWLVORA_WORKER_SIZE
+    if ($LASTEXITCODE) { throw 'Private portable assembly failed' }
     $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
     if (!(Test-Path $iscc)) { throw 'Inno Setup 6 is required.' }
     Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $bootstrapper
@@ -70,7 +73,7 @@ try {
     } | Set-Content (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
     Write-Host 'Private packages created locally. Do not upload to public GitHub releases.'
 } finally {
-    Remove-Item Env:SUDREG_CLIENT_ID,Env:SUDREG_CLIENT_SECRET,Env:CRAWLVORA_EMBEDDED_WORKER,Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+    Remove-Item Env:SUDREG_CLIENT_ID,Env:SUDREG_CLIENT_SECRET,Env:CRAWLVORA_WORKER_SIZE,Env:CRAWLVORA_WORKER_SHA256,Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
     Remove-Item $bootstrapper -Force -ErrorAction SilentlyContinue
     Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
 }
