@@ -1,6 +1,8 @@
 "use strict";
 const UI_LANGUAGE: 'en' | 'hr' = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES: Readonly<Record<string,string>> = {
+  "Nastavi preuzimanje": "Resume download",
+  "Prethodno preuzeti podaci su sačuvani.": "Previously downloaded data has been preserved.",
   "Preuzmi britansku bazu": "Download UK database",
   "Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.": "Download the UK database? An internet connection and at least 20 GiB of free disk space are required.",
   "Preuzimanje i priprema baze…": "Downloading and preparing the database…",

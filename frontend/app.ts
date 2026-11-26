@@ -519,7 +519,14 @@ async function nationalSearch(nextPage:number){
         const status=await api<Record<string,{available:boolean}>>('/api/national/status');
         if(seq!==nationalSequence)return;
         $('national-download').hidden=Boolean(status[country]?.available);
-        if(!status[country]?.available){$('national-status').textContent=translate('Nacionalna baza nije ugrađena u ovo izdanje.');$('national-page').textContent='';return;}
+        if(!status[country]?.available){
+            const state=await api<{status:string}>('/api/national/gb/download');
+            if(seq!==nationalSequence)return;
+            const paused=['paused','cancelled','failed'].includes(state.status);
+            $('national-download').textContent=translate(paused?'Nastavi preuzimanje':'Preuzmi britansku bazu');
+            $('national-status').textContent=translate(paused?'Prethodno preuzeti podaci su sačuvani.':'Nacionalna baza nije ugrađena u ovo izdanje.');
+            $('national-page').textContent='';return;
+        }
         const result=await api<{page:number;total_snapshot:number;snapshot:string;rows:{name:string;registration_number:string;city:string;status:string}[];next:boolean}>('/api/national/gb/search?'+new URLSearchParams({q:$('national-query').value,page:String(nextPage)}));
         if(seq!==nationalSequence)return;
         nationalPage=result.page;

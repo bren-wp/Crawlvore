@@ -26,44 +26,52 @@ def fetch_snapshot(destination,check=lambda:None,progress=lambda **kw:None):
     if shutil.disk_usage(destination.parent).free<20*1024**3: raise ValueError('Insufficient free disk space.')
     downloads=destination.parent/'downloads'
     downloads.mkdir(parents=True,exist_ok=True)
-    with requests.Session() as session:
-        session.trust_env=False
-        check(); progress(phase='listing')
-        with session.get(SOURCE,timeout=(15,20),allow_redirects=False,stream=True) as response:
-            if response.status_code!=200: raise ValueError('UK catalog temporarily unavailable.')
-            content=b''
-            for chunk in response.iter_content(65536):
+    saved_names={p.name for p in downloads.glob('transfer-*/*.zip') if PATTERN.fullmatch(p.name)}
+    saved=None
+    for name in sorted(saved_names,reverse=True):
+        saved=next((p for p,m,n in candidates(downloads,name) if m.get('complete') is True and n==m['total']),None)
+        if saved is not None:break
+    if saved is not None:
+        archive=saved
+    else:
+        with requests.Session() as session:
+            session.trust_env=False
+            check(); progress(phase='listing')
+            with session.get(SOURCE,timeout=(15,20),allow_redirects=False,stream=True) as response:
+                if response.status_code!=200: raise ValueError('UK catalog temporarily unavailable.')
+                content=b''
+                for chunk in response.iter_content(65536):
+                    check()
+                    content+=chunk
+                    if len(content)>1024**2: raise ValueError('Unexpected catalog listing size.')
+            matches=sorted(set(PATTERN.findall(content.decode('utf-8',errors='replace'))),reverse=True)
+            if not matches: raise ValueError('No official snapshot found.')
+            # Prefer a previously started snapshot if it is still advertised.
+            snapshot=next((d for d in matches if any(candidates(downloads,f'BasicCompanyDataAsOneFile-{d}.zip'))),matches[0])
+            snapshot=date.fromisoformat(snapshot).isoformat()
+            if snapshot>date.today().isoformat(): raise ValueError('Invalid snapshot date.')
+            name=f'BasicCompanyDataAsOneFile-{snapshot}.zip'
+            for attempt in range(3):
                 check()
-                content+=chunk
-                if len(content)>1024**2: raise ValueError('Unexpected catalog listing size.')
-        matches=sorted(set(PATTERN.findall(content.decode('utf-8',errors='replace'))),reverse=True)
-        if not matches: raise ValueError('No official snapshot found.')
-        # Prefer a previously started snapshot if it is still advertised.
-        snapshot=next((d for d in matches if any(candidates(downloads,f'BasicCompanyDataAsOneFile-{d}.zip'))),matches[0])
-        snapshot=date.fromisoformat(snapshot).isoformat()
-        if snapshot>date.today().isoformat(): raise ValueError('Invalid snapshot date.')
-        name=f'BasicCompanyDataAsOneFile-{snapshot}.zip'
-        for attempt in range(3):
-            check()
-            try:
-                archive=transfer(session,ORIGIN+name,downloads,name,check,progress)
-                break
-            except requests.RequestException:
-                if attempt==2:raise
-                progress(phase='retry',attempt=attempt+2)
-                for _ in range(10*(attempt+1)):
-                    check();time.sleep(.1)
-        check();progress(phase='indexing')
-        # Only derived scratch files are discarded; the downloaded ZIP remains.
-        with tempfile.TemporaryDirectory(prefix='gb-build-',dir=destination.parent) as tmp:
-            root=Path(tmp)
-            report=build([archive],root/'database',check=check)
-            check();progress(phase='verifying')
-            prepare(root/'database',root/'package',check=check)
-            check()
-            if destination.exists():raise ValueError('UK catalog already installed.')
-            (root/'package').rename(destination)
-        return {'rows':report['rows'],'snapshot':report['snapshot']}
+                try:
+                    archive=transfer(session,ORIGIN+name,downloads,name,check,progress)
+                    break
+                except requests.RequestException:
+                    if attempt==2:raise
+                    progress(phase='retry',attempt=attempt+2)
+                    for _ in range(10*(attempt+1)):
+                        check();time.sleep(.1)
+    check();progress(phase='indexing')
+    # Only derived scratch files are discarded; the downloaded ZIP remains.
+    with tempfile.TemporaryDirectory(prefix='gb-build-',dir=destination.parent) as tmp:
+        root=Path(tmp)
+        report=build([archive],root/'database',check=check)
+        check();progress(phase='verifying')
+        prepare(root/'database',root/'package',check=check)
+        check()
+        if destination.exists():raise ValueError('UK catalog already installed.')
+        (root/'package').rename(destination)
+    return {'rows':report['rows'],'snapshot':report['snapshot']}
 
 
 class GBDownload:
