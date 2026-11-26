@@ -323,6 +323,14 @@ $('protected-restore-test').onclick=()=>recoveryAction(async()=>{
 $('protected-manifest').onclick=()=>{const a=document.createElement('a'),id=$('protected-archive').value;a.href='/api/recovery/protected-manifest?'+new URLSearchParams({id});a.download=id+'.manifest.json';document.body.append(a);a.click();a.remove()};
 
 let nationalPage=1,nationalSequence=0;
+function showNationalDownload(state){
+    const paused=['paused','cancelled','failed'].includes(state.status),running=state.status==='running';
+    $('national-download').disabled=running;
+    $('national-download').textContent=translate(paused&&state.saved_bytes?'Nastavi preuzimanje':'Preuzmi britansku bazu');
+    const message=running?translate('Preuzimanje i priprema baze…'):paused?(state.saved_bytes?translate('Prethodno preuzeti podaci su sačuvani.'):translate('Preuzimanje nije uspjelo. Pokušajte ponovno.')):translate('Nacionalna baza nije ugrađena u ovo izdanje.');
+    const saved=state.saved_bytes||0,total=state.total||0;
+    $('national-status').textContent=message+(saved&&total?' · '+translate('Spremljeno na disk')+': '+n(Math.floor(saved/1048576))+' / '+n(Math.ceil(total/1048576))+' MiB':'');
+}
 async function nationalSearch(nextPage){
     const seq=++nationalSequence, country=$('national-country').value;
     $('national-status').textContent=translate('Učitavanje…');
@@ -335,9 +343,7 @@ async function nationalSearch(nextPage){
         if(!status[country]?.available){
             const state=await api('/api/national/gb/download');
             if(seq!==nationalSequence)return;
-            const paused=['paused','cancelled','failed'].includes(state.status);
-            $('national-download').textContent=translate(paused?'Nastavi preuzimanje':'Preuzmi britansku bazu');
-            $('national-status').textContent=translate(paused?'Prethodno preuzeti podaci su sačuvani.':'Nacionalna baza nije ugrađena u ovo izdanje.');
+            showNationalDownload(state);
             $('national-page').textContent='';return;
         }
         const result=await api('/api/national/gb/search?'+new URLSearchParams({q:$('national-query').value,page:String(nextPage)}));
@@ -372,10 +378,10 @@ $('national-download').onclick=async()=>{
         const timer=setInterval(async()=>{
             try{
                 const state=await api('/api/national/gb/download');
-                if(state.status==='running')return;
+                if(state.status==='running'){showNationalDownload(state);return;}
                 clearInterval(timer);$('national-download').disabled=false;
                 if(state.status==='complete')await nationalSearch(1);
-                else $('national-status').textContent=translate('Preuzimanje nije uspjelo. Pokušajte ponovno.');
+                else showNationalDownload(state);
             }catch(e){clearInterval(timer);$('national-download').disabled=false;fail(e)}
         },2000);
     }catch(e){$('national-download').disabled=false;fail(e)}
