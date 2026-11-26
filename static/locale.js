@@ -360,7 +360,7 @@ const UI_MESSAGES = {
   "Originalna baza": "Original database",
   "Odabir je spremljen. Zatvorite i ponovno pokrenite aplikaciju.": "Selection saved. Close and reopen the application.",
   "Promijeniti radni prostor pri sljedećem pokretanju? Sve baze ostaju sačuvane.": "Switch workspace on next launch? All databases are preserved. Saved registry tasks may resume if credentials are available.",
-  "Naziv, grad, fts:, oib: ili mbs:…": "Name, city, fts:, oib: or mbs:…",
+  "Naziv tvrtke, OIB ili MBS…": "Company name, OIB or MBS…",
   "Obična kopija nije šifrirana. Za neovisnu pohranu koristite šifrirani izvoz.": "The plain backup is not encrypted. Use encrypted export for independent storage.",
   "Lozinka sigurnosne kopije": "Backup passphrase",
   "Ponovite lozinku": "Repeat passphrase",

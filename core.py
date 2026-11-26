@@ -247,12 +247,16 @@ class Store:
     def where(self,q='',city='',contact='',provider=''):
         # SQL fragments below are fixed literals; user input is only bound as parameters.
         clauses=[]; args=[]
-        # Explicit identifier prefixes use existing indexes; ordinary text semantics stay unchanged.
+        # Recognize plain identifiers automatically; retain explicit legacy prefixes.
+        # Exact indexed matches avoid false positives in phones, addresses and descriptions.
         text=norm(q)
-        if text.startswith('oib:') and re.fullmatch(r'[0-9]{11}',text[4:].strip()):
-            clauses.append('oib=?'); args.append(text[4:].strip())
-        elif text.startswith('mbs:') and re.fullmatch(r'[0-9]{1,9}',text[4:].strip()):
-            mbs=text[4:].strip().zfill(9)
+        candidate=text[4:].strip() if text.startswith(('oib:','mbs:')) else text
+        digits=re.sub(r'[ -]','',candidate)
+        numeric=bool(re.fullmatch(r'[0-9]+',digits))
+        if numeric and len(digits)==11 and not text.startswith('mbs:'):
+            clauses.append('oib=?'); args.append(digits)
+        elif numeric and 1<=len(digits)<=9 and not text.startswith('oib:'):
+            mbs=digits.zfill(9)
             clauses.append('mbs IN (?,?,?,?,?,?,?,?,?)')
             args.extend(mbs[i:] if not mbs[:i].strip('0') else mbs for i in range(9))
         elif text.startswith('fts:'):
