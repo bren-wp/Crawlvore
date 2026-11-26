@@ -20,6 +20,8 @@ jobs:
   quality:
     needs: snapshot
     uses: ./.github/workflows/quality.yml
+    with:
+      retain_evidence: true
   vault:
     needs: snapshot
     uses: ./.github/workflows/vault-acceptance.yml
@@ -28,6 +30,7 @@ jobs:
     uses: ./.github/workflows/native.yml
     with:
       registry_bundle: true
+      publish_artifacts: true
   publish:
     needs: [snapshot, quality, vault, native]
     runs-on: ubuntu-latest

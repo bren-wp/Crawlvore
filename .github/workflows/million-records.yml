@@ -24,5 +24,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
+          retention-days: 1
           name: million-records
           path: million-records.json

@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
+      publish_artifacts:
+        type: boolean
+        default: false
       registry_bundle:
         type: boolean
         default: false
@@ -122,20 +125,29 @@ jobs:
         run: |
           cargo +stable install cargo-audit --locked
           cargo audit
-      - uses: actions/upload-artifact@v7
+      - name: Print Windows installer diagnostics
         if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path release-assets/native-install.log) { Get-Content release-assets/native-install.log -Tail 100 }
+      - uses: actions/upload-artifact@v7
+        if: failure() && runner.os == 'Windows' && inputs.publish_artifacts == true
         with:
           name: Windows-installer-diagnostics
+          retention-days: 1
           path: release-assets/native-install.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v7
+        if: inputs.publish_artifacts == true
         with:
+          retention-days: 1
           name: Crawlvora-native-${{ runner.os }}
           path: release-assets/
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && inputs.publish_artifacts == true
         with:
+          retention-days: 1
           name: Rust-lock-${{ runner.os }}
           path: desktop/src-tauri/Cargo.lock
           if-no-files-found: warn

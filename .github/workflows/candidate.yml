@@ -1,7 +1,5 @@
 name: Verified desktop release candidate
 on:
-  push:
-    branches: [data-safety-release]
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,9 +10,13 @@ jobs:
   quality:
     if: github.ref == 'refs/heads/data-safety-release'
     uses: ./.github/workflows/quality.yml
+    with:
+      retain_evidence: true
   native:
     if: github.ref == 'refs/heads/data-safety-release'
     uses: ./.github/workflows/native.yml
+    with:
+      publish_artifacts: true
   vault:
     if: github.ref == 'refs/heads/data-safety-release'
     uses: ./.github/workflows/vault-acceptance.yml
