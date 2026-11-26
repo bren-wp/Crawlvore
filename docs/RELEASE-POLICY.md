@@ -57,3 +57,7 @@ Registry seed installation and transactional integration now preflight destinati
 ## Unified Windows build evidence
 
 CI records the exact source SHA, accepted country snapshot hashes and final EXE sizes/SHA-256 after each edition's native and isolated installer acceptance. The production publisher verifies all four receipts against the release source and combined registry manifest before upload. Receipts stay in CI artifacts rather than increasing the 14 release files. Local archive previews may supply CRAWLVORA_BUILD_SOURCE_SHA only when the exact source has been established; local receipts are not production evidence.
+
+## Portable artifact publication safety
+
+Portable assembly checks free space, writes to an invocation-owned unique staging file, validates the assembled size and worker SHA-256, and publishes by an exclusive hard link. A competing destination is never overwritten; only the current invocation's temporary file is cleaned up. Unsupported filesystems fail closed. Native acceptance must still validate the resulting executable.
