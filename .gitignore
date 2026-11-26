@@ -20,3 +20,6 @@ registry-seed.json
 
 # Local national snapshots and private staging must never enter Git history.
 national-data/
+
+# Private local edition builds and payloads
+edition-builds/

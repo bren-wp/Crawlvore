@@ -1,5 +1,4 @@
 """Explicit user-initiated UK snapshot acquisition from the official fixed HTTPS origin."""
-import json
 import re
 import shutil
 import tempfile

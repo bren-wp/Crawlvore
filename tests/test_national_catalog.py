@@ -1,4 +1,7 @@
 import gzip
+import csv
+import io
+import zipfile
 import hashlib
 import json
 import sqlite3
@@ -35,3 +38,27 @@ class NationalCatalogTests(unittest.TestCase):
             self.assertEqual(original.read_bytes(),b'unchanged')
             self.assertEqual(set(catalog.status()),{'HR','GB'})
             with self.assertRaises(ValueError): catalog.detail('../secret')
+
+    def test_downloaded_onefile_catalog_is_isolated(self):
+        from tools.import_companies_house import build
+        from tools.prepare_national_bundle import prepare
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);workspace=root/'workspace';workspace.mkdir()
+            original=workspace/'companies.sqlite3';original.write_bytes(b'unchanged')
+            name='BasicCompanyDataAsOneFile-2026-11-01'
+            archive=root/(name+'.zip')
+            stream=io.StringIO(newline='')
+            writer=csv.writer(stream)
+            writer.writerow(['CompanyName','CompanyNumber']+[f'Field{i}' for i in range(2,55)])
+            writer.writerow(['Synthetic UK Ltd','AB123456']+['']*53)
+            with zipfile.ZipFile(archive,'w') as z:
+                z.writestr(name+'.csv',stream.getvalue())
+            report=build([archive],root/'database')
+            self.assertEqual(report['rows'],1)
+            catalog=NationalCatalog(root/'package',workspace)
+            self.assertFalse(catalog.status()['GB']['available'])
+            prepare(root/'database',catalog.downloaded)
+            self.assertTrue(catalog.status()['GB']['available'])
+            self.assertEqual(catalog.search('AB123456')['rows'][0]['name'],'Synthetic UK Ltd')
+            self.assertEqual(len(catalog.detail('AB123456')),55)
+            self.assertEqual(original.read_bytes(),b'unchanged')

@@ -85,6 +85,7 @@ def run_workspace(args,selection,active):
     national=NationalCatalog(ROOT,args.data_dir)
     gb_download=GBDownload(national.downloaded)
     database=args.data_dir/'companies.sqlite3'
+    edition=None
     edition_path=ROOT/'edition.json'
     if edition_path.is_file():
         edition=json.loads(edition_path.read_text(encoding='utf-8'))['edition']
@@ -115,7 +116,9 @@ def run_workspace(args,selection,active):
     integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
     # Full registry distributions use the verified snapshot, not the legacy CSV.
-    if active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
+    if edition is None and active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and edition in ('GB','Online') and store.stats()['total']!=0:
+        raise ValueError('Database-free Croatian workspace was not empty.')
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
     registry_access=RegistryAccess(ROOT,args.data_dir)

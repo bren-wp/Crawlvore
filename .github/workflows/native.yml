@@ -130,7 +130,10 @@ jobs:
           if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
           if ('${{ inputs.registry_bundle }}' -eq 'true' -and '${{ inputs.national_bundle }}' -eq 'true') {
             foreach ($edition in @('Full','HR','GB','Online')) { ./windows/package-native.ps1 -Edition $edition }
-          } else { ./windows/package-native.ps1 }
+          } else {
+            ./windows/package-native.ps1
+            ./windows/package-native.ps1 -Edition Online
+          }
       - name: Archive tested Linux package
         if: runner.os == 'Linux'
         shell: bash
