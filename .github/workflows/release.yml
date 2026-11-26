@@ -34,6 +34,7 @@ jobs:
     uses: ./.github/workflows/quality.yml
     with:
       strict_visual: true
+      retain_evidence: true
   vault:
     needs: validate
     uses: ./.github/workflows/vault-acceptance.yml
@@ -44,6 +45,8 @@ jobs:
   native:
     needs: validate
     uses: ./.github/workflows/native.yml
+    with:
+      publish_artifacts: true
   endurance:
     needs: validate
     uses: ./.github/workflows/endurance.yml

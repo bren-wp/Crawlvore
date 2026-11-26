@@ -1,0 +1,47 @@
+name: Complete public registry snapshot
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      SUDREG_CLIENT_ID:
+        required: true
+      SUDREG_CLIENT_SECRET:
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: complete-registry-snapshot
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/data-safety-release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    environment: production-api
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Collect complete official public snapshot
+        env:
+          SUDREG_CLIENT_ID: ${{ secrets.SUDREG_CLIENT_ID }}
+          SUDREG_CLIENT_SECRET: ${{ secrets.SUDREG_CLIENT_SECRET }}
+        run: python tools/build_registry_bundle.py registry-bundle
+      - name: Verify accepted database
+        run: |
+          python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
+          cd registry-bundle
+          sha256sum registry-seed.sqlite3 registry-seed.json > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verified-public-registry-snapshot
+          path: |
+            registry-bundle/registry-seed.sqlite3
+            registry-bundle/registry-seed.json
+            registry-bundle/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7

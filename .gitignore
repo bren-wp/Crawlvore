@@ -13,3 +13,7 @@ node_modules/
 registry-private.dpapi
 release-assets/
 native-preview/
+
+registry-bundle/
+registry-seed.sqlite3*
+registry-seed.json

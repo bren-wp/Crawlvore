@@ -14,13 +14,20 @@ try {
     python tools/create_private_registry_capsule.py $capsule
     if ($LASTEXITCODE) { throw 'Private credential capsule failed.' }
     Remove-Item Env:SUDREG_CLIENT_ID,Env:SUDREG_CLIENT_SECRET -ErrorAction SilentlyContinue
-    npm ci --ignore-scripts --no-audit
+    npm.cmd ci --ignore-scripts --no-audit
     if ($LASTEXITCODE) { throw 'Frontend dependencies failed.' }
-    npm run typecheck
+    npm.cmd run typecheck
     if ($LASTEXITCODE) { throw 'Frontend typecheck failed.' }
-    npm run build:frontend
+    npm.cmd run build:frontend
     if ($LASTEXITCODE) { throw 'Frontend build failed.' }
-    python -m PyInstaller --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath "$staging" --workpath "$staging\work" --specpath "$staging" --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --add-data "$capsule;." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+    $registryArgs = @()
+    if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
+        python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
+        if ($LASTEXITCODE) { throw 'Registry bundle acceptance failed' }
+        (Get-FileHash registry-bundle/registry-seed.sqlite3 -Algorithm SHA256).Hash.ToLower() | Set-Content registry-bundle/registry-seed.sha256 -Encoding ascii
+        $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3;.','--add-data','registry-bundle/registry-seed.sha256;.')
+    }
+    python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath "$staging" --workpath "$staging\work" --specpath "$staging" --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --add-data "$capsule;." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
     if ($LASTEXITCODE) { throw 'Private embedded worker build failed.' }
     $env:CRAWLVORA_EMBEDDED_WORKER = Join-Path $staging 'CrawlvoraWorker.exe'
     $env:CARGO_TARGET_DIR = Join-Path $staging 'target'

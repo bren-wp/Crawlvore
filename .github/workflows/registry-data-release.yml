@@ -1,0 +1,73 @@
+name: Verified registry-bearing release candidate
+on:
+  workflow_dispatch:
+    inputs:
+      distribution_reviewed:
+        description: Confirm licence attribution and data review for private distribution
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: registry-bearing-release
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    if: inputs.distribution_reviewed && github.event.repository.private && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/registry-bundle.yml
+    secrets: inherit
+  quality:
+    needs: snapshot
+    uses: ./.github/workflows/quality.yml
+    with:
+      retain_evidence: true
+  vault:
+    needs: snapshot
+    uses: ./.github/workflows/vault-acceptance.yml
+  native:
+    needs: snapshot
+    uses: ./.github/workflows/native.yml
+    with:
+      registry_bundle: true
+      publish_artifacts: true
+  publish:
+    needs: [snapshot, quality, vault, native]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-public-registry-snapshot
+          path: release/registry
+      - uses: actions/download-artifact@v8
+        with:
+          name: Crawlvora-native-Windows
+          path: release
+      - uses: actions/download-artifact@v8
+        with:
+          name: Crawlvora-native-Linux
+          path: release
+      - name: Publish accepted registry-bearing candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh repo view "$GITHUB_REPOSITORY" --json visibility --jq .visibility)" = PRIVATE
+          version="$(tr -d '\r\n' < VERSION)"
+          snapshot="$(python -c "import json; print(json.load(open('release/registry/registry-seed.json'))['snapshot'])")"
+          [[ "$snapshot" =~ ^[0-9]+$ ]]
+          tag="registry-preview-${version}-${snapshot}-${GITHUB_SHA:0:12}"
+          git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
+          cd release
+          cp registry/registry-seed.json REGISTRY-MANIFEST.json
+          files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json)
+          for file in "${files[@]}"; do test -s "$file"; done
+          sha256sum "${files[@]}" > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+          gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Registry snapshot $snapshot" --notes "Verified registry-bearing candidate. Fresh workspaces contain the accepted official public registry snapshot; existing workspaces are preserved. Source: Croatian Court Registry public v3 https://sudreg-data.gov.hr/api/javni . Croatian Open Licence https://www.data.gov.hr/hr/open-license . Snapshot and counts: REGISTRY-MANIFEST.json. No API credentials included. Production visual/endurance/recovery acceptance remains separate." "${files[@]}" SHA256SUMS.txt

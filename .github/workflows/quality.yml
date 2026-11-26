@@ -1,10 +1,14 @@
 name: Quality and security
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
   workflow_call:
     inputs:
+      retain_evidence:
+        type: boolean
+        default: false
       strict_visual:
         type: boolean
         default: false
@@ -42,10 +46,20 @@ jobs:
         if: inputs.strict_visual == true
         run: python tools/pixel_diff.py --strict
       - run: python tools/performance_check.py --records 100000 > performance.json
-      - uses: actions/upload-artifact@v7
+      - name: Record audit evidence in job summary
         if: always()
+        shell: bash
+        run: |
+          for report in source-audit.json clone-review.json pixel-diff.json performance.json; do
+            if [ -s "$report" ]; then
+              { printf '\n### %s\n\n```json\n' "$report"; head -c 160000 "$report"; printf '\n```\n'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - uses: actions/upload-artifact@v7
+        if: always() && inputs.retain_evidence == true
         with:
           name: quality-evidence
+          retention-days: 1
           path: |
             package-lock.json
             source-audit.json

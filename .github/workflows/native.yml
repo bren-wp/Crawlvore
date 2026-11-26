@@ -6,6 +6,13 @@ on:
     paths: ['desktop/**', 'windows/**', 'linux/**', 'tvrtk_scraper.py', 'static/**', 'frontend/**', 'requirements.txt', 'VERSION', '.github/workflows/native.yml']
   workflow_dispatch:
   workflow_call:
+    inputs:
+      publish_artifacts:
+        type: boolean
+        default: false
+      registry_bundle:
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -52,10 +59,29 @@ jobs:
       - name: Compile native executable
         working-directory: desktop/src-tauri
         run: cargo +stable build --release --locked
+      - uses: actions/download-artifact@v8
+        if: inputs.registry_bundle
+        with:
+          name: verified-public-registry-snapshot
+          path: registry-bundle
+      - name: Accept distribution snapshot
+        if: inputs.registry_bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
+          cd registry-bundle
+          sha256sum -c SHA256SUMS.txt
+          sha256sum registry-seed.sqlite3 | cut -d ' ' -f 1 > registry-seed.sha256
+          echo 'CRAWLVORA_REGISTRY_BUNDLE=1' >> "$GITHUB_ENV"
       - name: Build worker and assemble preview
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+          extra=()
+          if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" = 1 ]; then
+            extra=(--add-data "registry-bundle/registry-seed.sqlite3:." --add-data "registry-bundle/registry-seed.sha256:.")
+          fi
+          python -m PyInstaller "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
           mkdir -p native-preview
           cp -R dist/CrawlvoraWorker native-preview/worker
           if [ "$RUNNER_OS" = Windows ]; then
@@ -99,20 +125,29 @@ jobs:
         run: |
           cargo +stable install cargo-audit --locked
           cargo audit
-      - uses: actions/upload-artifact@v7
+      - name: Print Windows installer diagnostics
         if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path release-assets/native-install.log) { Get-Content release-assets/native-install.log -Tail 100 }
+      - uses: actions/upload-artifact@v7
+        if: failure() && runner.os == 'Windows' && inputs.publish_artifacts == true
         with:
           name: Windows-installer-diagnostics
+          retention-days: 1
           path: release-assets/native-install.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v7
+        if: inputs.publish_artifacts == true
         with:
+          retention-days: 1
           name: Crawlvora-native-${{ runner.os }}
           path: release-assets/
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && inputs.publish_artifacts == true
         with:
+          retention-days: 1
           name: Rust-lock-${{ runner.os }}
           path: desktop/src-tauri/Cargo.lock
           if-no-files-found: warn

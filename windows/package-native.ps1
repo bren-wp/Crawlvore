@@ -2,7 +2,14 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $version = (Get-Content VERSION -Raw).Trim()
 New-Item -ItemType Directory -Force release-assets | Out-Null
-python -m PyInstaller --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+$registryArgs = @()
+if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
+    python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
+    if ($LASTEXITCODE) { throw 'Registry bundle acceptance failed' }
+    (Get-FileHash registry-bundle/registry-seed.sqlite3 -Algorithm SHA256).Hash.ToLower() | Set-Content registry-bundle/registry-seed.sha256 -Encoding ascii
+    $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3;.','--add-data','registry-bundle/registry-seed.sha256;.')
+}
+python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --exclude-module playwright --exclude-module webview tvrtk_scraper.py
 if ($LASTEXITCODE) { throw 'Embedded worker build failed' }
 $env:CRAWLVORA_EMBEDDED_WORKER = (Resolve-Path dist/embedded/CrawlvoraWorker.exe).Path
 cargo +stable build --release --locked --features portable --manifest-path desktop/src-tauri/Cargo.toml

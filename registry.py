@@ -295,7 +295,7 @@ class Registry:
         if latest is None: raise ValueError('Nema označene najnovije snimke.')
         snap=str(latest.get('snapshot_id',latest.get('id','')))
         if not snap.isdigit(): raise ValueError('Nedostaje identifikator snimke.')
-        manifest=json.dumps({k:sorted(v) for k,v in cats.items()},sort_keys=True)
+        manifest=json.dumps({k:sorted(v|({'scope:all'} if 'only_active' in v else set())) for k,v in cats.items()},sort_keys=True)
         # Prefer an unfinished snapshot still advertised by the server; never mix snapshots.
         available={str(x.get('snapshot_id',x.get('id',''))) for x in snaps}
         with self.store.db() as c:
@@ -315,6 +315,7 @@ class Registry:
             while True:
                 bot.wait(0); q={'snapshot_id':snap}
                 if paged: q.update(offset=offset,limit=limit)
+                if 'only_active' in params: q['only_active']='false'
                 if 'expand_relations' in params: q['expand_relations']='true'
                 if 'omit_nulls' in params: q['omit_nulls']='false'
                 h,p=client.get(name,q); rows=rows_of(p)

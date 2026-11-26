@@ -30,7 +30,9 @@ def check(creds=None):
         identifier=str(snapshot.get('snapshot_id',snapshot.get('id','')))
         assert identifier.isdigit(),'Invalid snapshot identifier'
         assert {'limit','offset'}<=categories['subjekti'],'Bulk endpoint pagination is unavailable'
-        headers,body=client.get('subjekti',{'snapshot_id':identifier,'limit':1,'offset':0})
+        params={'snapshot_id':identifier,'limit':1,'offset':0}
+        if 'only_active' in categories['subjekti']: params['only_active']='false'
+        headers,body=client.get('subjekti',params)
         rows=rows_of(body)
         assert str(headers.get('X-Snapshot-Id',''))==identifier,'Snapshot mismatch'
         count=int(headers['X-Total-Count'])
