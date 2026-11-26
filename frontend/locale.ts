@@ -18,7 +18,6 @@ const UI_MESSAGES: Readonly<Record<string,string>> = {
   "Polja za izvoz": "Fields to export",
   "Odaberi sve": "Select all",
   "Poništi odabir": "Clear selection",
-  "Naziv tvrtke": "Company name",
   "Naziv, e-mail, telefon i OIB": "Name, email, phone and OIB",
   "Ukloni duplikate": "Remove duplicates",
   "Primijeni filtre imenika": "Apply directory filters",
