@@ -65,9 +65,13 @@ jobs:
           tag="registry-preview-${version}-${snapshot}-${GITHUB_SHA:0:12}"
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
           cd release
+          (cd registry && sha256sum -c SHA256SUMS.txt)
           cp registry/registry-seed.json REGISTRY-MANIFEST.json
           files=(Portable.exe Setup.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json)
-          for file in "${files[@]}"; do test -s "$file"; done
+          for file in "${files[@]}"; do
+            test -s "$file"
+            test "$(stat -c %s "$file")" -lt 2147483648 || { echo "Release asset exceeds GitHub limit: $file"; exit 1; }
+          done
           sha256sum "${files[@]}" > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
           gh release create "$tag" --target "$GITHUB_SHA" --prerelease --latest=false --title "Crawlvora $version — Registry snapshot $snapshot" --notes "Verified registry-bearing candidate. Fresh workspaces contain the accepted official public registry snapshot; existing workspaces are preserved. Source: Croatian Court Registry public v3 https://sudreg-data.gov.hr/api/javni . Croatian Open Licence https://www.data.gov.hr/hr/open-license . Snapshot and counts: REGISTRY-MANIFEST.json. No API credentials included. Production visual/endurance/recovery acceptance remains separate." "${files[@]}" SHA256SUMS.txt

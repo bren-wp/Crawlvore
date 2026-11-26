@@ -55,17 +55,43 @@ def run():
                 page.locator('#schedule-save').click()
                 expect(page.locator('#schedule-state')).to_have_text('Disabled')
                 page.locator('[data-view="data"]').click()
-                page.locator('#file').set_input_files({'name':'qa.json','mimeType':'application/json','buffer':json.dumps([{'title':'Crawlvora QA Synthetic Company','city':'Synthetic','phone':'111'},{'title':'Crawlvora QA Synthetic Company','city':'Synthetic','phone':'222'}]).encode()})
+                page.locator('#file').set_input_files({'name':'qa.json','mimeType':'application/json','buffer':json.dumps([{'title':'Crawlvora QA Synthetic Company','city':'Synthetic','phone':'111','oib':'12345678903','mbs':'987654321','entity_kind':'company'},{'title':'Crawlvora QA Synthetic Company','city':'Synthetic','phone':'222','oib':'12345678903','mbs':'987654321'}]).encode()})
                 page.locator('#import-btn').click()
                 expect(page.locator('#file-name')).to_have_text('No file selected.')
                 page.locator('[data-view="directory"]').click()
+                for query in ('Crawlvora QA Synthetic Company','12345678903','987654321'):
+                    page.locator('#search').fill(query)
+                    expect(page.locator('#result-count')).to_have_text('1 results')
+                    expect(page.locator('#company-rows tr')).to_contain_text('Crawlvora QA Synthetic Company')
                 page.locator('#search').fill('Crawlvora QA Synthetic Company')
+                with page.expect_response(lambda response: '/api/companies?' in response.url and 'entity_kind=nonprofit' in response.url) as filtered_response:
+                    page.locator('#entity-kind').select_option('nonprofit')
+                assert filtered_response.value.json()['total']==0
+                expect(page.locator('#result-count')).to_have_text('0 results')
+                page.locator('#entity-kind').select_option('company')
                 expect(page.locator('#company-rows .textbtn')).to_have_count(1)
+                page.locator('#entity-kind').select_option('')
                 page.locator('#company-rows .textbtn').click()
                 page.locator('[data-profile-tab="sources"]').click()
                 expect(page.locator('.alternate-values')).to_contain_text('222')
                 page.locator('#close-detail').click()
+                page.locator('[data-go="national"]').click()
+                expect(page.locator('#national-status')).to_have_text('National database is not included in this edition.')
+                expect(page.locator('#national-country option')).to_have_count(1)
                 page.locator('[data-view="data"]').click()
+                page.locator('#export-clear-all').click()
+                expect(page.locator('#export-selected')).to_be_disabled()
+                page.locator('input[name="export-field"][value="title"]').check()
+                page.locator('input[name="export-field"][value="oib"]').check()
+                expect(page.locator('#export-selected')).to_be_enabled()
+                page.locator('#export-format').select_option('json')
+                with page.expect_download(timeout=60000) as selected_download:
+                    page.locator('#export-selected').click()
+                with selected_download.value.path().open(encoding='utf-8') as stream:
+                    records=json.load(stream)
+                assert records and all(set(record)=={'title','oib'} for record in records)
+                page.locator('#export-select-all').click()
+                assert page.locator('input[name="export-field"]:checked').count()==11
                 for selector,ext in [('#all-export','.csv'),('#json-export','.json'),('#xlsx-export','.xlsx')]:
                     with page.expect_download(timeout=60000) as download:
                         page.locator(selector).click()

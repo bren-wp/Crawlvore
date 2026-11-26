@@ -27,6 +27,21 @@ class BundleTests(unittest.TestCase):
         report=verify_bundle(self.path,min_categories=2)
         self.assertEqual(report['subjects'],2)
         self.assertEqual(report['scope'],'all-status')
+        self.assertEqual(report['category_count'],2)
+        self.assertRegex(report['database_sha256'],r'^[0-9a-f]{64}$')
+
+    def test_unexpected_category(self):
+        with self.store.db() as db:
+            snapshot=db.execute('SELECT snapshot FROM registry_runs').fetchone()[0]
+            db.execute('INSERT INTO registry_rows VALUES (?,?,?,?,?)',(snapshot,'unlisted',0,'','{}'))
+        with self.assertRaisesRegex(ValueError,'Unexpected registry category'):
+            verify_bundle(self.path,min_categories=2)
+
+    def test_mixed_snapshot_progress(self):
+        with self.store.db() as db:
+            db.execute("INSERT INTO registry_progress VALUES ('999999','subjekti',0,1,0)")
+        with self.assertRaisesRegex(ValueError,'Mixed snapshot data'):
+            verify_bundle(self.path,min_categories=2)
 
     def test_partial_bundle(self):
         with self.store.db() as db:
@@ -50,3 +65,14 @@ class BundleTests(unittest.TestCase):
             db.execute("UPDATE companies SET mbs='' WHERE mbs='000000001'")
         with self.assertRaises(ValueError):
             verify_bundle(self.path,min_categories=2)
+
+    def test_partial_preview_is_explicit_and_not_production(self):
+        with self.store.db() as db:
+            db.execute('UPDATE registry_runs SET complete=0')
+        with self.assertRaisesRegex(ValueError,'completed isolated'):
+            verify_bundle(self.path,min_categories=2)
+        report=verify_bundle(self.path,min_categories=2,allow_partial=True)
+        self.assertFalse(report['complete'])
+        self.assertEqual(report['subjects'],2)
+        self.assertEqual(report['completed_categories'],2)
+        self.assertTrue(report['registry_bundle_included'])

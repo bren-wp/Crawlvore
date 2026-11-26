@@ -26,7 +26,11 @@ def main():
     root.mkdir(parents=True,exist_ok=True)
     path=root/'registry-seed.sqlite3'
     if (root/'registry-seed.json').exists():
-        print(json.dumps(verify_bundle(path),ensure_ascii=False))
+        report=verify_bundle(path)
+        saved=json.loads((root/'registry-seed.json').read_text(encoding='utf-8'))
+        if saved!=report:
+            raise ValueError('Registry manifest does not match the verified database.')
+        print(json.dumps(report,ensure_ascii=False))
         return
     keys=('SUDREG_CLIENT_ID','SUDREG_CLIENT_SECRET')
     if any(k in os.environ for k in keys):

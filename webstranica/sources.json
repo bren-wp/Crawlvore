@@ -1,0 +1,14 @@
+{
+  "HR": {
+    "name": "Croatia",
+    "url": "https://sudreg-data.gov.hr/",
+    "status": "open_api",
+    "note": "Official Court Registry. Other entity classes require additional registers."
+  },
+  "GB": {
+    "name": "United Kingdom",
+    "url": "https://www.gov.uk/guidance/companies-house-data-products",
+    "status": "bulk",
+    "note": "Free Companies House company data files; individual officer information is separate."
+  }
+}

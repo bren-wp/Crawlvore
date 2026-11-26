@@ -14,6 +14,25 @@ interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
 interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
 interface InterfaceElements {
+  "entity-kind":HTMLSelectElement;
+  "export-selected":HTMLButtonElement;
+  "export-select-all":HTMLButtonElement;
+  "export-clear-all":HTMLButtonElement;
+  "export-filtered":HTMLInputElement;
+  "export-distinct":HTMLInputElement;
+  "export-format":HTMLSelectElement;
+  "national-country":HTMLSelectElement;
+  "national-query":HTMLInputElement;
+  "national-status":HTMLElement;
+  "national-rows":HTMLElement;
+  "national-page":HTMLElement;
+  "national-prev":HTMLButtonElement;
+  "national-next":HTMLButtonElement;
+  "national-search":HTMLButtonElement;
+  "national-close":HTMLButtonElement;
+  "national-detail":HTMLDialogElement;
+  "national-title":HTMLElement;
+  "national-detail-body":HTMLElement;
   "protected-manifest":HTMLButtonElement;
   "protected-restore-test":HTMLButtonElement;
   "vault-status":HTMLElement;
@@ -172,9 +191,9 @@ async function api<T=unknown>(path:string,opts:RequestInit={}):Promise<T>{const 
 function toast(msg:string){$('toast').textContent=msg;$('toast').hidden=false;clearTimeout(timer);timer=setTimeout(()=>$('toast').hidden=true,5500);}
 const fail=(e:unknown)=>toast(e instanceof Error?e.message:translate('Pogreška pri povezivanju.'));
 function post<T=unknown>(path:string,data:unknown){return api<T>(path,{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify(data)});}
-function filters(){return new URLSearchParams({q:$('search').value,city:$('city').value,contact:$('contact').value,provider:$('source-filter').value});}
+function filters(){return new URLSearchParams({q:$('search').value,city:$('city').value,contact:$('contact').value,provider:$('source-filter').value,entity_kind:$('entity-kind').value});}
 function download(filtered=false){location.href='/api/export'+(filtered?'?'+filters():'');}
-function go(view:string){current=view;document.querySelectorAll<HTMLElement>('.view').forEach(e=>e.hidden=e.id!==view);document.querySelectorAll<HTMLElement>('[data-view]').forEach(e=>e.classList.toggle('active',e.dataset.view===view));$('crumb').textContent={overview:translate('Pregled'),directory:translate('Poslovni imenik'),registry:translate('Sudski registar'),data:translate('Uvoz i izvoz'),jobs:translate('Zadaci i raspored'),analytics:translate('Analitika i izvještaji'),settings:translate('Postavke')}[view];if(view==='analytics')refreshAnalytics().catch(fail);if(view==='settings')refreshSettings().catch(fail);if(view==='jobs')refreshJobs(true).catch(fail);if(view==='overview')overview().catch(fail);if(view==='directory')directory().catch(fail);if(view==='registry')registryRefresh().catch(fail);window.scrollTo(0,0);}
+function go(view:string){current=view;document.querySelectorAll<HTMLElement>('.view').forEach(e=>e.hidden=e.id!==view);document.querySelectorAll<HTMLElement>('[data-view]').forEach(e=>e.classList.toggle('active',e.dataset.view===view));$('crumb').textContent={overview:translate('Pregled'),directory:translate('Poslovni imenik'),national:translate('Međunarodni registri'),registry:translate('Sudski registar'),data:translate('Uvoz i izvoz'),jobs:translate('Zadaci i raspored'),analytics:translate('Analitika i izvještaji'),settings:translate('Postavke')}[view];if(view==='analytics')refreshAnalytics().catch(fail);if(view==='settings')refreshSettings().catch(fail);if(view==='jobs')refreshJobs(true).catch(fail);if(view==='overview')overview().catch(fail);if(view==='directory')directory().catch(fail);if(view==='national')nationalSearch(1).catch(fail);if(view==='registry')registryRefresh().catch(fail);window.scrollTo(0,0);}
 function safeLink(value:unknown){if(typeof value!=='string')return null;try{const u=new URL(value);const host=u.hostname.toLowerCase().replace(/\.$/,'');return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&host.includes('.')&&!/^[\d.]+$/.test(host)&&!/(^|\.)(localhost|local|internal|test|invalid|onion)$/.test(host)?u.href:null;}catch{return null;}}
 function rows(target:string,items:CompanyRow[]){const body=$(target);body.replaceChildren();for(const r of items){const tr=make('tr');const title=make('td');title.append(make('strong',r.title),make('small',[r.address,r.postal].filter(Boolean).join(' · '),'muted'));tr.append(title,make('td',r.city||'—'),make('td',r.phone||'—'));const web=make('td');const url=safeLink(r.website);if(url){const a=make('a',translate('Otvori ↗'));a.href=url;a.target='_blank';a.rel='noopener noreferrer';web.append(a)}else web.textContent='—';const action=make('td'),btn=make('button',translate('Detalji →'),'textbtn');btn.addEventListener('click',()=>detail(r.id).catch(fail));action.append(btn);const source=make('td');source.append(make('span',(r.providers||'').split(',').filter(Boolean).map(x=>providerNames[x]||x).join(' · ')||'—','source-chip'));tr.append(web,source,action);body.append(tr)}if(!items.length){const tr=make('tr'),td=make('td',translate('Nema rezultata za odabrane kriterije.'),'muted');td.colSpan=6;tr.append(td);body.append(tr)}}
 let dashboardReady=false;
@@ -183,10 +202,18 @@ async function cities(){const v=$('city').value;const cs=await api<string[]>('/a
 async function directory(){const seq=++serial,p=filters();p.set('page',String(page));p.set('sort',$('sort').value);const d=await api<CompanyPage>('/api/companies?'+p);if(seq!==serial)return;total=d.total;const pages=Math.max(1,Math.ceil(total/25));if(page>pages){page=pages;return directory()}rows('company-rows',d.rows);$('result-count').textContent=n(total)+translate(' rezultata');$('page-label').textContent=translate('Stranica ')+n(page)+translate(' od ')+n(pages);$('prev').disabled=page<=1;$('next').disabled=page>=pages;}
 const detailFields:Record<string,string>={oib:'OIB',email:translate('Poslovni e-mail'),industry:translate('Djelatnost'),address:translate('Adresa'),postal:translate('Poštanski broj'),city:translate('Grad'),country:translate('Država'),phone:translate('Telefon'),fax:translate('Telefon / faks'),website:translate('Web stranica'),social:translate('Društvene mreže'),logo:'Logo URL',person:translate('Kontakt osoba'),year:translate('Godina osnivanja'),employees:translate('Broj zaposlenih'),account:translate('Broj računa'),mbs:'MBS',rating:translate('Ocjena'),description:translate('Opis'),products:translate('Proizvodi i usluge'),source:translate('Izvor')};
 async function detail(id:number|string){const r=await api<CompanyDetails>('/api/company/'+id);$('detail-title').textContent=r.title;$('detail-sub').textContent=[r.city,r.country].filter(Boolean).join(' · ');const body=$('detail-body');body.replaceChildren();for(const [key,label] of Object.entries(detailFields)){const el=make('div',undefined,'detail-field profile-property');el.append(make('small',label,'muted'));const u=['website','social','logo','source'].includes(key)&&safeLink(r[key]);if(u){const a=make('a',u);a.href=u;a.target='_blank';a.rel='noopener noreferrer';el.append(a)}else el.append(make('div',r[key]||'—'));body.append(el)}const src=make('div',undefined,'detail-field profile-sources');src.append(make('h3',translate('Poveznice izvora')));if(!(r.sources||[]).length)src.append(make('p',translate('Nema povezanih izvora.'),'muted'));for(const x of r.sources||[]){src.append(make('div',(providerNames[x.provider]||x.provider)+' · '+x.updated));const u=safeLink(x.url);if(u){const a=make('a',u);a.href=u;a.target='_blank';a.rel='noopener noreferrer';src.append(a)}}const alt=make('div',undefined,'alternate-values');alt.append(make('h3',translate('Sačuvane alternativne vrijednosti')));if(!(r.alternate_values||[]).length)alt.append(make('p',translate('Nema alternativnih vrijednosti.'),'muted'));for(const v of r.alternate_values||[]){const item=make('div',undefined,'history-event');item.append(make('strong',detailFields[v.field]||v.field),make('p',v.value),make('small',(providerNames[v.provider]||v.provider)+' · '+v.observed_at+' UTC','muted'));alt.append(item)}src.append(alt);body.append(src);const hist=make('div',undefined,'detail-field history-block');hist.append(make('h3',translate('Povijest promjena')));body.append(hist);setProfileTab('details');$('detail').showModal();try{const changes=await api<CompanyHistory[]>('/api/history/'+id);if(!changes.length)hist.append(make('p',translate('Nema zabilježenih promjena od ove verzije.'),'muted'));for(const r of changes){const group=make('div',undefined,'history-event');group.append(make('strong',r.changed_at+' UTC · '+(providerNames[r.provider]||r.provider)));for(const [k,v] of Object.entries(r.changes))group.append(make('p',(detailFields[k]||k)+': '+(v.before||'—')+' → '+(v.after||'—')));hist.append(group)}}catch(e){hist.append(make('p',translate('Povijest nije dostupna.'),'muted'))}}
-document.querySelectorAll<HTMLElement>('[data-view]').forEach(e=>e.addEventListener('click',()=>go(e.dataset.view)));document.querySelectorAll<HTMLElement>('[data-go]').forEach(e=>e.addEventListener('click',()=>go(e.dataset.go)));$('all-export').onclick=()=>download();$('filtered-export').onclick=()=>download(true);$('close-detail').onclick=()=>$('detail').close();$('prev').onclick=()=>{page--;directory().catch(fail)};$('next').onclick=()=>{page++;directory().catch(fail)};let debounce;$('search').oninput=()=>{clearTimeout(debounce);debounce=setTimeout(()=>{page=1;directory().catch(fail)},250)};for(const id of ['city','contact','sort','source-filter'])$(id).onchange=()=>{page=1;directory().catch(fail)};$('reset').onclick=()=>{for(const id of ['search','city','contact','source-filter'])$(id).value='';$('sort').value='title';page=1;directory().catch(fail)};
+document.querySelectorAll<HTMLElement>('[data-view]').forEach(e=>e.addEventListener('click',()=>go(e.dataset.view)));document.querySelectorAll<HTMLElement>('[data-go]').forEach(e=>e.addEventListener('click',()=>go(e.dataset.go)));$('all-export').onclick=()=>download();$('filtered-export').onclick=()=>download(true);$('close-detail').onclick=()=>$('detail').close();$('prev').onclick=()=>{page--;directory().catch(fail)};$('next').onclick=()=>{page++;directory().catch(fail)};let debounce;$('search').oninput=()=>{clearTimeout(debounce);debounce=setTimeout(()=>{page=1;directory().catch(fail)},250)};for(const id of ['city','contact','sort','source-filter','entity-kind'])$(id).onchange=()=>{page=1;directory().catch(fail)};$('reset').onclick=()=>{for(const id of ['search','city','contact','source-filter','entity-kind'])$(id).value='';$('sort').value='title';page=1;directory().catch(fail)};
 const providerNames:Record<string,string>={tvrtke:'Tvrtke.hr',companywall:'CompanyWall.hr',registry:translate('Sudski registar'),company:'Company.hr',html:translate('Prilagođeni web'),json:translate('Prilagođeni API'),csv:translate('CSV / postojeći podaci')};
 async function providers(){const list=await api<SourceInfo[]>('/api/providers'),select=$('source-filter'),old=select.value;select.replaceChildren(new Option(translate('Svi izvori'),''));$('source-summary').replaceChildren();for(const p of list){select.append(new Option(p.label,p.provider));const r=make('div',undefined,'source-row');r.append(make('span',p.label),make('strong',n(p.n)));$('source-summary').append(r)}select.value=old;}
 $('json-export').onclick=()=>location.href='/api/export-json';
+const exportFields=[...document.querySelectorAll<HTMLInputElement>('input[name="export-field"]')];
+function syncExportFields(){$('export-selected').disabled=!exportFields.some(field=>field.checked);}
+for(const field of exportFields)field.addEventListener('change',syncExportFields);
+$('export-select-all').onclick=()=>{for(const field of exportFields)field.checked=true;syncExportFields();};
+$('export-clear-all').onclick=()=>{for(const field of exportFields)field.checked=false;syncExportFields();};
+$('export-selected').onclick=()=>{const selected=exportFields.filter(field=>field.checked).map(field=>field.value);if(!selected.length)return;const p=$('export-filtered').checked?filters():new URLSearchParams();p.set('fields',selected.join(','));p.set('format',$('export-format').value);p.set('distinct',$('export-distinct').checked?'1':'0');p.set('omit_empty','1');location.href='/api/export-fields?'+p;};
+syncExportFields();
+
 let themeWrite=Promise.resolve();
 $('theme').onclick=()=>{const t=document.documentElement.dataset.theme==='light'?'dark':'light';document.documentElement.dataset.theme=t;themeWrite=themeWrite.then(async()=>{await post('/api/preferences/theme',{theme:t})}).catch(fail);};cities().catch(fail);providers().catch(fail);go('overview');
 
@@ -480,3 +507,41 @@ $('protected-restore-test').onclick=()=>recoveryAction(async()=>{
 });
 
 $('protected-manifest').onclick=()=>{const a=document.createElement('a'),id=$('protected-archive').value;a.href='/api/recovery/protected-manifest?'+new URLSearchParams({id});a.download=id+'.manifest.json';document.body.append(a);a.click();a.remove()};
+
+let nationalPage=1,nationalSequence=0;
+async function nationalSearch(nextPage:number){
+    const seq=++nationalSequence, country=$('national-country').value;
+    $('national-status').textContent=translate('Učitavanje…');
+    $('national-rows').replaceChildren();$('national-prev').disabled=true;$('national-next').disabled=true;
+    $('national-search').disabled=true;
+    try{
+        const status=await api<Record<string,{available:boolean}>>('/api/national/status');
+        if(seq!==nationalSequence)return;
+        if(!status[country]?.available){$('national-status').textContent=translate('Nacionalna baza nije ugrađena u ovo izdanje.');$('national-page').textContent='';return;}
+        const result=await api<{page:number;total_snapshot:number;snapshot:string;rows:{name:string;registration_number:string;city:string;status:string}[];next:boolean}>('/api/national/gb/search?'+new URLSearchParams({q:$('national-query').value,page:String(nextPage)}));
+        if(seq!==nationalSequence)return;
+        nationalPage=result.page;
+        $('national-status').textContent=n(result.total_snapshot)+' · '+result.snapshot;
+        $('national-page').textContent=translate('Stranica ')+nationalPage;
+        for(const record of result.rows){
+            const row=make('tr');for(const value of [record.name,record.registration_number,record.city,record.status])row.append(make('td',value||'—'));
+            const action=make('td'),button=make('button',translate('Detalji →'),'textbtn');
+            button.onclick=()=>nationalDetail(record.registration_number).catch(fail);action.append(button);row.append(action);$('national-rows').append(row);
+        }
+        if(!result.rows.length){const row=make('tr'),td=make('td',translate('Nema rezultata za odabrane kriterije.'));td.colSpan=5;row.append(td);$('national-rows').append(row);}
+        $('national-prev').disabled=nationalPage<=1;$('national-next').disabled=!result.next;
+    }finally{if(seq===nationalSequence)$('national-search').disabled=false;}
+}
+async function nationalDetail(number:string){
+    const data=await api<Record<string,string>>('/api/national/gb/detail?'+new URLSearchParams({number}));
+    $('national-title').textContent=data.CompanyName;
+    const body=$('national-detail-body');body.replaceChildren();
+    for(const [key,value] of Object.entries(data)){if(!value)continue;const line=make('div',undefined,'detail-field');line.append(make('small',key),make('p',value));body.append(line);}
+    $('national-detail').showModal();
+}
+$('national-country').onchange=()=>nationalSearch(1).catch(fail);
+$('national-search').onclick=()=>nationalSearch(1).catch(fail);
+$('national-query').onkeydown=event=>{if(event.key==='Enter')nationalSearch(1).catch(fail);};
+$('national-prev').onclick=()=>nationalSearch(nationalPage-1).catch(fail);
+$('national-next').onclick=()=>nationalSearch(nationalPage+1).catch(fail);
+$('national-close').onclick=()=>$('national-detail').close();

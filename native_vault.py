@@ -3,7 +3,6 @@ import ctypes
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -58,10 +57,12 @@ class NativeVault:
             ctypes.memset(entropy_buf,0,len(entropy_buf))
 
     def secret_tool(self,action,value=None):
-        executable=shutil.which('secret-tool')
-        if not executable or not os.environ.get('DBUS_SESSION_BUS_ADDRESS'):
+        if action not in ('lookup','store','clear'):
+            raise VaultUnavailable('Unsupported Secret Service operation.')
+        executable=Path('/usr/bin/secret-tool')
+        if not executable.is_file() or not os.access(executable,os.X_OK) or not os.environ.get('DBUS_SESSION_BUS_ADDRESS'):
             raise VaultUnavailable('Linux Secret Service is unavailable.')
-        args=[executable,action]
+        args=[str(executable),action]
         if action=='store': args+=['--label='+('Crawlvora registry access' if self.purpose=='registry' else 'Crawlvora protected backup catalog')]
         args+=['application','Crawlvora','workspace',self.identity]
         try:

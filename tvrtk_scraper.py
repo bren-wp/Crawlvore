@@ -14,7 +14,7 @@ from core import Store, Collector
 from sources import NAMES
 from studio import excel
 from registry import Registry, RegistryAccess, start_registry
-from registry_seed import install_seed
+from registry_seed import accept_packaged_seed, install_seed
 import os
 import threading
 import tempfile
@@ -23,6 +23,8 @@ from automation import Queue
 from snapshot_diff import compare
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
 from registry_export import export as registry_export
+from field_export import export_selected, selected_fields
+from national_catalog import NationalCatalog
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
@@ -64,7 +66,8 @@ def main():
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(headless=True,executable_path=None if getattr(sys,'frozen',False) else os.getenv('CRAWLVORA_TEST_CHROMIUM'))
                 try:
-                    page=browser.new_page(); page.set_content('<h1>Crawlvora</h1>'); assert page.locator('h1').inner_text()=='Crawlvora'
+                    page=browser.new_page(); page.set_content('<h1>Crawlvora</h1>')
+                    if page.locator('h1').inner_text()!='Crawlvora': raise RuntimeError('Browser smoke test failed.')
                 finally: browser.close()
             Workbook().close(); result={'ok':True,'records':26261,'browser':True}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
@@ -79,18 +82,23 @@ def main():
             return run_workspace(args,selection,active)
 
 def run_workspace(args,selection,active):
+    national=NationalCatalog(ROOT,args.data_dir)
     database=args.data_dir/'companies.sqlite3'
-    if active=='primary': install_seed(ROOT,database)
+    installed=active=='primary' and install_seed(ROOT,database)
+    expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and expected:
+        accept_packaged_seed(ROOT,database,installed,expected)
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
-    verified_backup(database)
+    if not installed: verified_backup(database)
     store=Store(database); collector=Collector(store); registry=Registry(store)
     recovery=RecoveryCenter(database,root=selection.root)
     transfers=BackupTransfer(recovery)
     protected=ProtectedBackups(database,recovery)
     integrity=WorkspaceIntegrity(selection,recovery)
     seed=ROOT/'tvrtk_output.csv'
-    if active=='primary' and seed.exists(): store.seed(seed)
+    # Full registry distributions use the verified snapshot, not the legacy CSV.
+    if active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
     registry_access=RegistryAccess(ROOT,args.data_dir)
@@ -147,7 +155,7 @@ def run_workspace(args,selection,active):
                 return self.send_data(b'',status=303,extra={'Location':'/','Set-Cookie':self.cookie_name()+'='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict'})
             if not self.session_authorized(): return self.send_data({'error':'Access denied.'},status=403)
             params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
-            filters={k:get(k) for k in ('q','city','contact','provider')}
+            filters={k:get(k) for k in ('q','city','contact','provider','entity_kind')}
             try:
                 if p.path=='/':
                     with store.db() as db:
@@ -178,6 +186,17 @@ def run_workspace(args,selection,active):
                     for chunk in (registry.export_csv(snapshot,category) if is_csv else registry.export_rows(snapshot,category)): self.wfile.write(chunk)
                     return
                 if p.path=='/api/registry/rows': return self.send_data(registry.browse(get('snapshot'),get('category'),max(1,min(10000000,int(get('page','1')))),q=get('q')))
+                if p.path=='/api/export-fields':
+                    fields=selected_fields(get('fields'))
+                    kind=get('format','csv')
+                    types={'csv':'text/csv; charset=utf-8','json':'application/json; charset=utf-8','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+                    if kind not in types: raise ValueError('Invalid format.')
+                    with tempfile.TemporaryDirectory() as directory:
+                        out=Path(directory)/('selected.'+kind)
+                        export_selected(store,out,fields,kind,omit_empty=get('omit_empty','1')=='1',distinct=get('distinct')=='1',**filters)
+                        self.send_response(200); self.send_header('Content-Type',types[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="crawlvora-selected.{kind}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
                 if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
                 if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())
@@ -203,6 +222,11 @@ def run_workspace(args,selection,active):
                         self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(os.fstat(stream.fileno()).st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         shutil.copyfileobj(stream,self.wfile)
                     return
+                if p.path=='/api/national/status': return self.send_data(national.status())
+                if p.path=='/api/national/gb/search': return self.send_data(national.search(get('q'),int(get('page','1'))))
+                if p.path=='/api/national/gb/detail':
+                    record=national.detail(get('number'))
+                    return self.send_data(record if record else {'error':'Record not found.'},status=200 if record else 404)
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])

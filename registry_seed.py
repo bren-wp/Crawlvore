@@ -1,5 +1,8 @@
 """Initialize a fresh workspace from a verified, embedded registry database."""
 import hashlib
+import json
+import sqlite3
+from contextlib import closing
 import os
 import tempfile
 from pathlib import Path
@@ -35,3 +38,27 @@ def install_seed(root, destination):
         return True
     finally:
         os.unlink(name)
+
+
+def accept_packaged_seed(root, database, installed, expected_sha):
+    """Smoke acceptance of the actual offline seed, never the legacy CSV fallback."""
+    root=Path(root)
+    if not installed:
+        raise ValueError('Complete packaged registry seed was not installed.')
+    report=json.loads((root/'registry-seed.json').read_text(encoding='utf-8'))
+    if report.get('complete') is False:
+        raise ValueError('Incomplete preview cannot pass complete registry acceptance.')
+    declared=(root/'registry-seed.sha256').read_text(encoding='ascii').strip()
+    if not expected_sha or expected_sha!=declared or report.get('database_sha256')!=expected_sha:
+        raise ValueError('Packaged registry SHA-256 does not match accepted snapshot.')
+    # install_seed verified every copied byte against declared before publication.
+    with closing(sqlite3.connect(Path(database).resolve().as_uri()+'?mode=ro',uri=True)) as db:
+        runs=db.execute('SELECT snapshot,complete FROM registry_runs').fetchall()
+        if runs!=[(report['snapshot'],1)]:
+            raise ValueError('Packaged registry snapshot is incomplete.')
+        progress=dict(db.execute('SELECT category,total FROM registry_progress WHERE snapshot=? AND done=1 AND next_offset=total',(report['snapshot'],)))
+        if len(progress)<36 or progress!=report['categories'] or len(progress)!=report['category_count']:
+            raise ValueError('Packaged registry categories are incomplete.')
+        if report.get('scope')!='all-status' or progress.get('subjekti')!=report['subjects'] or sum(progress.values())!=report['rows']:
+            raise ValueError('Packaged registry counts do not match manifest.')
+    return report
