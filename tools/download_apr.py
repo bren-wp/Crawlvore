@@ -15,7 +15,7 @@ def download(destination):
     pending=root/'companies.json.incomplete'
     digest=hashlib.sha256()
     size=0
-    with requests.get(SOURCE,headers={'Accept':'application/json','User-Agent':'Crawlvora APR importer'},stream=True,timeout=(15,90),allow_redirects=False) as response:
+    with requests.get(SOURCE,headers={'Accept':'application/json','User-Agent':'Crawlvora APR importer'},stream=True,timeout=(30,600),allow_redirects=False) as response:
         response.raise_for_status()
         if response.status_code!=200 or 'json' not in response.headers.get('Content-Type','').lower():
             raise ValueError('Unexpected APR response')
