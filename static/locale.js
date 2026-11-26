@@ -1,6 +1,13 @@
 "use strict";
 const UI_LANGUAGE = document.documentElement.dataset.language === "hr" ? "hr" : "en";
 const UI_MESSAGES = {
+  "UTF-8 · najviše 2 GiB": "UTF-8 · up to 2 GiB",
+  "CSV izvornog formata ili JSON lista poslovnih zapisa do 2 GiB.": "Original-format CSV or a JSON array of business records up to 2 GiB.",
+  "Datoteka je prevelika (2 GiB).": "File exceeds 2 GiB.",
+  "Izvorni registarski podaci": "Original registry records",
+  "Nepotpuna snimka": "Incomplete snapshot",
+  "Nema povezanih registarskih zapisa.": "No linked registry records.",
+  "Registarski podaci nisu dostupni.": "Registry records are unavailable.",
   "Međunarodni registri":"International registries",
   "Odvojene nacionalne baze dostupne lokalno.":"Separate national catalogs available locally.",
   "Naziv tvrtke ili registracijski broj…":"Company name or registration number…",
@@ -150,7 +157,6 @@ const UI_MESSAGES = {
   "Uvoz podataka": "Import Data",
   "CSV izvornog formata ili JSON lista poslovnih zapisa.": "Original CSV format or a JSON list of business records.",
   "Odaberite CSV ili JSON datoteku": "Choose a CSV or JSON file",
-  "UTF-8 · najviše 64 MB": "UTF-8 · up to 64 MB",
   "Nije odabrana datoteka.": "No file selected.",
   "Uvezi zapise": "Import records",
   "Izvoz podataka": "Export Data",

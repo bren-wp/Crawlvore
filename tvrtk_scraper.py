@@ -12,7 +12,7 @@ from urllib.parse import urlsplit, parse_qs
 import io
 from core import Store, Collector
 from sources import NAMES
-from studio import excel
+from bulk_io import MAX_IMPORT, receive, import_file, export_file, company_registry
 from registry import Registry, RegistryAccess, start_registry
 from registry_seed import accept_packaged_seed, accept_preview_seed, install_seed
 import os
@@ -206,7 +206,15 @@ def run_workspace(args,selection,active):
                         self.send_response(200); self.send_header('Content-Type',types[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="crawlvora-selected.{kind}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
                     return
-                if p.path=='/api/export-xlsx': return self.send_data(excel(store,**filters),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',extra={'Content-Disposition':'attachment; filename="crawlvora_export.xlsx"'})
+                if p.path in ('/api/export','/api/export-json','/api/export-xlsx'):
+                    kind={'/api/export':'csv','/api/export-json':'json','/api/export-xlsx':'xlsx'}[p.path]
+                    types={'csv':'text/csv; charset=utf-8','json':'application/json; charset=utf-8','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+                    with tempfile.TemporaryDirectory() as directory:
+                        out=Path(directory)/('crawlvora_export.'+kind)
+                        export_file(store,out,kind,**filters)
+                        self.send_response(200); self.send_header('Content-Type',types[kind]); self.send_header('Content-Length',str(out.stat().st_size)); self.send_header('Content-Disposition',f'attachment; filename="{out.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
+                        with out.open('rb') as stream: shutil.copyfileobj(stream,self.wfile,1024*1024)
+                    return
                 if p.path=='/api/recovery': return self.send_data(dict(recovery.summary(),active=active,selected=selection.chosen()))
                 if p.path=='/api/recovery/protected': return self.send_data(protected.snapshot())
                 if p.path=='/api/recovery/protected-manifest':
@@ -239,13 +247,14 @@ def run_workspace(args,selection,active):
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
-                if p.path=='/api/export-json': return self.send_data(store.export_json(**filters),'application/json; charset=utf-8',extra={'Content-Disposition':'attachment; filename="crawlvora_export.json"'})
                 if p.path=='/api/cities': return self.send_data(store.cities())
                 if p.path=='/api/status': return self.send_data(collector.snapshot())
                 if p.path=='/api/companies': return self.send_data(store.query(**filters,page=max(1,min(100000,int(get('page','1')))),limit=max(1,min(100,int(get('limit','25')))),sort=get('sort','title')))
+                if p.path.startswith('/api/company-registry/'):
+                    result=company_registry(store,int(p.path.rsplit('/',1)[1]),get('snapshot'),int(get('offset','0')))
+                    return self.send_data(result if result is not None else {'error':'Record not found.'},status=200 if result is not None else 404)
                 if p.path.startswith('/api/company/'):
                     item=store.detail(int(p.path.rsplit('/',1)[1])); return self.send_data(item or {'error':'Zapis nije pronađen.'},status=200 if item else 404)
-                if p.path=='/api/export': return self.send_data(store.export(**filters),'text/csv; charset=utf-8',extra={'Content-Disposition':'attachment; filename="crawlvora_export.csv"'})
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)
             except (ValueError,OverflowError): self.send_data({'error':'Neispravan parametar.'},status=400)
             except (BrokenPipeError,ConnectionResetError): pass
@@ -262,15 +271,18 @@ def run_workspace(args,selection,active):
                     except InvalidTag: raise ValueError('Incorrect passphrase or damaged encrypted backup.') from None
                     integrity.start()
                     return self.send_data({'id':identifier})
+                if self.path in ('/api/import-json','/api/import'):
+                    if not 0<n<=MAX_IMPORT: return self.send_data({'error':'Datoteka je prevelika (2 GiB).'},status=413)
+                    self.connection.settimeout(120)
+                    with tempfile.TemporaryDirectory() as directory:
+                        staged=Path(directory)/'upload'
+                        receive(self.rfile,staged,n)
+                        protected.before_import()
+                        return self.send_data(import_file(store,staged,'json' if self.path=='/api/import-json' else 'csv'))
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 self.connection.settimeout(120)
                 raw=self.rfile.read(n)
                 if len(raw)!=n: raise ValueError('Incomplete request body.')
-                if self.path in ('/api/import-json','/api/import'):
-                    # A consistent backup precedes every user-initiated import; rejected imports never mutate the directory.
-                    protected.before_import()
-                    if self.path=='/api/import-json': return self.send_data(store.import_json(raw.decode('utf-8-sig')))
-                    return self.send_data(store.import_csv(io.StringIO(raw.decode('utf-8-sig'),newline='')))
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
                 if self.path=='/api/recovery/encrypt':

@@ -2,6 +2,8 @@
 
 ## 8.1.4 — release candidate
 
+- Support disk-backed 2 GiB CSV/JSON imports, transactional incremental JSON parsing, bounded-memory full CSV/JSON/Excel exports, and paginated original registry records in company profiles.
+
 - Add local-only Linux dual-database packaging and extracted DEB/TAR smoke acceptance; ignore national data staging in Git.
 
 - Stage verified partial HR and complete GB snapshots for private local preview packaging, with separate smoke acceptance and no relaxation of production release requirements.
