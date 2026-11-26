@@ -1,6 +1,7 @@
 """Public Croatian court registry v3: schema-driven, checkpointed snapshot mirror."""
 import json, os, re, time, threading, hashlib, sys, csv, io
 from pathlib import Path
+from contextlib import nullcontext
 from urllib.parse import urlsplit
 import requests
 from network import public_session
@@ -339,7 +340,7 @@ class Registry:
                 if done: break
         self.merge(snap,bot)
         with self.store.db() as c: c.execute('UPDATE registry_runs SET complete=1 WHERE snapshot=?',(snap,))
-    def merge(self,snap,bot):
+    def merge(self,snap,bot,connection=None):
         # Keep original payloads; project documented v3 fields into the directory.
         def value(record,*keys):
             for key in keys:
@@ -353,7 +354,7 @@ class Registry:
         def related(c,mbs,category):
             for rr in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND mbs=? AND category=? ORDER BY ordinal",(snap,mbs,category)):
                 yield json.loads(rr[0])
-        with self.store.db() as c:
+        with (self.store.db() if connection is None else nullcontext(connection)) as c:
             for r in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND category='subjekti' ORDER BY ordinal",(snap,)):
                 bot.wait(0)
                 d=json.loads(r[0]); mbs=normalized_id(d.get('mbs'),9); oib=normalized_id(d.get('oib'),11)
