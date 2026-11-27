@@ -7,7 +7,7 @@ import tempfile
 import time
 from pathlib import Path
 import tkinter as tk
-from PIL import ImageGrab, ImageChops, ImageStat
+from PIL import ImageGrab, ImageStat
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"src"))
@@ -39,9 +39,8 @@ def capture(root,path):
     im.save(path)
     return im
 
-def run(output,reference):
+def run(output,width=1280,height=700):
     if sys.platform!="win32":raise RuntimeError("This capture uses the Windows window-only screenshot API.")
-    from PIL import Image
     output.mkdir(parents=True,exist_ok=True)
     for name in list(os.environ):
         if name.startswith(("SUDREG_","CRAWLVORA_")):os.environ.pop(name,None)
@@ -54,7 +53,8 @@ def run(output,reference):
             conn.execute("INSERT INTO meta(key,value) VALUES ('seeded','1')")
         root=tk.Tk();app=Desktop(root,Path(tmp))
         try:
-            w=min(1440,root.winfo_screenwidth()-100);h=min(900,root.winfo_screenheight()-120)
+            w,h=width,height
+            if w>root.winfo_screenwidth()-80 or h>root.winfo_screenheight()-100:raise ValueError("Requested viewport exceeds available screen.")
             root.geometry(f"{w}x{h}+30+30")
             wait(root,lambda:app.metric_values["total"].get()=="6")
             steps=[("overview",lambda:app.metric_values["total"].get()=="6"),("directory",lambda:app.total==6),
@@ -69,16 +69,9 @@ def run(output,reference):
                 until=time.monotonic()+.2
                 while time.monotonic()<until:root.update();time.sleep(.02)
                 im=capture(root,output/(key+".png"))
-                ref=reference/(key+"-dark.jpg")
-                result={"view":key,"capture":list(im.size),"reference":None,"changed_pixels_percent":None}
-                if ref.exists():
-                    with Image.open(ref) as old:
-                        result["reference"]=list(old.size)
-                        if old.size==im.size:
-                            diff=ImageChops.difference(im,old.convert("RGB"))
-                            hist=diff.convert("L").histogram()
-                            result["changed_pixels_percent"]=round(100*(1-hist[0]/(im.width*im.height)),3)
-                report.append(result)
+                if im.size!=(width,height):
+                    raise RuntimeError(f"Native viewport mismatch: {key}: {im.size} != {(width,height)}")
+                report.append({"view":key,"capture":list(im.size)})
             for w,h in ((960,600),(800,540),(640,420)):
                 if w>root.winfo_screenwidth()-50 or h>root.winfo_screenheight()-80:continue
                 root.geometry(f"{w}x{h}+30+30")
@@ -94,10 +87,11 @@ def run(output,reference):
                     try:wait(root,reachable,timeout=3)
                     except RuntimeError as error:raise RuntimeError(f"Unreachable content: {key} {w}x{h}") from error
                 print(f"All seven views accessible via viewport at {w}x{h}",flush=True)
-            (output/"comparison.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+            (output/"capture.json").write_text(json.dumps({"captures":report,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
             print(json.dumps(report,indent=2),flush=True)
         finally:app.close()
 
 if __name__=="__main__":
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument("output",type=Path);p.add_argument("--reference",type=Path,default=ROOT/"docs/screenshots")
-    args=p.parse_args();run(args.output,args.reference)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument("output",type=Path)
+    p.add_argument("--width",type=int,default=1280);p.add_argument("--height",type=int,default=700)
+    args=p.parse_args();run(args.output,args.width,args.height)

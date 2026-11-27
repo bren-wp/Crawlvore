@@ -46,6 +46,11 @@ def install(root):
         style.configure(name,background=fill,foreground=fg,padding=(11,9),
                         anchor="w" if "Nav" in name else "center",font=("Segoe UI",10,"bold"),borderwidth=1)
         style.map(name,foreground=[("disabled",MUTED),("active",fg)],background=[("active",fill)])
+    style.configure("Header.TFrame",background=SIDE)
+    style.configure("Header.TLabel",background=SIDE,foreground=MUTED)
+    style.configure("Small.TButton",padding=(9,5),font=("Segoe UI",9,"bold"))
+    style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=("Segoe UI",9))
+    style.configure("Recent.Treeview",rowheight=36)
     style.configure("Panel.TFrame",background=PANEL,borderwidth=1,relief="solid")
     style.configure("PanelInner.TFrame",background=PANEL)
     style.configure("Panel.TCheckbutton",background=PANEL,foreground=TEXT,indicatorcolor=BG)

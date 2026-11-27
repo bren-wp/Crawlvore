@@ -1,86 +1,82 @@
-[
-  {
-    "view": "overview",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  },
-  {
-    "view": "directory",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  },
-  {
-    "view": "jobs",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  },
-  {
-    "view": "data",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  },
-  {
-    "view": "analytics",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  },
-  {
-    "view": "registry",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  },
-  {
-    "view": "settings",
-    "capture": [
-      1436,
-      744
-    ],
-    "reference": [
-      1440,
-      900
-    ],
-    "changed_pixels_percent": null
-  }
-]
+{
+  "exact": false,
+  "views": [
+    {
+      "view": "overview",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 746933,
+      "total_pixels": 896000,
+      "changed_percent": 83.363058,
+      "exact": false
+    },
+    {
+      "view": "directory",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 719723,
+      "total_pixels": 896000,
+      "changed_percent": 80.326228,
+      "exact": false
+    },
+    {
+      "view": "registry",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 742506,
+      "total_pixels": 896000,
+      "changed_percent": 82.868973,
+      "exact": false
+    },
+    {
+      "view": "jobs",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 738898,
+      "total_pixels": 896000,
+      "changed_percent": 82.466295,
+      "exact": false
+    },
+    {
+      "view": "data",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 741799,
+      "total_pixels": 896000,
+      "changed_percent": 82.790067,
+      "exact": false
+    },
+    {
+      "view": "analytics",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 689702,
+      "total_pixels": 896000,
+      "changed_percent": 76.97567,
+      "exact": false
+    },
+    {
+      "view": "settings",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 721748,
+      "total_pixels": 896000,
+      "changed_percent": 80.552232,
+      "exact": false
+    }
+  ]
+}

@@ -2,6 +2,8 @@
 
 ## 8.1.7
 
+- Improve native header, navigation spacing, overview metrics and charts; capture matching 1280×700 lossless reference and native screenshots and add a strict RGB comparator with single-channel regression tests. Current native visual acceptance remains failed.
+
 - Use final reference palette and compact desktop layout; move synchronization above Settings, add native navigation icons and a resizable non-maximized window with adaptive card grids and overflow access.
 - Capture actual native windows separately from reference screenshots and check seven pages at compact window sizes.
 

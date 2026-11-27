@@ -62,12 +62,12 @@ class Desktop(SecondaryPages):
         sidebar.pack_propagate(False)
         brand=tk.Frame(sidebar,bg=SIDE)
         self.brand=brand
-        brand.pack(fill="x",padx=20,pady=(28,25))
-        logo=tk.Canvas(brand,width=42,height=42,bg=SIDE,highlightthickness=0)
+        brand.pack(fill="x",padx=20,pady=(24,18))
+        logo=tk.Canvas(brand,width=38,height=38,bg=SIDE,highlightthickness=0)
         logo.pack(side="left",padx=(0,12))
-        logo.create_polygon(6,0,36,0,42,6,42,36,36,42,6,42,0,36,0,6,fill=ACCENT,outline="")
-        logo.create_polygon(21,8,33,15,33,28,21,35,9,28,9,15,outline=INK,fill="",width=2)
-        logo.create_line(9,15,21,22,33,15,21,8,21,22,21,35,fill=INK,width=2)
+        logo.create_polygon(6,0,32,0,38,6,38,32,32,38,6,38,0,32,0,6,fill=ACCENT,outline="",smooth=True)
+        logo.create_polygon(19,6,30,13,30,25,19,32,8,25,8,13,outline=INK,fill="",width=2)
+        logo.create_line(8,13,19,19,30,13,19,6,19,19,19,32,fill=INK,width=2)
         tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",17,"bold")).pack(anchor="w")
         tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=("Segoe UI",8)).pack(anchor="w")
         self.sidebar=sidebar
@@ -94,12 +94,12 @@ class Desktop(SecondaryPages):
         nav("settings","Postavke",lambda:self.show_view("settings"))
         main=ttk.Frame(shell)
         main.pack(side="left",fill="both",expand=True)
-        self.header=ttk.Frame(main,padding=(28,10))
+        self.header=ttk.Frame(main,padding=(28,7),style="Header.TFrame")
         self.header.pack(fill="x")
         self.crumb=tk.StringVar(value="Radni prostor / Pregled")
-        ttk.Label(self.header,textvariable=self.crumb,style="Muted.TLabel").pack(side="left")
+        ttk.Label(self.header,textvariable=self.crumb,style="Header.TLabel").pack(side="left")
         self.stats=tk.StringVar(value="")
-        ttk.Label(self.header,textvariable=self.stats,style="Muted.TLabel").pack(side="right")
+        ttk.Button(self.header,text="⇄ Uvoz i izvoz",style="Small.TButton",command=lambda:self.show_view("data")).pack(side="right")
         ttk.Separator(main).pack(fill="x")
         viewport=ttk.Frame(main)
         viewport.pack(fill="both",expand=True)
@@ -149,7 +149,7 @@ class Desktop(SecondaryPages):
             short=event.height<580
             if getattr(self,"short_navigation",None)!=short:
                 self.short_navigation=short
-                self.brand.pack_configure(pady=(10,8) if short else (28,25))
+                self.brand.pack_configure(pady=(10,8) if short else (24,18))
                 for label in self.nav_labels:label.pack_configure(pady=(5,2) if short else (14,5))
                 for button in self.nav.values():button.pack_configure(pady=0 if short else 2)
                 style=ttk.Style(self.root)
@@ -332,35 +332,47 @@ class Desktop(SecondaryPages):
 
     def build_overview(self):
         view=self.views["overview"]
-        ttk.Label(view,text="POSLOVNI PODACI",foreground=ACCENT).pack(anchor="w")
-        ttk.Label(view,text="Pregled imenika",style="Title.TLabel").pack(anchor="w",pady=(4,4))
-        ttk.Label(view,text="Pronađite, istražite i organizirajte podatke o tvrtkama na jednom mjestu.",style="Muted.TLabel").pack(anchor="w",pady=(0,18))
+        heading=ttk.Frame(view)
+        heading.pack(fill="x",pady=(0,12))
+        copy=ttk.Frame(heading)
+        copy.pack(side="left",fill="x",expand=True)
+        ttk.Label(copy,text="WEB POSLOVNI PODACI",style="Kicker.TLabel").pack(anchor="w")
+        ttk.Label(copy,text="Pregled imenika",style="Title.TLabel").pack(anchor="w",pady=(2,2))
+        ttk.Label(copy,text="Pronađite, istražite i organizirajte podatke o tvrtkama na jednom mjestu.",style="Muted.TLabel",wraplength=520).pack(anchor="w")
+        ttk.Button(heading,text="+ Sinkronizacija",style="Accent.TButton",command=lambda:self.show_view("registry")).pack(side="right",padx=(8,0))
         metrics=ttk.Frame(view)
-        metrics.pack(fill="x",pady=(0,16))
+        metrics.pack(fill="x",pady=(0,12))
         self.metric_values={}
         for column,(key,label) in enumerate((("total","Tvrtke u bazi"),("cities","Gradovi"),("phones","S telefonom"),("websites","S web stranicom"))):
             metrics.columnconfigure(column,weight=1,uniform="metric")
             panel=ttk.Frame(metrics,style="Panel.TFrame",padding=14)
             panel.grid(row=0,column=column,sticky="nsew",padx=(0,10 if column<3 else 0))
-            ttk.Label(panel,text=label,style="Panel.TLabel").pack(anchor="w")
+            row=ttk.Frame(panel,style="PanelInner.TFrame")
+            row.pack(fill="x")
+            icon=nav_icon(self.root,{"total":"directory","cities":"registry","phones":"data","websites":"analytics"}[key],ACCENT)
+            mark=ttk.Label(row,image=icon,style="Panel.TLabel");mark.image=icon;mark.pack(side="left",padx=(0,8))
+            ttk.Label(row,text=label,style="Panel.TLabel").pack(side="left")
             value=tk.StringVar(value="—")
-            ttk.Label(panel,textvariable=value,style="Metric.TLabel").pack(anchor="w",pady=(12,0))
+            ttk.Label(panel,textvariable=value,style="Metric.TLabel").pack(anchor="w",pady=(6,0))
             self.metric_values[key]=value
         self.register_grid(metrics,4)
         charts=ttk.Frame(view)
-        charts.pack(fill="x",pady=(0,16))
+        charts.pack(fill="x",pady=(0,12))
         charts.columnconfigure(0,weight=6)
         charts.columnconfigure(1,weight=5)
         city=ttk.Frame(charts,style="Panel.TFrame",padding=14)
         city.grid(row=0,column=0,sticky="nsew",padx=(0,12))
         ttk.Label(city,text="Najzastupljeniji gradovi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
-        self.city_chart=tk.Canvas(city,width=220,height=195,bg=PANEL,highlightthickness=0)
+        ttk.Label(city,text="Broj tvrtki po gradu",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
+        self.city_chart=tk.Canvas(city,width=220,height=165,bg=PANEL,highlightthickness=0)
         self.city_chart.pack(fill="x",expand=True,pady=(8,0))
         coverage=ttk.Frame(charts,style="Panel.TFrame",padding=14)
         coverage.grid(row=0,column=1,sticky="nsew")
         ttk.Label(coverage,text="Dostupnost podataka",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
-        self.coverage_chart=tk.Canvas(coverage,width=200,height=195,bg=PANEL,highlightthickness=0)
+        ttk.Label(coverage,text="Kontaktni podaci u imeniku",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
+        self.coverage_chart=tk.Canvas(coverage,width=200,height=130,bg=PANEL,highlightthickness=0)
         self.coverage_chart.pack(fill="x",expand=True,pady=(8,0))
+        ttk.Label(coverage,text="Udio se izračunava iz stvarnih zapisa u bazi.",style="Hint.TLabel",wraplength=340).pack(fill="x",pady=(6,0))
         self.register_grid(charts,2)
         self.overview_data=None
         for canvas in (self.city_chart,self.coverage_chart):
@@ -371,9 +383,10 @@ class Desktop(SecondaryPages):
         top.pack(fill="x")
         ttk.Label(top,text="Nedavni zapisi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(side="left")
         ttk.Button(top,text="Otvori imenik",command=lambda:self.show_view("directory")).pack(side="right")
-        self.recent=ttk.Treeview(recent,columns=("name","city","phone","web","source","action"),show="headings",height=4)
+        ttk.Label(recent,text="Brz pristup zapisima iz baze",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
+        self.recent=ttk.Treeview(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
         for key,label,width in (("name","TVRTKA",240),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",65)):
-            self.recent.heading(key,text=label)
+            self.recent.heading(key,text=label,anchor="w")
             self.recent.column(key,width=width)
         self.recent.pack(fill="both",expand=True,pady=(10,0))
         def open_recent(_event):
@@ -434,17 +447,23 @@ class Desktop(SecondaryPages):
         for index,row in enumerate(cities[:6]):
             y=8+30*index
             self.city_chart.create_text(0,y,anchor="w",text=row["city"][:18],fill=TEXT)
-            self.city_chart.create_rectangle(0,y+9,width,y+16,fill=PANEL2,outline="")
-            self.city_chart.create_rectangle(0,y+9,width*row["n"]/largest,y+16,fill=ACCENT,outline="")
+            self.chart_bar(self.city_chart,y+12,width,row["n"]/largest)
             self.city_chart.create_text(width-2,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=MUTED)
         width=max(180,self.coverage_chart.winfo_width())
         for index,(key,label) in enumerate((("phones","Telefonski broj"),("websites","Web stranica"))):
-            y=15+65*index
+            y=10+59*index
             pct=100*stats[key]/max(1,stats["total"])
             self.coverage_chart.create_text(0,y,anchor="w",text=label,fill=MUTED)
             self.coverage_chart.create_text(width-2,y,anchor="e",text=f"{pct:.0f}%",fill=TEXT)
-            self.coverage_chart.create_rectangle(0,y+14,width,y+23,fill=PANEL2,outline="")
-            self.coverage_chart.create_rectangle(0,y+14,width*pct/100,y+23,fill=ACCENT,outline="")
+            self.chart_bar(self.coverage_chart,y+17,width,pct/100)
+            self.coverage_chart.create_text(0,y+35,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=("Segoe UI",9))
+
+    @staticmethod
+    def chart_bar(canvas,y,width,fraction):
+        canvas.create_line(4,y,width-4,y,width=8,capstyle="round",fill=PANEL2)
+        if fraction>0:
+            end=max(4,min(width-4,width*fraction-4))
+            canvas.create_line(4,y,end,y,width=8,capstyle="round",fill=ACCENT)
 
     def build_directory(self):
         self.section_header(self.body,"ISTRAŽIVANJE PODATAKA","Poslovni imenik","Pretražite i filtrirajte cjelokupnu bazu tvrtki.")

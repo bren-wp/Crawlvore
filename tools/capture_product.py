@@ -15,7 +15,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from core import Store
 
 
-def capture(output):
+def capture(output, width=1440, height=900, lossless=False):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -50,13 +50,14 @@ def capture(output):
                 with sync_playwright() as pw:
                     browser = pw.chromium.launch(headless=True,
                         executable_path=os.getenv("CRAWLVORA_TEST_CHROMIUM") or None)
-                    page = browser.new_page(viewport={"width": 1440, "height": 900})
+                    page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1)
                     page.goto(line.strip().split(" ", 1)[1], wait_until="domcontentloaded")
                     expect(page.locator("html")).to_have_attribute("lang", "hr")
                     expect(page.locator("#preview-rows .textbtn").first).to_be_visible(timeout=20000)
                     expect(page.locator("#preview-rows")).to_contain_text("Demo")
                     def shot(name):
-                        page.screenshot(path=str(output / (name + ".jpg")), type="jpeg", quality=78)
+                        if lossless:page.screenshot(path=str(output / (name + ".png")), type="png", animations="disabled")
+                        else:page.screenshot(path=str(output / (name + ".jpg")), type="jpeg", quality=78)
                     for view in ("overview", "directory", "registry", "jobs", "data", "analytics", "settings"):
                         page.locator('[data-view="' + view + '"]').click()
                         expect(page.locator("#" + view)).to_be_visible()
@@ -84,11 +85,15 @@ def capture(output):
                 for stream in (worker.stdin, worker.stdout):
                     if stream and not stream.closed:
                         stream.close()
-    print("Captured", len(list(output.glob("*.jpg"))), "real worker-backed browser views")
+    print("Captured", len(list(output.glob("*.png" if lossless else "*.jpg"))), "real worker-backed browser views")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output")
-    capture(parser.parse_args().output)
+    parser.add_argument("--width",type=int,default=1440)
+    parser.add_argument("--height",type=int,default=900)
+    parser.add_argument("--png",action="store_true")
+    args=parser.parse_args()
+    capture(args.output,args.width,args.height,args.png)
 
