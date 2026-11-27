@@ -60,7 +60,9 @@ jobs:
       - run: python tools/pixel_diff.py > pixel-diff.json
       - name: Exact approved visual comparison (production only)
         if: inputs.strict_visual == true
-        run: python tools/pixel_diff.py --strict
+        run: |
+          python tools/import_design_references.py --verify
+          python tools/pixel_diff.py --strict
       - run: python tools/performance_check.py --records 100000 > performance.json
       - name: Build verified shared-hosting candidate
         run: python tools/package_web.py "${{ runner.temp }}/Crawlvora-Web.zip" --ref "$GITHUB_SHA"
@@ -75,7 +77,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          for report in source-audit.json clone-review.json pixel-diff.json performance.json; do
+          for report in source-audit.json clone-review.json pixel-diff.json performance.json layout-evidence/layout-report.json; do
             if [ -s "$report" ]; then
               { printf '\n### %s\n\n```json\n' "$report"; head -c 160000 "$report"; printf '\n```\n'; } >> "$GITHUB_STEP_SUMMARY"
             fi
@@ -93,4 +95,5 @@ jobs:
             clone-review.json
             pixel-diff.json
             performance.json
+            layout-evidence/layout-report.json
             branding/*fixture.png

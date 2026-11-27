@@ -153,3 +153,13 @@ dialog{max-width:calc(100% - 24px);max-height:calc(100vh - 24px);overscroll-beha
   overflow-wrap:anywhere;
   text-align:left;
 }
+
+/* Accessible national and company profiles, including long legal names. */
+.dialog-head>div{min-width:0}
+.dialog-head>button{flex-shrink:0}
+#national-title{overflow-wrap:anywhere;line-height:1.25}
+.national-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;margin:12px 0}
+.national-detail-grid .detail-field{min-width:0;overflow-wrap:anywhere}
+#national-close{max-width:100%}
+button:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:600px){.national-detail-grid{grid-template-columns:minmax(0,1fr)}}

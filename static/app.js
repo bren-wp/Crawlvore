@@ -19,7 +19,10 @@ const fail = (e) => toast(e instanceof Error ? e.message : translate('Pogreška 
 function post(path, data) { return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token }, body: JSON.stringify(data) }); }
 function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value }); }
 function download(filtered = false) { location.href = '/api/export' + (filtered ? '?' + filters() : ''); }
-function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => e.classList.toggle('active', e.dataset.view === view)); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), national: translate('Crawlvora UK'), registry: translate('Crawlvora Sync'), data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
+function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === (view === 'national' ? 'directory' : view); e.classList.toggle('active', selected); if (selected)
+    e.setAttribute('aria-current', 'page');
+else
+    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), national: translate('Crawlvora UK'), registry: translate('Crawlvora Sync'), data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
     refreshAnalytics().catch(fail); if (view === 'settings')
     refreshSettings().catch(fail); if (view === 'jobs')
     refreshJobs(true).catch(fail); if (view === 'overview')
