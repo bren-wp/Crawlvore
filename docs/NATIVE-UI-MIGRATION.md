@@ -24,3 +24,5 @@ Keep the production renderer until these functions have equivalent native contro
 A separate updater client supports signed manifests, bounded HTTPS downloads, edition and downgrade checks, staging and explicit installer confirmation. Portable replacement, rollback and native UI integration are still pending. Do not automatically execute packages without authenticated metadata.
 
 Pixel-perfect parity is not established by a successful smoke test. Compare native captures against the current production reference at the same viewport, DPI and font, then review differences before replacing the production shell.
+
+The Tvrtke rebrand retains the existing workspace path, installer identity and updater product identifier. Settings, jobs, import/export and basic analytics now have native candidate views. Native analytics still needs the reference chart layout, and synchronization, mail and protected backup workflows require additional feature parity tests.

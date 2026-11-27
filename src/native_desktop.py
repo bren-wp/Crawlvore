@@ -8,10 +8,12 @@ import sys
 import tempfile
 import threading
 import tkinter as tk
+import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
+from native_sections import SecondaryPages
 
 BG, PANEL, TEXT, MUTED, ACCENT = "#0b101a", "#111b2a", "#edf2f9", "#95a5bb", "#52d6b0"
 SIDE, PANEL2, LINE, ACTIVE, INK = "#0d1420", "#162335", "#243247", "#153b35", "#06291f"
@@ -29,7 +31,7 @@ def workspace_path():
         return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Crawlvora"
     return Path(os.environ.get("XDG_DATA_HOME", str(Path.home()/".local/share"))) / "Crawlvora"
 
-class Desktop:
+class Desktop(SecondaryPages):
     def __init__(self, root, workspace, smoke=False):
         self.root, self.smoke = root, smoke
         self.cancel_start=threading.Event()
@@ -45,7 +47,7 @@ class Desktop:
         self.page, self.total, self.sequence = 1, 0, 0
         self.pending_search = False
         self.search_timer = None
-        root.title("Crawlvora")
+        root.title("Tvrtke")
         root.geometry("1280x820")
         root.minsize(960, 600)
         root.configure(bg=BG)
@@ -82,8 +84,8 @@ class Desktop:
         logo.create_polygon(6,0,36,0,42,6,42,36,36,42,6,42,0,36,0,6,fill=ACCENT,outline="")
         logo.create_polygon(21,8,33,15,33,28,21,35,9,28,9,15,outline=INK,fill="",width=2)
         logo.create_line(9,15,21,22,33,15,21,8,21,22,21,35,fill=INK,width=2)
-        tk.Label(brand,text="Crawlvora",bg=SIDE,fg=TEXT,font=("Segoe UI",17,"bold")).pack(anchor="w")
-        tk.Label(brand,text="DATA INTELLIGENCE",bg=SIDE,fg=MUTED,font=("Segoe UI",8)).pack(anchor="w")
+        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",17,"bold")).pack(anchor="w")
+        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=("Segoe UI",8)).pack(anchor="w")
         self.nav={}
         def nav_label(label):
             tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",9,"bold")).pack(anchor="w",padx=20,pady=(14,5))
@@ -94,11 +96,12 @@ class Desktop:
         nav_label("RADNI PROSTOR")
         nav("overview","Pregled",lambda:self.show_view("overview"))
         nav("directory","Poslovni imenik",lambda:self.show_view("directory"))
-        nav("registry","Crawlvora",self.sync_dialog)
+        nav("registry","Tvrtke",lambda:self.show_view("registry"))
         nav_label("UPRAVLJANJE")
-        nav("backup","Izrada sigurnosne kopije",self.backup_dialog)
-        nav("duplicates","Pregled duplikata",self.duplicate_dialog)
-        tk.Label(sidebar,text="●  Lokalni radni prostor",bg=SIDE,fg=ACCENT,font=("Segoe UI",10)).pack(side="bottom",anchor="w",padx=20,pady=24)
+        nav("jobs","Zadaci i raspored",lambda:self.show_view("jobs"))
+        nav("data","Uvoz i izvoz",lambda:self.show_view("data"))
+        nav("analytics","Analitika i izvještaji",lambda:self.show_view("analytics"))
+        nav("settings","Postavke",lambda:self.show_view("settings"))
         main=ttk.Frame(shell)
         main.pack(side="left",fill="both",expand=True)
         self.header=ttk.Frame(main,padding=(34,18))
@@ -110,10 +113,15 @@ class Desktop:
         ttk.Separator(main).pack(fill="x")
         content=ttk.Frame(main,padding=(34,24,34,14))
         content.pack(fill="both",expand=True)
-        self.views={key:ttk.Frame(content) for key in ("overview","directory")}
+        self.views={key:ttk.Frame(content) for key in ("overview","directory","settings","jobs","data","analytics","registry")}
         self.body=self.views["directory"]
         self.build_directory()
         self.build_overview()
+        self.build_settings()
+        self.build_jobs()
+        self.build_data()
+        self.build_analytics()
+        self.build_registry()
         self.current_view=""
         self.show_view("overview")
         ttk.Label(main,textvariable=self.status,style="Muted.TLabel",padding=(34,8)).pack(fill="x")
@@ -151,7 +159,8 @@ class Desktop:
         self.status.set("Spremno.")
         self.submit(lambda:(self.client.request("/api/cities"),self.client.request("/api/industries")),self.facets)
         if self.current_view=="overview":self.refresh_overview()
-        else:self.refresh()
+        elif self.current_view=="directory":self.refresh()
+        else:self.refresh_settings()
         self.poll_sync()
 
     def facets(self, result):
@@ -166,10 +175,64 @@ class Desktop:
         self.current_view=key
         self.nav[key].configure(style="Active.Nav.TButton")
         self.views[key].pack(fill="both",expand=True)
-        self.crumb.set("Radni prostor / "+("Pregled" if key=="overview" else "Poslovni imenik"))
+        self.crumb.set("Radni prostor / "+{"overview":"Pregled","directory":"Poslovni imenik","settings":"Postavke","jobs":"Zadaci i raspored","data":"Uvoz i izvoz","analytics":"Analitika i izvještaji","registry":"Tvrtke"}[key])
         if self.client:
             if key=="overview":self.refresh_overview()
-            else:self.refresh()
+            elif key=="directory":self.refresh()
+            elif key=="settings":self.refresh_settings()
+            elif key=="jobs":self.refresh_jobs()
+            elif key=="analytics":self.refresh_analytics()
+            elif key=="registry":self.refresh_registry()
+
+    def build_settings(self):
+        view=self.views["settings"]
+        ttk.Label(view,text="UPRAVLJANJE APLIKACIJOM",foreground=ACCENT).pack(anchor="w")
+        ttk.Label(view,text="Postavke",style="Title.TLabel").pack(anchor="w",pady=(4,4))
+        ttk.Label(view,text="Sigurnost, pristup poslovnim podacima i informacije o aplikaciji.",style="Muted.TLabel").pack(anchor="w",pady=(0,16))
+        columns=ttk.Frame(view);columns.pack(fill="both",expand=True)
+        for col in (0,1):columns.columnconfigure(col,weight=1,uniform="settings")
+        left=ttk.Frame(columns);left.grid(row=0,column=0,sticky="nsew",padx=(0,10))
+        right=ttk.Frame(columns);right.grid(row=0,column=1,sticky="nsew")
+        about=ttk.LabelFrame(left,text="O aplikaciji",padding=14);about.pack(fill="x",pady=(0,12))
+        for label,value,url in (("Brend","Tvrtke",None),("Službena web stranica","tvrtke.com.hr","https://tvrtke.com.hr/"),("Izrada i razvoj","Brendigo",None),("Web stranica developera","brendigo.com","https://brendigo.com/")):
+            row=ttk.Frame(about);row.pack(fill="x",pady=4)
+            ttk.Label(row,text=label,style="Muted.TLabel").pack(side="left")
+            if url:ttk.Button(row,text=value,command=lambda url=url:webbrowser.open_new_tab(url)).pack(side="right")
+            else:ttk.Label(row,text=value).pack(side="right")
+        backups=ttk.LabelFrame(left,text="Sigurnosne kopije i oporavak",padding=14);backups.pack(fill="x",pady=(0,12))
+        self.backup_choice=tk.StringVar()
+        self.backup_selector=ttk.Combobox(backups,textvariable=self.backup_choice,state="readonly")
+        self.backup_selector.pack(fill="x",pady=6)
+        self.backup_status=tk.StringVar(value="Odaberite sigurnosnu kopiju.")
+        ttk.Label(backups,textvariable=self.backup_status,wraplength=380).pack(anchor="w",pady=6)
+        buttons=ttk.Frame(backups);buttons.pack(fill="x")
+        ttk.Button(buttons,text="Izradi kopiju",style="Accent.TButton",command=self.backup_dialog).pack(side="left")
+        ttk.Button(buttons,text="Osvježi",command=self.refresh_settings).pack(side="left",padx=6)
+        ttk.Button(backups,text="Vrati u novi prostor",command=self.restore_selected).pack(anchor="w",pady=6)
+        connection=ttk.LabelFrame(right,text="Pristup poslovnim podacima",padding=14);connection.pack(fill="x",pady=(0,12))
+        self.access_status=tk.StringVar(value="Provjera pristupa…")
+        ttk.Label(connection,textvariable=self.access_status).pack(anchor="w",pady=4)
+        ttk.Button(connection,text="Upravljaj pristupom",command=self.sync_dialog).pack(anchor="w",pady=6)
+        cleanup=ttk.LabelFrame(right,text="Uređivanje baze",padding=14);cleanup.pack(fill="x")
+        ttk.Label(cleanup,text="Pregledajte moguće duplikate prije spajanja.",wraplength=350).pack(anchor="w")
+        ttk.Button(cleanup,text="Pregled duplikata",command=self.duplicate_dialog).pack(anchor="w",pady=6)
+
+    def refresh_settings(self):
+        if not self.client:return
+        def done(data):
+            recovery,access=data
+            ids=[row["id"] for row in recovery["backups"]]
+            self.backup_selector.configure(values=ids)
+            if self.backup_choice.get() not in ids:self.backup_choice.set(ids[0] if ids else "")
+            self.backup_status.set(f"Dostupne sigurnosne kopije: {len(ids)}")
+            self.access_status.set("Pristup omogućen" if access["configured"] else "Pristup nije omogućen")
+        self.submit(lambda:(self.client.request("/api/recovery"),self.client.request("/api/registry")),done)
+
+    def restore_selected(self):
+        if not self.client or not self.backup_choice.get():return
+        if not messagebox.askyesno("Tvrtke","Vratiti odabranu kopiju u novi prostor bez zamjene postojeće baze?"):return
+        data={"id":self.backup_choice.get(),"confirmed":True}
+        self.submit(lambda:self.client.request("/api/recovery/restore",data=data,timeout=900),lambda _result:messagebox.showinfo("Tvrtke","Kopija je vraćena u novi prostor. Postojeća baza nije zamijenjena."))
 
     def build_overview(self):
         view=self.views["overview"]
@@ -233,8 +296,31 @@ class Desktop:
                 self.recent.insert("","end",iid=str(row["id"]),values=(row["title"],row.get("city") or "—",row.get("phone") or "—"))
             if self.smoke:
                 if stats["total"]!=1 or len(self.recent.get_children())!=1 or self.metric_values["total"].get()!="1":self.close();return
-                self.show_view("directory")
+                self.smoke_pages()
         self.submit(lambda:(self.client.request("/api/stats"),self.client.request("/api/companies",{"limit":5,"sort":"new"})),done)
+
+    def smoke_pages(self):
+        # Exercise all seven native page renderers using the synthetic worker.
+        steps=[("registry",lambda:self.registry_values["runs"].get()=="0"),
+               ("jobs",lambda:self.job_metrics.get()!="—"),
+               ("data",lambda:self.import_button.winfo_ismapped() and len(self.export_fields)==11),
+               ("analytics",lambda:self.analytics_values["total"].get()=="1"),
+               ("settings",lambda:self.access_status.get() in ("Pristup omogućen","Pristup nije omogućen"))]
+        def next_page(index):
+            if self.closed:return
+            if index==len(steps):
+                self.show_view("directory")
+                return
+            key,ready=steps[index]
+            self.show_view(key)
+            def check(attempt=0):
+                if self.closed:return
+                if ready() and self.views[key].winfo_ismapped():
+                    next_page(index+1)
+                elif attempt>=100:self.close()
+                else:self.root.after(50,lambda:check(attempt+1))
+            self.root.after(50,check)
+        next_page(0)
 
     def draw_charts(self):
         if not self.overview_data:return
@@ -327,6 +413,11 @@ class Desktop:
             self.page=max(1,self.page+delta)
             self.refresh()
 
+    def directory_filters(self):
+        return {"q":self.query.get(),"city":"" if self.city.get()=="Svi gradovi" else self.city.get(),
+                "industry":"" if self.industry.get()=="Sve djelatnosti" else self.industry.get(),
+                "contact":CONTACTS.get(self.contact.get(),""),"entity_kind":KINDS[self.kind.get()]}
+
     def refresh(self):
         self.search_timer=None
         if not self.client:
@@ -337,9 +428,7 @@ class Desktop:
         self.sequence+=1
         serial=self.sequence
         self.pending_search=True
-        params={"q":self.query.get(),"city":"" if self.city.get()=="Svi gradovi" else self.city.get(),
-                "industry":"" if self.industry.get()=="Sve djelatnosti" else self.industry.get(),
-                "contact":CONTACTS.get(self.contact.get(),""),"entity_kind":KINDS[self.kind.get()],"sort":SORTS[self.sort.get()],"page":self.page,"limit":25}
+        params=dict(self.directory_filters(),sort=SORTS[self.sort.get()],page=self.page,limit=25)
         self.status.set("Učitavanje…")
         self.previous.configure(state="disabled")
         self.next.configure(state="disabled")
@@ -483,7 +572,7 @@ class Desktop:
     def duplicate_dialog(self):
         if not self.client or self.merge_active:return
         dialog=tk.Toplevel(self.root)
-        dialog.title("Crawlvora – pregled duplikata")
+        dialog.title("Tvrtke – pregled duplikata")
         dialog.geometry("900x650")
         dialog.minsize(720,460)
         dialog.configure(bg=BG)
@@ -534,7 +623,7 @@ class Desktop:
             if busy or self.merge_active:return
             chosen=[pairs[x] for x in table.selection()]
             if not chosen or len(chosen)>100:return
-            if not messagebox.askyesno("Crawlvora",f"Potvrđujete da {len(chosen)} odabranih parova predstavlja iste poslovne subjekte? Prije spajanja izradit će se provjerena sigurnosna kopija.",parent=dialog):return
+            if not messagebox.askyesno("Tvrtke",f"Potvrđujete da {len(chosen)} odabranih parova predstavlja iste poslovne subjekte? Prije spajanja izradit će se provjerena sigurnosna kopija.",parent=dialog):return
             data={"confirmed":True,"pairs":[{"legacy":r["legacy"]["id"],"canonical":r["canonical"]["id"],"fingerprint":r["fingerprint"]} for r in chosen]}
             busy=True
             self.merge_active=True
@@ -543,7 +632,7 @@ class Desktop:
             def complete(result):
                 self.merge_active=False
                 if dialog.winfo_exists():
-                    messagebox.showinfo("Crawlvora",f"Spojeno zapisa: {result['merged']}. Sigurnosna kopija: {result['backup']}",parent=dialog)
+                    messagebox.showinfo("Tvrtke",f"Spojeno zapisa: {result['merged']}. Sigurnosna kopija: {result['backup']}",parent=dialog)
                     dialog.destroy()
                 if self.current_view=="overview":self.refresh_overview()
                 else:self.refresh()
@@ -558,7 +647,7 @@ class Desktop:
     def sync_dialog(self):
         if not self.client:return
         dialog=tk.Toplevel(self.root)
-        dialog.title("Crawlvora – sinkronizacija")
+        dialog.title("Tvrtke – sinkronizacija")
         dialog.geometry("550x420")
         dialog.configure(bg=BG)
         dialog.transient(self.root)
@@ -579,13 +668,13 @@ class Desktop:
         persist=tk.BooleanVar(value=True)
         ttk.Checkbutton(frame,text="Spremi u sigurnu pohranu sustava",variable=persist).pack(anchor="w",pady=8)
         def save():
-            if not messagebox.askyesno("Crawlvora","Potvrđujete ovlašteni pristup podacima?",parent=dialog):return
+            if not messagebox.askyesno("Tvrtke","Potvrđujete ovlašteni pristup podacima?",parent=dialog):return
             data={"client_id":user.get(),"client_secret":secret.get(),"persist":persist.get(),"permission":True}
             secret.set("")
             self.submit(lambda:self.client.request("/api/registry/credentials",data=data),update_access)
         ttk.Button(frame,text="Spremi pristup",command=save).pack(anchor="w")
         def start():
-            if not messagebox.askyesno("Crawlvora","Pokrenuti osvježavanje poslovnih podataka?",parent=dialog):return
+            if not messagebox.askyesno("Tvrtke","Pokrenuti osvježavanje poslovnih podataka?",parent=dialog):return
             self.sync_active=True
             self.submit(lambda:self.client.request("/api/registry/start",data={"permission":True,"limit":500}),lambda _:dialog.destroy() if dialog.winfo_exists() else None)
         buttons=ttk.Frame(frame)
@@ -617,12 +706,13 @@ class Desktop:
             self.sync_polling=True
             def failed(_exc):self.sync_polling=False
             self.submit(lambda:self.client.request("/api/status"),done,failed)
+        if self.current_view=="registry":self.refresh_registry()
         self.root.after(3500,self.poll_sync)
 
     def backup_dialog(self):
         if not self.client:return
         dialog=tk.Toplevel(self.root)
-        dialog.title("Crawlvora – sigurnosne kopije")
+        dialog.title("Tvrtke – sigurnosne kopije")
         dialog.geometry("530x280")
         dialog.configure(bg=BG)
         frame=ttk.Frame(dialog,padding=18)
@@ -631,7 +721,7 @@ class Desktop:
         status=tk.StringVar(value="Izradite novu provjerenu kopiju postojećeg radnog prostora.")
         ttk.Label(frame,textvariable=status,wraplength=470).pack(anchor="w",pady=16)
         def create():
-            if not messagebox.askyesno("Crawlvora","Izraditi novu sigurnosnu kopiju?",parent=dialog):return
+            if not messagebox.askyesno("Tvrtke","Izraditi novu sigurnosnu kopiju?",parent=dialog):return
             button.configure(state="disabled")
             status.set("Izrada kopije…")
             def done(_result):
@@ -654,7 +744,7 @@ class Desktop:
         if self.closed:
             return
         if self.worker is None and not self.smoke:
-            if not messagebox.askyesno("Crawlvora","Prekinuti pripremu radnog prostora?"):
+            if not messagebox.askyesno("Tvrtke","Prekinuti pripremu radnog prostora?"):
                 return
         self.closed=True
         self.cancel_start.set()
@@ -676,7 +766,7 @@ def main():
     if "--worker" in sys.argv:
         from tvrtk_scraper import main as worker_main
         return worker_main()
-    parser=argparse.ArgumentParser(description="Crawlvora nativno sučelje")
+    parser=argparse.ArgumentParser(description="Tvrtke – poslovni imenik")
     parser.add_argument("--data-dir",type=Path,default=workspace_path())
     parser.add_argument("--native-smoke",action="store_true")
     args=parser.parse_args()

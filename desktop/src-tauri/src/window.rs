@@ -6,7 +6,7 @@ use crate::security_policy::{allowed_external_url, allowed_worker_navigation};
 pub(crate) fn build(app: &App, url: Url, smoke: bool) -> tauri::Result<WebviewWindow> {
     let port = url.port();
     WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
-        .title("Crawlvora")
+        .title("Tvrtke")
         .inner_size(1120.0, 720.0)
         .min_inner_size(360.0, 300.0)
         .resizable(true)

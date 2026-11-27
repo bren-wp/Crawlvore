@@ -170,3 +170,8 @@ textarea{font:inherit;background:var(--bg);color:var(--text);border:1px solid va
 #mail-dialog #mail-result,#mail-config-status{overflow-wrap:anywhere;color:var(--muted)}
 @media(max-height:500px){#detail .dialog-head,#mail-dialog>.panel-head{position:static}}
 @media(prefers-reduced-motion:reduce){#company-rows{transition:none}}
+
+/* Tvrtke: retain the original layout and remove redundant workspace badges. */
+.about-panel .about-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.about-panel .about-row:last-child{border-bottom:0}
+.about-panel .about-row a{color:var(--accent)}

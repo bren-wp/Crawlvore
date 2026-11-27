@@ -2,6 +2,11 @@
 
 ## 8.1.7
 
+- Add native settings, tasks, import/export and analytics candidate views with bounded authenticated streaming transfers.
+
+- Rebrand the visible application to Tvrtke, add official product and developer information, remove workspace badges, retain compatibility identifiers and existing data paths.
+- Add offline verified legacy seed cleanup with a recovery copy and preservation of linked official records.
+
 - Add reviewed duplicate reconciliation, verified pre-merge backup, preservation of alternate fields, history and original records, and reimport protection.
 - Port profile history and additional business data into native widgets; check directory coverage before skipping a completed snapshot.
 

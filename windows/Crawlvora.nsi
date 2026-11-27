@@ -19,28 +19,28 @@ SetCompressor /SOLID lzma
   !error "WEBVIEW_BOOTSTRAPPER is required"
 !endif
 !ifdef ACCEPTANCE
-  !define APP_NAME "Crawlvora - test instalacije"
+  !define APP_NAME "Tvrtke - test instalacije"
   !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Crawlvora.Acceptance.NSIS"
   InstallDir "$TEMP\Crawlvora-Acceptance"
 !else
-  !define APP_NAME "Crawlvora"
+  !define APP_NAME "Tvrtke"
   !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Crawlvora.BusinessData_is1"
   InstallDir "$LOCALAPPDATA\Programs\Crawlvora"
 !endif
 Name "${APP_NAME}"
 OutFile "${SETUP_EXE}"
-BrandingText "Crawlvora"
+BrandingText "Tvrtke"
 !define MUI_ICON "Crawlvora.ico"
 !define MUI_UNICON "Crawlvora.ico"
 !define MUI_ABORTWARNING
-!define MUI_WELCOMEPAGE_TITLE "Dobro došli u Crawlvora"
+!define MUI_WELCOMEPAGE_TITLE "Dobro došli u Tvrtke"
 !define MUI_WELCOMEPAGE_TEXT "Instalacija poslovnog imenika za Hrvatsku. Postojeće baze, sigurnosne kopije i korisničke postavke ostaju sačuvane."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !ifndef ACCEPTANCE
   !define MUI_FINISHPAGE_RUN "$INSTDIR\Crawlvora.exe"
-  !define MUI_FINISHPAGE_RUN_TEXT "Pokreni Crawlvora"
+  !define MUI_FINISHPAGE_RUN_TEXT "Pokreni Tvrtke"
   !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !endif
 !insertmacro MUI_PAGE_FINISH
@@ -60,7 +60,7 @@ Function HasWebView2
 FunctionEnd
 Function .onInit
   ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP "Crawlvora zahtijeva 64-bitni Windows." /SD IDOK
+    MessageBox MB_ICONSTOP "Tvrtke zahtijeva 64-bitni Windows." /SD IDOK
     Abort
   ${EndIf}
   SetShellVarContext current
@@ -73,7 +73,7 @@ Function .onInit
     ${EndIf}
   !endif
 FunctionEnd
-Section "Crawlvora (obavezno)" Main
+Section "Tvrtke (obavezno)" Main
   SectionIn RO
   Call HasWebView2
   ${If} $RuntimeVersion == ""
@@ -123,6 +123,7 @@ Section "Crawlvora (obavezno)" Main
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${APP_NAME}"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "Publisher" "Brendigo"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "URLInfoAbout" "https://tvrtke.com.hr/"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\Crawlvora.exe"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\Uninstall-Crawlvora.exe"'
