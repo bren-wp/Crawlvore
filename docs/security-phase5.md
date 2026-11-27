@@ -158,3 +158,30 @@ Profile searches match a unique published registration identifier only.
 The production ZIP verifier rejects traversal, aliases and symlink members
 and requires the complete WordPress allowlist. Latest PHP/WordPress and CI
 checks remain required, as do the six documented upstream Rust warnings.
+
+
+## Follow-up ? dependency surface and PHP path cache
+
+The only use of tauri-plugin-opener was its Rust open_url call. Inspection
+of the locally cached 2.7.3 source confirmed that the default-program path
+delegates to open::that_detached. Replace the plugin by the already resolved
+open 5.4.5 dependency, with default features disabled; preserve the existing
+external URL allowlist and deny new WebView windows. Offline cargo update
+removed 35 packages from the lock (475 to 440), with no new package versions.
+zbus_names, zvariant and zvariant_derive are absent. New native and RustSec
+CI must confirm the new lock; chrono, glib and proc-macro-error remain.
+No unreviewed compatibility override or advisory suppression was introduced.
+
+Quality run 45922954376 on 842c900 failed the same-server symlink replacement
+case after Python tests passed (189 tests, five platform skips). Clear the
+PHP stat/realpath cache and explicitly reject symlink components in both
+catalog implementations. A focused PHP 8.4 CLI reproduction of the standalone
+read_json function passed ordinary file, replaced symlink rejection and
+restored ordinary file. Full HTTP regression on the committed source remains
+required. Concurrent malicious filesystem writers are outside this check's
+guarantee; catalog directories must be operator-controlled.
+
+WPCS 3.4.1 is run in isolated CI tooling with a complete JSON report and
+resolved Composer lock retained. Ordinary PRs collect the baseline; the
+production strict quality gate requires a clean WPCS exit. Composer is not
+a runtime dependency. No claim of WPCS compliance is made before review.

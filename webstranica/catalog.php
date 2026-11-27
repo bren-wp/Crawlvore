@@ -3,6 +3,16 @@ declare(strict_types=1);
 const DATA = __DIR__ . '/storage/data';
 const TYPES = ['company'=>'Companies','entrepreneur'=>'Entrepreneurs','institution'=>'Institutions','nonprofit'=>'Nonprofit organizations','unknown'=>'Unclassified'];
 function read_json(string $file, int $max=4194304): array {
+    // A long-running PHP process must not trust a cached pre-replacement path.
+    clearstatcache(true);
+    $cursor=str_replace('\\','/',$file);
+    $site=str_replace('\\','/',__DIR__);
+    while ($cursor!==$site) {
+        if (is_link($cursor)) throw new RuntimeException('Catalog unavailable');
+        $parent=str_replace('\\','/',dirname($cursor));
+        if ($parent===$cursor) throw new RuntimeException('Catalog unavailable');
+        $cursor=$parent;
+    }
     $root=realpath(__DIR__);
     $resolved=realpath($file);
     if ($root===false || $resolved===false || !is_file($resolved) || !is_readable($resolved)) throw new RuntimeException('Catalog unavailable');

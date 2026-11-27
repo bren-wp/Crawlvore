@@ -27,7 +27,16 @@ final class Catalog {
     }
 
     private static function read(string $root,string $relative,int $max): array {
-        $file = realpath($root.'/'.$relative);
+        clearstatcache(true);
+        $candidate=$root.'/'.$relative;
+        $cursor=$candidate;
+        while ($cursor!==$root) {
+            if (is_link($cursor)) { throw new \RuntimeException('Catalog unavailable.'); }
+            $parent=str_replace('\\','/',dirname($cursor));
+            if ($parent===$cursor) { throw new \RuntimeException('Catalog unavailable.'); }
+            $cursor=$parent;
+        }
+        $file = realpath($candidate);
         if ($file === false || !str_starts_with(str_replace('\\','/',$file),$root.'/') || !is_file($file) || !is_readable($file)) {
             throw new \RuntimeException('Catalog unavailable.');
         }

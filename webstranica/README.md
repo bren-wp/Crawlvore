@@ -37,3 +37,20 @@ rules independently on your actual Apache or Nginx server.
 For subdirectory hosting, merge the generated robots rules and sitemap URL into the domain-root robots.txt; crawlers do not treat a subdirectory robots.txt as authoritative.
 
 Company profiles use the exact published registration identifier, country and entity type. Missing or ambiguous profiles are not synthesized. Profiles are noindex and omit private catalog fields.
+
+
+### Nginx deployment acceptance
+
+The Apache storage .htaccess does not apply to Nginx. Configure an explicit
+deny location at the actual deployed path, including any URL prefix:
+
+    location = /storage { deny all; }
+    location ^~ /storage/ { deny all; }
+
+For a subdirectory deployment, use its prefix in both locations. Restrict
+PHP execution to the public entry point and do not expose catalog files
+through aliases, backup paths or symlinks. Do not expose a PHP CLI
+development server to the Internet. The disposable CI test uses an actual
+Nginx reverse proxy with an isolated PHP CLI upstream and checks normalized
+storage URLs. Actual PHP-FPM, TLS, domain, filesystem permissions and
+operator hosting configuration must be separately verified before deployment.

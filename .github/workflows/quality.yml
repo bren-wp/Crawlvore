@@ -37,6 +37,8 @@ jobs:
           php tests/wordpress_catalog.php
           bash tools/wordpress_acceptance.sh
           bash tools/apache_storage_acceptance.sh
+          sudo apt-get update && sudo apt-get install -y nginx
+          python tools/nginx_storage_acceptance.py
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
       - run: npm audit --audit-level=moderate
       - run: npm run typecheck
@@ -55,6 +57,7 @@ jobs:
           python -m bandit -r . -x ./tests -f json -o bandit-extended.json --exit-zero
           python -m vulture . --exclude tests --min-confidence 60 > dead-code-candidates.txt || test "$?" -eq 3
       - run: python -m playwright install --with-deps chromium
+      - run: python tools/web_layout_acceptance.py
       - run: python tools/ui_e2e.py
       - run: python tools/layout_acceptance.py layout-evidence
       - run: python tools/visual_check.py
@@ -112,3 +115,33 @@ jobs:
         run: cargo install cargo-audit --version 0.23.0 --locked
       - name: Audit native dependency lock
         run: cargo audit --file desktop/src-tauri/Cargo.lock
+
+  wordpress-coding-standards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install WPCS in isolated tooling directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/wpcs"
+          cd "$RUNNER_TEMP/wpcs"
+          composer init --name=crawlvora/audit --no-interaction
+          composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer require --dev --no-interaction "wp-coding-standards/wpcs:3.4.1"
+      - name: Record complete WPCS findings
+        run: |
+          set +e
+          "$RUNNER_TEMP/wpcs/vendor/bin/phpcs" --standard=WordPress --extensions=php --report=json wordpress > wpcs-report.json
+          status=$?
+          set -e
+          python -c "import json; r=json.load(open('wpcs-report.json')); print(r['totals']); assert 'files' in r"
+          test "$status" -le 3
+          if [ "${{ inputs.strict_visual }}" = true ]; then test "$status" -eq 0; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: wordpress-coding-standards
+          path: |
+            wpcs-report.json
+            ${{ runner.temp }}/wpcs/composer.lock
+          if-no-files-found: error
+          retention-days: 7

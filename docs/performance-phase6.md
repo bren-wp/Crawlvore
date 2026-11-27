@@ -77,3 +77,19 @@ tracking. Every exported row and source verified. SQLite integrity and
 foreign-key checks passed. Full million-record JSON and CSV runs are wired
 into CI; existing four-hour run remains independent. XLSX full-scale and
 native startup/CPU measurements remain outstanding.
+
+
+## Full million exports and XLSX
+
+Verified Linux run 45922947057 (842c900): all 1,000,000 JSON and CSV
+records validated with provenance; JSON 479,888,897 bytes in 17.574 s,
+peak RSS 40,148,992 bytes; CSV 78,000,284 bytes in 11.391 s, peak RSS
+39,747,584 bytes. Integrity and foreign key checks passed. Windows
+100,000-row XLSX run: 7,325,784 bytes in 48.925 s, export peak working
+set 48,279,552 bytes, validation peak 66,420,736 bytes. Every row and
+source validated via read-only workbook iteration; no formula cells.
+Million-record workflow now also exercises XLSX. Native startup tool
+measures launch through smoke readiness and shutdown, and OS CPU time
+(host only on Windows, waited children on Linux); not continuous runtime
+CPU or pure first-paint time. Existing four-hour run 45921653337 remains
+independent and has not been restarted.

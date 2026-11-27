@@ -38,3 +38,18 @@ workflows are modified. The new commit requires its own CI evidence.
 - Release ZIP checks now reject traversal, duplicate case-insensitive paths,
   nonregular members and unexpected WordPress files. The 14-file release
   matrix and all private distribution, reference and registry gates remain.
+
+
+## Further phase 5?8 acceptance
+
+- Rust dependency surface reduced from 475 to 440 locked packages. Three
+  previously warned D-Bus-related crates removed, three remain.
+- Million-row JSON and CSV export passed; Windows 100,000-row XLSX passed.
+  Million XLSX and native CPU/startup measurements added to CI.
+- PHP symlink replacement regression corrected; added Nginx + PHP CLI
+  acceptance and 140 bilingual page/viewport browser cases. WPCS full
+  report is retained; actual hosting and all new CI results remain open.
+- Read-only local HR snapshot 1370: 8,417,305 registry offsets across 18
+  initiated categories, 17 completed of 36 expected; run complete=0.
+  No complete HR distribution or backup asserted. Original reference
+  archive not found. All release and private distribution gates preserved.

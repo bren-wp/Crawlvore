@@ -18,8 +18,8 @@ pub(crate) fn build(app: &App, url: Url, smoke: bool) -> tauri::Result<WebviewWi
         .on_navigation(move |url| allowed_worker_navigation(url, port))
         .on_new_window(move |url, _| {
             if !smoke && allowed_external_url(&url) {
-                // Rust-only opener; no JavaScript plugin permissions are exposed.
-                if tauri_plugin_opener::open_url(url.as_str(), None::<&str>).is_err() {
+                // Same desktop launcher used by the former opener plugin, without its IPC or D-Bus dependencies.
+                if open::that_detached(url.as_str()).is_err() {
                     eprintln!("Unable to open external link");
                 }
             }
