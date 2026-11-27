@@ -82,7 +82,7 @@ The intended Windows distribution offers four editions. Availability depends on 
 | Windows 10/11 x64 | Portable executable or installer |
 | Linux x86_64 | DEB package or TAR.GZ distribution |
 
-The current 8.1.4 public download is a non-production candidate. Check the release notes and accompanying manifest before use; it does not contain a verified complete national catalog. Windows packages may be unsigned. Production editions must pass their respective acceptance checks before distribution.
+Public Online releases contain the tested application without bundled national catalogs. Check the release notes and accompanying manifest before use. Windows packages may be unsigned. Full, HR and GB offline editions are separate distributions that require complete, reviewed national snapshots.
 
 ## Crawlvora for the web
 

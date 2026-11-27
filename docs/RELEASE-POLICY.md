@@ -83,3 +83,24 @@ five-member code-only packaging tool in both workflows.
 
 Private registry distribution, complete verified HR/GB snapshots, strict
 visual acceptance and full native/quality/endurance gates are unchanged.
+
+
+## Public stable Online application releases
+
+A version bump on main triggers the candidate workflow's separate public
+Online publication job after successful quality, native Windows/Linux and
+vault acceptance. Manual publication is also possible through its explicit
+publish_public input. Public or private repository visibility and lack of
+code signing are not blockers for the database-free application release.
+The tag is vVERSION-online, a normal non-prerelease GitHub Release. Exact
+asset checksums and the Online Windows receipt are verified; both Linux
+archives must identify the Online edition and contain no registry payload.
+The code-only source ZIP excludes the historical CSV. All uploaded bytes
+are verified against server-reported digests before draft promotion.
+The full fourteen-asset registry-bearing distribution, licence review,
+private gate and complete snapshot acceptance remain unchanged. The public
+release does not claim Full/HR/GB availability or strict visual, production
+hosting, WPCS or extended endurance certification. Code-only companion web
+and plugin packages are included with these limitations disclosed.
+
+The non-distribution candidate now builds only the explicit Online Windows pair and database-free Linux packages; the older Legacy pair is not rebuilt or republished by public CI. The private single-registry and full-edition workflows retain their existing naming and data review requirements.
