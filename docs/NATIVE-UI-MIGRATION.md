@@ -36,3 +36,5 @@ The seven native PNGs are kept separately from existing renderer reference image
 Exact 1280×700 lossless RGB comparison is now available: see [visual acceptance](visual-acceptance/README.md). Every current main view still fails the zero-difference threshold. The existing renderer remains in production pending full native parity.
 
 The next candidate uses procedural native rounded cards and gradients, a three-panel analytics view, directory source filters, queue status cards and the original launch icon. The 30% per-view threshold is diagnostic only and has not passed. Production parity, protected backup and mail flows, full DPI/OS acceptance and all release packages remain outstanding.
+
+Settings now include native authorized API credential fields and revocation, with synchronization remaining in its own view. My companies opens from the directory and uses stable MBS bookmarks, not copied records. The separate WordPress prototype does not enter the desktop runtime. Current native visual acceptance remains above the required 30% threshold; the existing reference renderer is retained.

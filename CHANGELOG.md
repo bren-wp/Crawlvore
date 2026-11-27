@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Harden registry OAuth and HTTP retry handling and correct CI test fixtures and Pillow installation.
+- Add native saved company selection keyed by MBS, restore access credentials to Settings, and introduce an isolated administrator-only WordPress directory prototype.
+
 - Use complete compact 11-file regular releases with database-free installers and portable packages; add opt-in authorized registry refresh on the first launch of each new installed version.
 
 - Enforce an independent mandatory 16-file release contract and verify Linux installer/archive acceptance receipts alongside Windows installer/portable receipts before publication.

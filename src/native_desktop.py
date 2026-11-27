@@ -328,7 +328,27 @@ class Desktop(SecondaryPages):
         connection=Card(right,"Pristup poslovnim podacima",padding=15);connection.pack(fill="x",pady=(0,12))
         self.access_status=tk.StringVar(value="Provjera pristupa…")
         ttk.Label(connection,textvariable=self.access_status).pack(anchor="w",pady=4)
-        ttk.Button(connection,text="Upravljaj pristupom",command=self.sync_dialog).pack(anchor="w",pady=6)
+        ttk.Label(connection,text="Za osvježavanje podataka potreban je ovlašten pristup.",style="PanelMuted.TLabel",wraplength=350).pack(anchor="w",pady=(0,8))
+        client_id=tk.StringVar();client_secret=tk.StringVar();persist=tk.BooleanVar(value=True)
+        for label,var,mask in (("Client ID",client_id,""),("Client Secret",client_secret,"•")):
+            ttk.Label(connection,text=label,style="PanelMuted.TLabel").pack(anchor="w",pady=(5,3))
+            ttk.Entry(connection,textvariable=var,show=mask).pack(fill="x")
+        ttk.Checkbutton(connection,text="Spremi ovlaštene pristupne podatke",variable=persist).pack(anchor="w",pady=8)
+        def save_access():
+            if not self.client or not messagebox.askyesno("Tvrtke","Potvrđujete ovlašten pristup poslovnim podacima?"):return
+            data={"client_id":client_id.get(),"client_secret":client_secret.get(),"persist":persist.get(),"permission":True}
+            client_secret.set("")
+            self.submit(lambda:self.client.request("/api/registry/credentials",data=data),lambda _:self.refresh_settings())
+        def forget_access():
+            if self.client and messagebox.askyesno("Tvrtke","Ukloniti spremljene pristupne podatke?"):
+                def done(data):
+                    self.refresh_settings()
+                    if not data.get("revocation_verified",True):self.status.set("Brisanje iz sigurnog spremišta nije potvrđeno.")
+                self.submit(lambda:self.client.request("/api/registry/forget",data={}),done)
+        buttons=ttk.Frame(connection);buttons.pack(fill="x",pady=6)
+        ttk.Button(buttons,text="Primijeni pristup",style="Accent.TButton",command=save_access).pack(side="left")
+        ttk.Button(buttons,text="Ukloni pristup",command=forget_access).pack(side="left",padx=6)
+        ttk.Button(connection,text="Tvrtke – sinkronizacija",command=lambda:self.show_view("registry")).pack(anchor="w",pady=4)
         cleanup=Card(right,"Uređivanje baze",padding=15);cleanup.pack(fill="x")
         ttk.Label(cleanup,text="Pregledajte moguće duplikate prije spajanja.",wraplength=350).pack(anchor="w")
         ttk.Button(cleanup,text="Pregled duplikata",command=self.duplicate_dialog).pack(anchor="w",pady=6)
@@ -527,6 +547,7 @@ class Desktop(SecondaryPages):
         results.pack(fill="both",expand=True)
         resultbar=ttk.Frame(results,style="PanelInner.TFrame");resultbar.pack(fill="x",pady=(0,9))
         ttk.Label(resultbar,textvariable=self.stats,style="PanelTitle.TLabel").pack(side="left")
+        ttk.Button(resultbar,text="Moje tvrtke",command=self.saved_dialog).pack(side="right")
         table=ttk.Frame(results,style="PanelInner.TFrame")
         table.pack(fill="both",expand=True)
         self.tree=ttk.Treeview(table,columns=("name","city","phone","web","source","action"),show="headings",selectmode="browse",height=7)
@@ -717,11 +738,57 @@ class Desktop(SecondaryPages):
             if index==1:self.submit(lambda:self.client.request(f"/api/history/{company['id']}"),fill_history)
             if index==2:load()
         notebook.bind("<<NotebookTabChanged>>",tab_changed)
-        ttk.Button(dialog,text="Zatvori",command=dialog.destroy).pack(anchor="e",padx=18,pady=10)
+        controls=ttk.Frame(dialog,padding=(18,6))
+        controls.pack(fill="x")
+        ttk.Button(controls,text="Zatvori",command=dialog.destroy).pack(side="right")
+        if len(company.get("mbs") or "")==9 and company["mbs"].isascii() and company["mbs"].isdigit():
+            def save():
+                self.submit(lambda:self.client.request("/api/saved-companies",data={"mbs":company["mbs"],"saved":True}),lambda _:self.status.set("Tvrtka je spremljena u Moje tvrtke."))
+            ttk.Button(controls,text="Spremi u Moje tvrtke",style="Accent.TButton",command=save).pack(side="left")
         if self.smoke:
             self.result=0 if company.get("title")=="Sintetička tvrtka" else 1
             dialog.destroy()
             self.close()
+
+    def saved_dialog(self):
+        if not self.client:return
+        dialog=tk.Toplevel(self.root);dialog.title("Tvrtke – Moje tvrtke");dialog.geometry("840x540");dialog.configure(bg=BG)
+        dialog.transient(self.root)
+        body=ttk.Frame(dialog,padding=18);body.pack(fill="both",expand=True)
+        self.section_header(body,"MOJ ODABIR","Moje tvrtke","Spremljeni poslovni subjekti. Odabir ne mijenja poslovne podatke.")
+        table=ttk.Treeview(body,columns=("name","mbs","city","email"),show="headings",height=7)
+        for key,label,width in (("name","Tvrtka",260),("mbs","MBS",100),("city","Grad",100),("email","E-pošta",180)):
+            table.heading(key,text=label,anchor="w");table.column(key,width=width)
+        table.pack(fill="both",expand=True)
+        buttons=ttk.Frame(body);buttons.pack(fill="x",pady=8)
+        items={};cursor="";following="";generation=0
+        def load(after=""):
+            nonlocal cursor,generation
+            cursor=after;generation+=1;seq=generation
+            def done(data):
+                nonlocal following
+                if not dialog.winfo_exists() or seq!=generation:return
+                table.delete(*table.get_children());items.clear()
+                for row in data["rows"]:
+                    items[row["mbs"]]=row
+                    table.insert("","end",iid=row["mbs"],values=(row["title"],row["mbs"],row["city"] or "—",row["email"] or "—"))
+                following=data["next"]
+                next_button.configure(state="normal" if following else "disabled")
+            self.submit(lambda:self.client.request("/api/saved-companies",{"after":after}),done)
+        def selected():
+            return items.get(table.selection()[0]) if table.selection() else None
+        def open_profile():
+            row=selected()
+            if row and row["id"] is not None:self.submit(lambda:self.client.request(f"/api/company/{row['id']}"),self.profile)
+        def remove():
+            row=selected()
+            if row and messagebox.askyesno("Tvrtke","Ukloniti tvrtku samo iz spremljenog odabira?",parent=dialog):
+                self.submit(lambda:self.client.request("/api/saved-companies",data={"mbs":row["mbs"],"saved":False}),lambda _:load(cursor) if dialog.winfo_exists() else None)
+        ttk.Button(buttons,text="Otvori profil",command=open_profile).pack(side="left")
+        ttk.Button(buttons,text="Ukloni iz odabira",command=remove).pack(side="left",padx=6)
+        next_button=ttk.Button(buttons,text="Sljedeća",command=lambda:load(following),state="disabled");next_button.pack(side="right")
+        ttk.Button(buttons,text="Prva stranica",command=lambda:load()).pack(side="right",padx=6)
+        table.bind("<Double-1>",lambda _e:open_profile());load()
 
     def duplicate_dialog(self):
         if not self.client or self.merge_active:return

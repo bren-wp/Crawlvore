@@ -16,6 +16,7 @@ from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
 from cryptography.exceptions import InvalidTag
 from crawlvora_mail import MailService, TEMPLATES
+from saved_companies import browse as saved_browse, change as saved_change
 from duplicate_review import preview as duplicate_preview, merge as duplicate_merge
 
 
@@ -55,6 +56,7 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 if p.path=='/api/mail/templates': return self.send_data(TEMPLATES)
                 if p.path=='/api/mail/history': return self.send_data(mail.history(int(get('company_id','0'))))
                 if p.path=='/api/duplicates': return self.send_data(duplicate_preview(store))
+                if p.path=='/api/saved-companies': return self.send_data(saved_browse(store,get('after')))
                 if p.path=='/api/jobs': return self.send_data(queue.summary())
                 if p.path.startswith('/api/history/'): return self.send_data(store.history(int(p.path.rsplit('/',1)[1])))
                 if p.path in ('/api/registry/export-xlsx','/api/registry/export-xml','/api/registry/export-sql'):
@@ -264,6 +266,7 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                     return self.send_data(dict(queue.direct(forget_access),ok=True))
                 if self.path=='/api/jobs/add': return self.send_data(queue.enqueue(data.get('kind'),data.get('config',{})))
                 if self.path=='/api/jobs/cancel': return self.send_data(queue.cancel(data.get('id')))
+                if self.path=='/api/saved-companies': return self.send_data(queue.direct(lambda:saved_change(store,data.get('mbs'),data.get('saved'))))
                 if self.path=='/api/jobs/update-sync':
                     return self.send_data(queue.update_policy(data.get('enabled'),data.get('permission')))
                 if self.path=='/api/jobs/schedule':
