@@ -9,9 +9,9 @@
         1280,
         700
       ],
-      "changed_pixels": 635656,
+      "changed_pixels": 635737,
       "total_pixels": 896000,
-      "changed_percent": 70.94375,
+      "changed_percent": 70.95279,
       "exact": false
     },
     {
@@ -20,9 +20,9 @@
         1280,
         700
       ],
-      "changed_pixels": 620922,
+      "changed_pixels": 620972,
       "total_pixels": 896000,
-      "changed_percent": 69.29933,
+      "changed_percent": 69.304911,
       "exact": false
     },
     {
@@ -31,9 +31,9 @@
         1280,
         700
       ],
-      "changed_pixels": 638230,
+      "changed_pixels": 638268,
       "total_pixels": 896000,
-      "changed_percent": 71.231027,
+      "changed_percent": 71.235268,
       "exact": false
     },
     {
@@ -42,9 +42,9 @@
         1280,
         700
       ],
-      "changed_pixels": 659305,
+      "changed_pixels": 659346,
       "total_pixels": 896000,
-      "changed_percent": 73.583147,
+      "changed_percent": 73.587723,
       "exact": false
     },
     {
@@ -53,9 +53,9 @@
         1280,
         700
       ],
-      "changed_pixels": 601088,
+      "changed_pixels": 601136,
       "total_pixels": 896000,
-      "changed_percent": 67.085714,
+      "changed_percent": 67.091071,
       "exact": false
     },
     {
@@ -64,9 +64,9 @@
         1280,
         700
       ],
-      "changed_pixels": 583790,
+      "changed_pixels": 583837,
       "total_pixels": 896000,
-      "changed_percent": 65.155134,
+      "changed_percent": 65.160379,
       "exact": false
     },
     {
@@ -75,9 +75,9 @@
         1280,
         700
       ],
-      "changed_pixels": 655843,
+      "changed_pixels": 655896,
       "total_pixels": 896000,
-      "changed_percent": 73.196763,
+      "changed_percent": 73.202679,
       "exact": false
     }
   ]

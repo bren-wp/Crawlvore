@@ -14,7 +14,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
 from native_sections import SecondaryPages
-from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon
+from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon, brand_surface
 
 CONTACTS = {"Svi zapisi": "", "Ima telefon": "phone", "Ima web": "web", "Ima e-poštu": "email", "Bez telefona i weba": "missing"}
 KINDS = {"Sve vrste":"","Trgovačka društva":"company","Poduzetnici i obrti":"entrepreneur","Institucije":"institution","Neprofitne organizacije":"nonprofit","Neklasificirani subjekti":"unknown"}
@@ -67,7 +67,8 @@ class Desktop(SecondaryPages):
         brand.pack(fill="x",padx=20,pady=(24,13))
         logo=tk.Canvas(brand,width=38,height=38,bg=SIDE,highlightthickness=0)
         logo.pack(side="left",anchor="n",padx=(0,11))
-        logo.create_polygon(6,0,32,0,38,6,38,32,32,38,6,38,0,32,0,6,fill=ACCENT,outline="",smooth=True)
+        logo.surface=brand_surface(root)
+        logo.create_image(0,0,image=logo.surface,anchor="nw")
         logo.create_polygon(19,6,30,13,30,25,19,32,8,25,8,13,outline=INK,fill="",width=2)
         logo.create_line(8,13,19,19,30,13,19,6,19,19,19,32,fill=INK,width=2)
         tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",-22,"bold")).pack(anchor="w")

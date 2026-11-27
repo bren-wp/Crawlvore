@@ -4,17 +4,15 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk
+from native_render import rounded_surface, stroke_icon
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
 
 def nav_icon(root,key,color):
-    image=tk.PhotoImage(master=root,width=20,height=20)
+    segments=[]
     def line(x1,y1,x2,y2):
-        steps=max(abs(x2-x1),abs(y2-y1),1)
-        for i in range(steps+1):
-            x=round(x1+(x2-x1)*i/steps);y=round(y1+(y2-y1)*i/steps)
-            image.put(color,(x,y,min(20,x+2),min(20,y+2)))
+        segments.append((x1+.5,y1+.5,x2+.5,y2+.5))
     def rect(x,y,w,h):
         line(x,y,x+w,y);line(x+w,y,x+w,y+h);line(x+w,y+h,x,y+h);line(x,y+h,x,y)
     if key=="overview":
@@ -38,7 +36,11 @@ def nav_icon(root,key,color):
         points=((8,2),(11,2),(12,5),(15,5),(18,8),(15,11),(15,14),(12,15),(11,18),(8,18),(7,15),(4,15),(2,12),(4,9),(4,6),(7,5),(8,2))
         for start,end in zip(points,points[1:]):line(*start,*end)
         rect(7,7,5,5)
-    return image
+    return tk.PhotoImage(master=root,data=stroke_icon(tuple(segments),color))
+
+def brand_surface(root):
+    return tk.PhotoImage(master=root,data=rounded_surface(ACCENT,ACCENT,11,38))
+
 
 def install(root):
     style=ttk.Style(root)
