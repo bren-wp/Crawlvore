@@ -8,11 +8,11 @@ permissions:
   contents: read
 concurrency:
   group: national-editions-1370
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   hr:
     if: github.event.repository.private
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -35,7 +35,7 @@ jobs:
           if-no-files-found: error
   gb:
     if: github.event.repository.private
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -43,6 +43,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
+      - name: Reserve disk space for national catalog
+        run: |
+          set -euo pipefail
+          df -h .
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo apt-get clean
+          df -h .
+          python -c "import shutil; assert shutil.disk_usage('.').free >= 20*1024**3, 'National catalog needs at least 20 GiB'"
       - run: python -c "from gb_download import fetch_snapshot; print(fetch_snapshot('national-data/GB'))"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
@@ -87,7 +95,7 @@ jobs:
       artifact_suffix: ${{ matrix.suffix }}
   publish:
     needs: [hr_full, en_full, online, quality]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

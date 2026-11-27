@@ -1,11 +1,11 @@
-# 8.1.6
+# Changelog
+
+## 8.1.6
 
 - Separate Croatian and English national and database-free editions.
 - Restore and verify Croatian registry snapshot 1370 from the private data archive without redownloading it.
 - Verify the official UK live-register monthly catalog independently.
 - Preserve existing workspace data and language preferences.
-
-# Changelog
 
 ## 8.1.5 - Online
 
