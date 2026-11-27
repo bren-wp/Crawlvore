@@ -48,3 +48,65 @@ No scanner result is a security guarantee. Complete cross-language dead-code,
 semantic clone, dependency, packaging and manual threat review remains an
 acceptance requirement. Filesystems without hard-link support fail closed;
 original databases and older backups are retained.
+
+## Increment 3: audit evidence and supply-chain hardening
+
+Verified baseline: e0a914fa0905cd76e59a4de13d8478c4f18e3253.
+
+- Quality and security run 45920343256: both verify and rust-dependencies
+  jobs passed. Logs show 179 Python tests, npm and pip vulnerability checks,
+  Bandit medium/high gate, Vulture 90% gate, PHP HTTP acceptance (12 pages),
+  real WordPress integration, 65 browser controls and 320 view / 80 dialog
+  cases without detected layout errors.
+- Secure vault run 45920343257: Windows 8/10 (2 Linux-only skipped), Linux
+  7/10 (3 Windows-only skipped). Both real OS vault namespaces verified.
+  Local Rust navigation/handshake tests passed 3/3; local Python suite 177/179
+  (2 Linux-only skipped).
+- Source audit: 260 Python functions, 405 four-statement windows, no reported
+  unused import, normalized clone or high-risk call candidates. Lexical
+  inventory also covered 10 TS files, 5 Rust files, 5 PHP files, 3 CSS files
+  and 12 CI workflow files. A separate conservative exact-token scan (60-token
+  minimum, not a semantic proof) found no candidates in TS/Rust and one PHP
+  candidate: the FAQ markup rendered on the home and help pages from the
+  same data. The separate web and WordPress catalog implementations are
+  intentional independent distribution boundaries. Frontend and native URL
+  validation are independent defense-in-depth checks, not interchangeable.
+- Removed 41 CSS selector branches for 10 confirmed retired collector/studio
+  classes and 12 retired translation entries (generated locale rebuilt).
+  Other literal-absence candidates are not automatically deleted: dynamic
+  text, translated errors and compatibility paths need case-by-case review.
+  After cleanup, TS typecheck/build, 320 view / 80 dialog tests and 65-control
+  browser E2E passed locally.
+- Pinned 50 external GitHub Actions uses to five full SHA commit IDs resolved
+  from their existing official tags. All 12 workflow files reverse exactly
+  to baseline when the pins are replaced with their former tags. New
+  regression check rejects floating external action references. This does
+  not pin every external service, Docker image or system package.
+
+### RustSec residual advisory register
+
+The audit scanned 475 crates against 1568 advisories and exited successfully,
+but reported six allowed warnings. None are being hidden or waived:
+
+| Crate | Version | Advisory | Disposition |
+|---|---|---|---|
+| chrono | 0.4.45 | RUSTSEC-2026-0543 | Unmaintained; serde_with via tauri-utils; no fixed upgrade reported |
+| proc-macro-error | 1.0.4 | RUSTSEC-2024-0370 | Unmaintained; GTK/glib macros; no fixed upgrade reported |
+| zbus_names | 4.3.5 | RUSTSEC-2026-0371 | Unmaintained; zbus via opener; no fixed upgrade reported |
+| zvariant | 5.15.1 | RUSTSEC-2026-0370 | Unmaintained; zbus via opener; no fixed upgrade reported |
+| zvariant_derive | 5.15.1 | RUSTSEC-2026-0372 | Unmaintained; zvariant; no fixed upgrade reported |
+| glib | 0.18.5 | RUSTSEC-2024-0429 | Unsound VariantStrIter; patched >=0.20; current GTK/WebKit stack uses 0.18 |
+
+The application Rust source contains no direct references to those six
+crates or VariantStrIter. This is not a reachability proof for dependencies.
+A compatible stable GTK/WebKit/Tauri upgrade is required for the glib finding;
+do not force incompatible lockfile versions or migrate to an alpha just to
+clear a scanner warning. Upstream monitoring and risk disposition remain open.
+
+### Remaining release/security acceptance
+
+No production release is authorized. Native jobs for the baseline were still
+running during this review; the cleanup/pinning revision requires fresh CI.
+Actual hosting access rules, comprehensive manual threat review and remaining
+dynamic dead-code/semantic candidates are not fully verified. Original design
+PNGs and approved private national-data distribution remain independent gates.
