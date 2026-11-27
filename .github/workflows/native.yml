@@ -107,7 +107,7 @@ jobs:
             extra=(--add-data "registry-bundle/registry-seed.sqlite3.xz:." --add-data "registry-bundle/registry-seed.size:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
           fi
           mkdir -p native-edition
-          python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
+          python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"],"version":open("VERSION").read().strip()}))' > native-edition/edition.json
           extra+=(--add-data "native-edition/edition.json:.")
           python -m PyInstaller --paths src "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview src/tvrtk_scraper.py
           mkdir -p native-preview

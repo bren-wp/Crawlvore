@@ -11,4 +11,4 @@ interface RegistryCategory { snapshot:string;category:string;rows:number;total:n
 interface RegistrySummary { configured:boolean;authorized:boolean;runs:RegistryRun[];categories:RegistryCategory[] }
 interface RegistryPage { total:number;rows:Record<string,unknown>[] }
 interface RegistryDiff { before:string;after:string;categories:{category:string;comparable:boolean;added:number;removed:number;affected_subjects:number}[] }
-interface JobSummary { schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }
+interface JobSummary { update_sync:{enabled:boolean|number;last_version:string}; schedule:{enabled:boolean|number;hour:number}; jobs:{id:number;kind:string;state:string;created:string;finished?:string;attempts?:number;next_run?:number}[] }

@@ -1,4 +1,8 @@
-# Croatian desktop release policy
+# Redovna kompaktna distribucija (važeća politika)
+
+Redovna izdanja sada obavezno sadrže četiri paketa bez ugrađene baze: Windows NSIS i Portable, Linux DEB i TAR.GZ. Oba updatera, izvorni ZIP, veličine paketa, potpisani manifest i SHA-256 čine ukupno 11 datoteka. Preuzimanje hrvatske baze i osvježavanje odvijaju se u aplikaciji s ovlaštenim pristupom; postojeća baza nikada se ne zamjenjuje praznom. Opcija u Zadaci i raspored dopušta automatsko preuzimanje nakon nadogradnje. Svježa instalacija bez ovlaštenog pristupa ne može automatski preuzeti podatke. Stari Full ugovor u nastavku ostaje samo za zasebnu, privatnu distribuciju uz odobrenje; nije uvjet redovnog izdanja.
+
+# Povijesni ugovor za privatno Full izdanje (nije redovna distribucija)
 
 Only HR Full and HR Online are built, for Windows and Linux. Each has installer and portable/archive variants. Full must contain the verified Croatian registry snapshot; Online starts empty in a fresh workspace. Never overwrite an existing workspace. Release checks must include source identity, actual package smoke tests, snapshot counts and checksums, and asset size/digest checks. Raw snapshot 1370 is preserved separately in the private data release. No credentials in distributable packages. Private distribution is not authorization for public redistribution.
 

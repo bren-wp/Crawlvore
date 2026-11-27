@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from tools.complete_release import REQUIRED, verify
+from tools.complete_release import REQUIRED, COMPACT_REQUIRED, COMPACT_PACKAGES, verify
 from tools.sign_release_updates import sign
 from update_verification import TARGETS
 
@@ -56,3 +56,18 @@ class CompleteReleaseTests(unittest.TestCase):
         extra.unlink()
         (self.root/"Portable-HR-Online.exe").write_bytes(b"")
         with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public)
+
+    def test_compact_requires_every_one_of_eleven_assets(self):
+        for path in self.root.iterdir():
+            if path.name not in COMPACT_REQUIRED or path.name in ("UPDATE-MANIFEST.json","UPDATE-MANIFEST.sig","SHA256SUMS.txt"):path.unlink()
+        (self.root/"PACKAGE-SIZES.json").write_text(json.dumps({"packages":[{"name":name,"bytes":(self.root/name).stat().st_size} for name in COMPACT_PACKAGES.values()]}))
+        with patch("tools.sign_release_updates.TRUSTED_KEY_HEX",self.public.hex()):
+            sign(self.root,"8.1.7",self.key.private_bytes_raw().hex(),"Online")
+        (self.root/"SHA256SUMS.txt").write_text("".join(hashlib.sha256((self.root/name).read_bytes()).hexdigest()+"  "+name+"\n" for name in sorted(COMPACT_REQUIRED-{"SHA256SUMS.txt"})),encoding="ascii")
+        self.assertEqual(verify(self.root,"8.1.7",self.public,mode="online"),11)
+        for name in COMPACT_REQUIRED:
+            path=self.root/name;raw=path.read_bytes();path.unlink()
+            with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public,mode="online")
+            path.write_bytes(raw)
+        (self.root/"REGISTRY-HR-MANIFEST.json").write_text("{}")
+        with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public,mode="online")

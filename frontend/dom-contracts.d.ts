@@ -151,6 +151,8 @@ interface InterfaceElements {
   "schedule-enabled": HTMLElementTagNameMap["input"];
   "schedule-hour": HTMLElementTagNameMap["input"];
   "schedule-permission": HTMLElementTagNameMap["input"];
+  "update-sync-enabled": HTMLElementTagNameMap["input"];
+  "update-sync-save": HTMLElementTagNameMap["button"];
   "schedule-save": HTMLElementTagNameMap["button"];
   "jobs-registry": HTMLElementTagNameMap["button"];
   "job-metrics": HTMLElementTagNameMap["div"];

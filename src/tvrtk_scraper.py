@@ -66,11 +66,16 @@ def main():
 def run_workspace(args,selection,active):
     database=args.data_dir/'companies.sqlite3'
     edition=None
+    app_version=None
     default_language='hr'
     edition_path=ROOT/'edition.json'
     if edition_path.is_file():
         edition_config=json.loads(edition_path.read_text(encoding='utf-8'))
         edition=edition_config['edition']
+        app_version=edition_config.get('version')
+        if app_version is not None:
+            from update_verification import version
+            version(app_version)
         default_language=edition_config.get('language','hr')
         if default_language != 'hr': raise ValueError('Invalid edition language.')
         if edition not in ('HR','Online'): raise ValueError('Invalid edition.')
@@ -122,7 +127,9 @@ def run_workspace(args,selection,active):
     import_lock=threading.Lock()
     ui_ready=threading.Event()
     ui_ready_lock=threading.Lock()
-    queue=Queue(store,collector,registry,registry_access.credentials); queue.start()
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':app_version=None
+    queue=Queue(store,collector,registry,registry_access.credentials,app_version=app_version,
+                authorized=lambda:registry_access.status()['authorized']); queue.start()
     protected.start()
     Handler=make_handler(ROOT=ROOT, TOKEN=TOKEN, args=args, active=active,
         collector=collector, database=database,

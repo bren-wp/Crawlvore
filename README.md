@@ -80,16 +80,9 @@ Stvarne snimke prozora nativne aplikacije bez WebViewa, s demonstracijskim podac
 
 Hrvatsko sučelje s jedinstvenom tamnom temom.
 
-## Choose your edition
+## Jedna aplikacija, uvijek aktualni podaci
 
-Two Croatian editions are built for Windows and Linux.
-
-| Edition | Included data |
-|---|---|
-| HR Full | Verified Croatian Court Registry snapshot |
-| HR Online | Empty workspace on first launch |
-
-The interface is exclusively Croatian with a fixed dark appearance. Existing user databases are preserved during upgrades. Full distribution uses only the verified Croatian data archive and never embeds API credentials.
+Redovna izdanja za Windows i Linux ne sadrže ugrađenu bazu. Poslovne podatke preuzmite iz aplikacije uz ovlašteni pristup. U rubrici **Zadaci i raspored** omogućite osvježavanje nakon nadogradnje aplikacije. Prethodno preuzeti podaci ostaju u imeniku.
 
 ## Get Tvrtke
 

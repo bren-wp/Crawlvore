@@ -2,6 +2,8 @@
 
 ## 8.1.7
 
+- Use complete compact 11-file regular releases with database-free installers and portable packages; add opt-in authorized registry refresh on the first launch of each new installed version.
+
 - Enforce an independent mandatory 16-file release contract and verify Linux installer/archive acceptance receipts alongside Windows installer/portable receipts before publication.
 
 - Add procedural native card surfaces, three-panel analytics, source filters, job status cards, readable snapshot comparison and original launcher assets; retain the strict zero-difference gate and add the intermediate 30% check.

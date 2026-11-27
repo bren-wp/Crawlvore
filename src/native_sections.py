@@ -40,6 +40,7 @@ class SecondaryPages:
         ttk.Label(left,text="Tvrtke · radni dani",style="PanelMuted.TLabel").pack(anchor="w",pady=(0,8))
         self.schedule_enabled=tk.BooleanVar()
         self.schedule_permission=tk.BooleanVar()
+        self.update_sync_enabled=tk.BooleanVar()
         self.schedule_hour=tk.StringVar(value="3")
         ttk.Checkbutton(left,text="Automatsko osvježavanje",variable=self.schedule_enabled).pack(anchor="w",pady=6)
         ttk.Label(left,text="Sat pokretanja (lokalno vrijeme)").pack(anchor="w")
@@ -49,6 +50,8 @@ class SecondaryPages:
         ttk.Button(buttons,text="Spremi raspored",style="Accent.TButton",command=self.save_schedule).pack(side="left")
         ttk.Button(buttons,text="+ Sinkronizacija",command=self.enqueue_sync).pack(side="left",padx=8)
         ttk.Label(left,text="Aplikacija mora biti pokrenuta. Privremene mrežne pogreške ponavljaju se najviše dva puta.",style="PanelMuted.TLabel",wraplength=360).pack(anchor="w",pady=(4,0))
+        ttk.Checkbutton(left,text="Osvježi bazu nakon nadogradnje aplikacije",variable=self.update_sync_enabled).pack(anchor="w",pady=(4,0))
+        ttk.Button(left,text="Spremi osvježavanje nakon nadogradnje",command=self.save_update_sync).pack(anchor="w",pady=(4,0))
         self.job_metrics=tk.StringVar(value="—")
         ttk.Label(right,text="Serijsko izvršavanje bez paralelnih zahtjeva.",wraplength=320,style="PanelMuted.TLabel").pack(anchor="w",pady=(0,12))
         counts_grid=ttk.Frame(right,style="PanelInner.TFrame");counts_grid.pack(fill="x")
@@ -82,6 +85,7 @@ class SecondaryPages:
         if not self.client:return
         def done(data):
             self.schedule_enabled.set(bool(data["schedule"]["enabled"]))
+            self.update_sync_enabled.set(bool(data["update_sync"]["enabled"]))
             self.schedule_hour.set(str(data["schedule"]["hour"]))
             self.schedule_state.set("Uključeno" if data["schedule"]["enabled"] else "Isključeno")
             self.job_states.clear()
@@ -97,6 +101,13 @@ class SecondaryPages:
             self.job_empty.set("" if data["jobs"] else "Nema spremljenih zadataka.")
             self.job_metrics.set("\n".join(f"{STATES[key]}: {count}" for key,count in counts.items()))
         self.submit(lambda:self.client.request("/api/jobs"),done)
+    def save_update_sync(self):
+        if not self.client:return
+        enabled=self.update_sync_enabled.get()
+        if enabled and not messagebox.askyesno("Tvrtke","Dopuštate automatsko preuzimanje novih poslovnih podataka nakon nadogradnje aplikacije? Potreban je ovlašteni spremljeni pristup."):
+            self.refresh_jobs();return
+        self.submit(lambda:self.client.request("/api/jobs/update-sync",data={"enabled":enabled,"permission":enabled}),lambda _:self.refresh_jobs())
+
     def save_schedule(self):
         if not self.client:return
         try:

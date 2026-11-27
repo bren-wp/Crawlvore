@@ -391,6 +391,7 @@ async function refreshJobs(init = false) { const request = ++jobsRefreshSequence
     return; if (init) {
     $('schedule-enabled').checked = !!r.schedule.enabled;
     $('schedule-hour').value = String(r.schedule.hour);
+    $('update-sync-enabled').checked = !!r.update_sync.enabled;
 } $('schedule-state').textContent = r.schedule.enabled ? translate('Aktivno') : translate('Isključeno'); const signature = JSON.stringify(r.jobs); if (signature === jobsRendered)
     return; jobsRendered = signature; const m = $('job-metrics'); m.replaceChildren(); for (const state of ['queued', 'retry_wait', 'running', 'completed', 'failed']) {
     const el = make('div');
@@ -416,6 +417,10 @@ async function refreshJobs(init = false) { const request = ++jobsRefreshSequence
     b.append(tr);
 } }
 $('jobs-refresh').onclick = () => refreshJobs(true).catch(fail);
+$('update-sync-save').onclick = () => { const enabled = $('update-sync-enabled').checked; if (enabled && !window.confirm('Dopuštate automatsko preuzimanje novih poslovnih podataka nakon nadogradnje? Potreban je ovlašteni spremljeni pristup.')) {
+    void refreshJobs(true);
+    return;
+} post('/api/jobs/update-sync', { enabled, permission: enabled }).then(() => refreshJobs(true)).catch(fail); };
 $('schedule-save').onclick = () => post('/api/jobs/schedule', { enabled: $('schedule-enabled').checked, hour: +$('schedule-hour').value, permission: $('schedule-permission').checked }).then(() => { toast(translate('Raspored je spremljen.')); return refreshJobs(true); }).catch(fail);
 $('jobs-registry').onclick = () => post('/api/jobs/add', { kind: 'registry', config: { permission: $('schedule-permission').checked, limit: 500 } }).then(() => refreshJobs()).catch(fail);
 setInterval(() => { if (current === 'jobs' && !document.hidden)

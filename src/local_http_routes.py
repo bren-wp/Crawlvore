@@ -264,6 +264,8 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                     return self.send_data(dict(queue.direct(forget_access),ok=True))
                 if self.path=='/api/jobs/add': return self.send_data(queue.enqueue(data.get('kind'),data.get('config',{})))
                 if self.path=='/api/jobs/cancel': return self.send_data(queue.cancel(data.get('id')))
+                if self.path=='/api/jobs/update-sync':
+                    return self.send_data(queue.update_policy(data.get('enabled'),data.get('permission')))
                 if self.path=='/api/jobs/schedule':
                     if data.get('enabled') and data.get('permission') is not True: raise ValueError('Potvrdite dopuštenje API-ja.')
                     return self.send_data(queue.schedule(data.get('enabled'),int(data.get('hour',3))))
