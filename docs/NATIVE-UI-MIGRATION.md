@@ -34,3 +34,5 @@ The native shell opens centered in a non-maximized, resizable window, bounded by
 The seven native PNGs are kept separately from existing renderer reference images. Captures of different dimensions are not compared as if pixel-equivalent. Rounded shapes, gradient and remaining reference differences still require work. Do not mark the native candidate stable on the basis of these captures.
 
 Exact 1280×700 lossless RGB comparison is now available: see [visual acceptance](visual-acceptance/README.md). Every current main view still fails the zero-difference threshold. The existing renderer remains in production pending full native parity.
+
+The next candidate uses procedural native rounded cards and gradients, a three-panel analytics view, directory source filters, queue status cards and the original launch icon. The 30% per-view threshold is diagnostic only and has not passed. Production parity, protected backup and mail flows, full DPI/OS acceptance and all release packages remain outstanding.

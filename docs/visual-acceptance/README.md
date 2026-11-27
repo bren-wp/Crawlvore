@@ -11,3 +11,7 @@ The command returns 1 for any difference and rejects unequal image dimensions. I
 The current candidate fails strict acceptance on all seven pages. This is diagnostic evidence, not a complete feature or release acceptance certificate. Further work must cover all dialogs, interactive states, native fonts, gradients, rounded surfaces, charts, DPI and operating systems. Screenshots from different rendering stacks and actual OS DPI settings must be aligned; never resize or mask away differences to claim exact parity. The current evidence is limited to one Windows client viewport and a synthetic dataset. The 960×600, 800×540 and 640×420 checks test access to content, not exact pixels.
 
 Keep the reference renderer until native feature parity and visual acceptance are established. Stable native production release must not be described as fully verified on the basis of the current smoke tests or visual reports.
+
+## Intermediate milestone
+
+Use --max-changed-percent 30 to check that each of the seven pages has at most 30% differing RGB pixels. This is a separate development milestone; the default gate remains zero. The latest candidate still fails both gates. Procedural card surfaces, native charts, filters, task indicators and the original launcher assets are now integrated. Reference PNGs remain unchanged.

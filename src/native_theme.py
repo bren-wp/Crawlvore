@@ -1,5 +1,8 @@
 """Shared native design tokens, no web renderer."""
 import tkinter as tk
+import math
+import sys
+from pathlib import Path
 from tkinter import ttk
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
@@ -40,31 +43,37 @@ def nav_icon(root,key,color):
 def install(root):
     style=ttk.Style(root)
     style.theme_use("clam")
-    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=("Segoe UI",10),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
+    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=("Segoe UI",-13),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
     for name,fill,fg in (("TButton",PANEL2,TEXT),("Accent.TButton",ACCENT,INK),
                          ("Nav.TButton",SIDE,TEXT),("Active.Nav.TButton",ACTIVE,ACCENT)):
         style.configure(name,background=fill,foreground=fg,padding=(11,9),
                         anchor="w" if "Nav" in name else "center",font=("Segoe UI",10,"bold"),borderwidth=1)
         style.map(name,foreground=[("disabled",MUTED),("active",fg)],background=[("active",fill)])
+    style.configure("Upload.TFrame",background=BG,borderwidth=1,relief="solid")
+    style.configure("Upload.TLabel",background=BG,foreground=TEXT)
+    style.configure("UploadIcon.TLabel",background=BG,foreground=ACCENT,font=("Segoe UI",-28,"bold"))
     style.configure("Header.TFrame",background=SIDE)
     style.configure("Header.TLabel",background=SIDE,foreground=MUTED)
+    style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=("Segoe UI",10,"bold"))
     style.configure("Small.TButton",padding=(9,5),font=("Segoe UI",9,"bold"))
     style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=("Segoe UI",9))
     style.configure("Recent.Treeview",rowheight=36)
-    style.configure("Panel.TFrame",background=PANEL,borderwidth=1,relief="solid")
+    style.configure("Card.TFrame",background=BG,borderwidth=0,relief="flat")
+    style.configure("Panel.TFrame",background=PANEL,borderwidth=0,relief="flat")
     style.configure("PanelInner.TFrame",background=PANEL)
-    style.configure("Panel.TCheckbutton",background=PANEL,foreground=TEXT,indicatorcolor=BG)
+    style.configure("Panel.TCheckbutton",background=PANEL,foreground=TEXT,indicatorbackground=BG,indicatorforeground=ACCENT,indicatorcolor=BG,indicatordiameter=12)
     style.map("Panel.TCheckbutton",indicatorcolor=[("selected",ACCENT)],background=[("active",PANEL)])
+    style.configure("Vertical.TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
     style.configure("TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
     style.configure("TSeparator",background=LINE)
     style.configure("Nav.TButton",borderwidth=0)
-    style.configure("Treeview",font=("Segoe UI",10))
+    style.configure("Treeview",font=("Segoe UI",-13))
     style.configure("Panel.TLabel",background=PANEL)
-    style.configure("Metric.TLabel",background=PANEL,font=("Segoe UI",23,"bold"))
-    style.configure("Title.TLabel",font=("Segoe UI",23,"bold"))
+    style.configure("Metric.TLabel",background=PANEL,font=("Segoe UI",-30,"bold"))
+    style.configure("Title.TLabel",font=("Segoe UI",-28,"bold"))
     style.configure("Kicker.TLabel",foreground=ACCENT,font=("Segoe UI",9,"bold"))
     style.configure("Muted.TLabel",foreground=MUTED)
-    style.configure("PanelTitle.TLabel",background=PANEL,font=("Segoe UI",13,"bold"))
+    style.configure("PanelTitle.TLabel",background=PANEL,font=("Segoe UI",-16,"bold"),padding=0)
     style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED)
     style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=43,borderwidth=0)
     style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=("Segoe UI",9,"bold"),padding=(8,8))
@@ -84,3 +93,108 @@ def panel(parent,title=None,padding=15):
     box=ttk.Frame(parent,style="Panel.TFrame",padding=padding)
     if title:ttk.Label(box,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
     return box
+
+def mix(a,b,t):
+    return "#"+"".join(f"{round(int(a[i:i+2],16)*(1-t)+int(b[i:i+2],16)*t):02x}" for i in (1,3,5))
+
+def clip_band(points,projection,bound,keep_above):
+    if not points:return []
+    result=[]
+    prev=points[-1]
+    d0=projection(prev)-bound
+    for point in points:
+        d1=projection(point)-bound
+        inside=(d1>=0 if keep_above else d1<=0)
+        was=(d0>=0 if keep_above else d0<=0)
+        if inside!=was:
+            t=d0/(d0-d1)
+            result.append((prev[0]+t*(point[0]-prev[0]),prev[1]+t*(point[1]-prev[1])))
+        if inside:result.append(point)
+        prev,d0=point,d1
+    return result
+
+def rounded_points(width,height,radius):
+    r=min(radius,width/2,height/2)
+    result=[]
+    for cx,cy,start in ((width-r,r,-90),(width-r,height-r,0),(r,height-r,90),(r,r,180)):
+        for angle in range(start,start+91,15):
+            a=math.radians(angle)
+            result.append((cx+r*math.cos(a),cy+r*math.sin(a)))
+    return result
+
+def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
+    """Draw only procedural surface geometry behind live native controls."""
+    canvas=tk.Canvas(parent,bg=outer,highlightthickness=0,borderwidth=0,takefocus=0)
+    canvas.place(x=0,y=0,relwidth=1,relheight=1,bordermode="outside")
+    canvas.tk.call("lower",canvas._w)
+    last=None
+    pending=None
+    def draw():
+        nonlocal last,pending
+        pending=None
+        w,h=canvas.winfo_width(),canvas.winfo_height()
+        if (w,h)==last or min(w,h)<3:return
+        last=(w,h)
+        canvas.delete("surface")
+        points=rounded_points(w-1,h-1,radius)
+        angle=math.radians(145)
+        dx,dy=math.sin(angle),-math.cos(angle)
+        span=max(1,dx*(w-1)+dy*(h-1))
+        def projection(point):return (dx*point[0]+dy*point[1])/span
+        bands=24
+        for i in range(bands):
+            polygon=clip_band(points,projection,i/bands,True)
+            polygon=clip_band(polygon,projection,min(1,(i+1)/bands+.002),False)
+            if len(polygon)>=3:
+                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(start,end,(i+.5)/bands),outline="",tags="surface")
+        if border:
+            canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
+    def resized(_event):
+        nonlocal pending
+        if pending is not None:canvas.after_cancel(pending)
+        pending=canvas.after(45,draw)
+    def destroyed(_event):
+        nonlocal pending
+        if pending is not None:
+            canvas.after_cancel(pending)
+            pending=None
+    canvas.bind("<Configure>",resized)
+    canvas.bind("<Destroy>",destroyed)
+    return canvas
+
+class Card(ttk.Frame):
+    def __init__(self,parent,title=None,padding=15,outer=BG,**kwargs):
+        super().__init__(parent,style="Card.TFrame",padding=padding,**kwargs)
+        decorate(self,outer=outer)
+        if title:ttk.Label(self,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
+
+def header_glow(parent):
+    """Native procedural header accent; no screenshot or web rendering."""
+    canvas=tk.Canvas(parent,height=119,bg=BG,highlightthickness=0,borderwidth=0,takefocus=0)
+    canvas.place(x=0,y=0,relwidth=1)
+    canvas.tk.call("lower",canvas._w)
+    def draw(event):
+        w,h=event.width,event.height
+        if w<20:return
+        canvas.delete("glow")
+        # Header surface follows the reference's rising diagonal.
+        points=[(.80*w,0),(w,0),(w,h),(.56*w,h),(.70*w,.43*h)]
+        def projection(point):
+            return point[0]/w-(.80-.24*point[1]/h)
+        for i in range(24):
+            lo=i*.44/24;hi=(i+1)*.44/24
+            polygon=clip_band(points,projection,lo,True)
+            polygon=clip_band(polygon,projection,hi+.001,False)
+            if len(polygon)>=3:
+                alpha=.24*math.exp(-lo*13)
+                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(BG,ACCENT,alpha),outline="",tags="glow")
+    canvas.bind("<Configure>",draw)
+    return canvas
+
+def product_icon(root):
+    """Reuse the original launch asset in source and packaged native builds."""
+    bundle=getattr(sys,"_MEIPASS",None)
+    path=Path(bundle)/"assets"/"icon.png" if bundle else Path(__file__).resolve().parents[1]/"desktop"/"src-tauri"/"icons"/"icon.png"
+    icon=tk.PhotoImage(master=root,file=str(path))
+    root.iconphoto(True,icon)
+    return icon

@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from PIL import Image
-from tools.native_pixel_compare import compare,VIEWS
+from tools.native_pixel_compare import compare,VIEWS,meets_threshold
 
 class NativePixelCompareTests(unittest.TestCase):
     def setUp(self):
@@ -28,3 +28,13 @@ class NativePixelCompareTests(unittest.TestCase):
     def test_dimensions_cannot_be_rescaled(self):
         Image.new("RGB",(3,4)).save(self.candidate/"overview.png")
         with self.assertRaises(ValueError):compare(self.reference,self.candidate,self.diff)
+
+    def test_intermediate_threshold_never_changes_exact_gate(self):
+        results=compare(self.reference,self.candidate,self.diff)
+        results[0]["changed_pixels"]=3
+        self.assertTrue(meets_threshold(results,30))
+        self.assertFalse(meets_threshold(results))
+        results[0]["changed_pixels"]=4
+        self.assertFalse(meets_threshold(results,30))
+        self.assertFalse(meets_threshold(results[:1],30))
+        with self.assertRaises(ValueError):meets_threshold(results,101)

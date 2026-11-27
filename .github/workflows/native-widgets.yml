@@ -34,8 +34,12 @@ jobs:
       - name: Native GUI smoke (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a python src/native_desktop.py --native-smoke
-      - name: Build migration executable without HTML assets
-        run: python -m PyInstaller --paths src --noconfirm --clean --onefile --console --exclude-module webview --exclude-module playwright --name CrawlvoraNativePreview src/native_desktop.py
+      - name: Build Windows migration executable with original launcher icon
+        if: runner.os == 'Windows'
+        run: python -m PyInstaller --paths src --noconfirm --clean --onefile --console --exclude-module webview --exclude-module playwright --add-data desktop/src-tauri/icons/icon.png:assets --icon windows/Crawlvora.ico --name CrawlvoraNativePreview src/native_desktop.py
+      - name: Build Linux migration executable without HTML assets
+        if: runner.os == 'Linux'
+        run: python -m PyInstaller --paths src --noconfirm --clean --onefile --console --exclude-module webview --exclude-module playwright --add-data desktop/src-tauri/icons/icon.png:assets --name CrawlvoraNativePreview src/native_desktop.py
       - name: Packaged native smoke (Windows)
         if: runner.os == 'Windows'
         run: |

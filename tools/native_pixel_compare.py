@@ -23,13 +23,18 @@ def compare(reference,candidate,diff_dir):
                             "changed_percent":round(100*changed/total,6),"exact":changed==0})
     return results
 
+def meets_threshold(results, maximum=0):
+    if not 0<=maximum<=100:raise ValueError("Invalid changed-pixel threshold")
+    return len(results)==len(VIEWS) and all(100*r["changed_pixels"]<=maximum*r["total_pixels"] for r in results)
+
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("reference",type=Path);p.add_argument("candidate",type=Path);p.add_argument("output",type=Path)
     p.add_argument("--report-only",action="store_true")
+    p.add_argument("--max-changed-percent",type=float,default=0)
     args=p.parse_args()
     results=compare(args.reference,args.candidate,args.output)
-    report={"exact":all(r["exact"] for r in results),"views":results}
+    report={"exact":meets_threshold(results),"threshold_percent":args.max_changed_percent,"threshold_passed":meets_threshold(results,args.max_changed_percent),"views":results}
     (args.output/"report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
     print(json.dumps(report,indent=2))
-    if not report["exact"] and not args.report_only:raise SystemExit(1)
+    if not report["threshold_passed"] and not args.report_only:raise SystemExit(1)

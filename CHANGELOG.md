@@ -2,6 +2,8 @@
 
 ## 8.1.7
 
+- Add procedural native card surfaces, three-panel analytics, source filters, job status cards, readable snapshot comparison and original launcher assets; retain the strict zero-difference gate and add the intermediate 30% check.
+
 - Improve native header, navigation spacing, overview metrics and charts; capture matching 1280×700 lossless reference and native screenshots and add a strict RGB comparator with single-channel regression tests. Current native visual acceptance remains failed.
 
 - Use final reference palette and compact desktop layout; move synchronization above Settings, add native navigation icons and a resizable non-maximized window with adaptive card grids and overflow access.

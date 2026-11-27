@@ -14,7 +14,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
 from native_sections import SecondaryPages
-from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon
+from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon
 
 CONTACTS = {"Svi zapisi": "", "Ima telefon": "phone", "Ima web": "web", "Ima e-poštu": "email", "Bez telefona i weba": "missing"}
 KINDS = {"Sve vrste":"","Trgovačka društva":"company","Poduzetnici i obrti":"entrepreneur","Institucije":"institution","Neprofitne organizacije":"nonprofit","Neklasificirani subjekti":"unknown"}
@@ -54,22 +54,24 @@ class Desktop(SecondaryPages):
         root.configure(bg=BG)
         root.protocol("WM_DELETE_WINDOW", self.close)
         install(root)
+        self.launch_icon=product_icon(root)
         self.status = tk.StringVar(value="Priprema radnog prostora…")
         shell=ttk.Frame(root)
         shell.pack(fill="both",expand=True)
         sidebar=tk.Frame(shell,bg=SIDE,width=232,highlightbackground=LINE,highlightthickness=1)
         sidebar.pack(side="left",fill="y")
         sidebar.pack_propagate(False)
+        decorate(sidebar,SIDE,BG,radius=0,outer=BG,border=LINE)
         brand=tk.Frame(sidebar,bg=SIDE)
         self.brand=brand
-        brand.pack(fill="x",padx=20,pady=(24,18))
+        brand.pack(fill="x",padx=20,pady=(24,13))
         logo=tk.Canvas(brand,width=38,height=38,bg=SIDE,highlightthickness=0)
-        logo.pack(side="left",padx=(0,12))
+        logo.pack(side="left",anchor="n",padx=(0,11))
         logo.create_polygon(6,0,32,0,38,6,38,32,32,38,6,38,0,32,0,6,fill=ACCENT,outline="",smooth=True)
         logo.create_polygon(19,6,30,13,30,25,19,32,8,25,8,13,outline=INK,fill="",width=2)
         logo.create_line(8,13,19,19,30,13,19,6,19,19,19,32,fill=INK,width=2)
-        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",17,"bold")).pack(anchor="w")
-        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=("Segoe UI",8)).pack(anchor="w")
+        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",-22,"bold")).pack(anchor="w")
+        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=("Segoe UI",-9,"bold")).pack(anchor="w")
         self.sidebar=sidebar
         self.nav={}
         self.nav_icons={}
@@ -96,8 +98,10 @@ class Desktop(SecondaryPages):
         main.pack(side="left",fill="both",expand=True)
         self.header=ttk.Frame(main,padding=(28,7),style="Header.TFrame")
         self.header.pack(fill="x")
-        self.crumb=tk.StringVar(value="Radni prostor / Pregled")
-        ttk.Label(self.header,textvariable=self.crumb,style="Header.TLabel").pack(side="left")
+        self.crumb=tk.StringVar(value="Pregled")
+        ttk.Label(self.header,text="Radni prostor",style="Header.TLabel").pack(side="left")
+        ttk.Label(self.header,text="/",style="Header.TLabel").pack(side="left",padx=12)
+        ttk.Label(self.header,textvariable=self.crumb,style="HeaderTitle.TLabel").pack(side="left")
         self.stats=tk.StringVar(value="")
         ttk.Button(self.header,text="⇄ Uvoz i izvoz",style="Small.TButton",command=lambda:self.show_view("data")).pack(side="right")
         ttk.Separator(main).pack(fill="x")
@@ -123,6 +127,7 @@ class Desktop(SecondaryPages):
         self.resize_pending=False
         self.reflow_groups=[]
         self.views={key:ttk.Frame(content) for key in ("overview","directory","settings","jobs","data","analytics","registry")}
+        for view in self.views.values():header_glow(view)
         self.body=self.views["directory"]
         self.build_directory()
         self.build_overview()
@@ -134,7 +139,13 @@ class Desktop(SecondaryPages):
         for view in self.views.values():self.polish_panel_children(view)
         self.current_view=""
         self.show_view("overview")
-        ttk.Label(main,textvariable=self.status,style="Muted.TLabel",padding=(34,8)).pack(fill="x")
+        footer=ttk.Label(main,text="Tvrtke  ·  Poslovni imenik",style="Muted.TLabel",anchor="center",padding=(12,3))
+        footer.pack(fill="x")
+        def update_footer(*_):
+            status=self.status.get()
+            footer.configure(text="Tvrtke  ·  Poslovni imenik" if status=="Spremno." else status)
+        self.status.trace_add("write",update_footer)
+        update_footer()
         self.root.after(40,self.drain)
         self.root.bind("<Configure>",self.resize_shell,add="+")
         self.root.after(100,self.reflow_layout)
@@ -149,7 +160,7 @@ class Desktop(SecondaryPages):
             short=event.height<580
             if getattr(self,"short_navigation",None)!=short:
                 self.short_navigation=short
-                self.brand.pack_configure(pady=(10,8) if short else (24,18))
+                self.brand.pack_configure(pady=(10,8) if short else (24,13))
                 for label in self.nav_labels:label.pack_configure(pady=(5,2) if short else (14,5))
                 for button in self.nav.values():button.pack_configure(pady=0 if short else 2)
                 style=ttk.Style(self.root)
@@ -159,16 +170,16 @@ class Desktop(SecondaryPages):
 
     def polish_panel_children(self,widget,inside=False):
         for child in widget.winfo_children():
-            panel=isinstance(child,ttk.LabelFrame) or (isinstance(child,ttk.Frame) and child.cget("style") in ("Panel.TFrame","PanelInner.TFrame"))
+            panel=isinstance(child,ttk.LabelFrame) or (isinstance(child,ttk.Frame) and child.cget("style") in ("Panel.TFrame","PanelInner.TFrame","Card.TFrame"))
             if inside:
                 if isinstance(child,ttk.Label) and child.cget("style") in ("","Muted.TLabel"):
                     child.configure(style="PanelMuted.TLabel" if child.cget("style")=="Muted.TLabel" else "Panel.TLabel")
-                elif isinstance(child,ttk.Frame) and not panel:child.configure(style="PanelInner.TFrame")
+                elif isinstance(child,ttk.Frame) and not panel and not child.cget("style"):child.configure(style="PanelInner.TFrame")
                 elif isinstance(child,ttk.Checkbutton):child.configure(style="Panel.TCheckbutton")
             self.polish_panel_children(child,inside or panel)
 
     def register_grid(self,grid,columns):
-        self.reflow_groups.append((grid,columns,[(w,dict(w.grid_info())) for w in grid.grid_slaves()]))
+        self.reflow_groups.append((grid,columns,[(w,dict(w.grid_info())) for w in grid.grid_slaves()],[dict(grid.columnconfigure(i)) for i in range(columns)]))
 
     def reflow_layout(self):
         if self.closed:return
@@ -176,11 +187,13 @@ class Desktop(SecondaryPages):
         compact=available<740
         if getattr(self,"compact_layout",None)==compact:return
         self.compact_layout=compact
-        for grid,columns,items in self.reflow_groups:
+        for grid,columns,items,weights in self.reflow_groups:
             if not items:continue
             for i in range(columns):grid.columnconfigure(i,weight=0,uniform="")
             target=(2 if columns==4 else 1) if compact else columns
-            for i in range(target):grid.columnconfigure(i,weight=1,uniform="responsive")
+            for i in range(target):
+                if compact:grid.columnconfigure(i,weight=1,uniform="responsive")
+                else:grid.columnconfigure(i,weight=weights[i]["weight"],uniform=weights[i]["uniform"])
             ordered=sorted(items,key=lambda pair:(int(pair[1]["row"]),int(pair[1]["column"])))
             for i,(widget,info) in enumerate(ordered):
                 if compact:widget.grid_configure(row=i//target,column=i%target,padx=(0,6 if i%target<target-1 else 0),pady=(0,8))
@@ -259,6 +272,13 @@ class Desktop(SecondaryPages):
         cities,industries = result
         self.citybox.configure(values=["Svi gradovi"]+[x if isinstance(x,str) else x.get("city","") for x in cities])
         self.industrybox.configure(values=["Sve djelatnosti"]+industries)
+        self.submit(lambda:self.client.request("/api/providers"),self.update_provider_choices)
+
+    def update_provider_choices(self, rows):
+        self.provider_map={"Svi izvori":""}
+        for row in rows:self.provider_map[row["label"]]=row["provider"]
+        self.providerbox.configure(values=list(self.provider_map))
+        if self.provider.get() not in self.provider_map:self.provider.set("Svi izvori")
 
     def show_view(self,key):
         if self.current_view:
@@ -270,7 +290,7 @@ class Desktop(SecondaryPages):
         self.viewport.xview_moveto(0)
         self.viewport.yview_moveto(0)
         self.resize_content()
-        self.crumb.set("Radni prostor / "+{"overview":"Pregled","directory":"Poslovni imenik","settings":"Postavke","jobs":"Zadaci i raspored","data":"Uvoz i izvoz","analytics":"Analitika i izvještaji","registry":"Tvrtke – sinkronizacija"}[key])
+        self.crumb.set({"overview":"Pregled","directory":"Poslovni imenik","settings":"Postavke","jobs":"Zadaci i raspored","data":"Uvoz i izvoz","analytics":"Analitika i izvještaji","registry":"Tvrtke – sinkronizacija"}[key])
         if self.client:
             if key=="overview":self.refresh_overview()
             elif key=="directory":self.refresh()
@@ -288,13 +308,13 @@ class Desktop(SecondaryPages):
         for col in (0,1):columns.columnconfigure(col,weight=1,uniform="settings")
         left=ttk.Frame(columns);left.grid(row=0,column=0,sticky="nsew",padx=(0,10))
         right=ttk.Frame(columns);right.grid(row=0,column=1,sticky="nsew")
-        about=ttk.LabelFrame(left,text="O aplikaciji",padding=14);about.pack(fill="x",pady=(0,12))
+        about=Card(left,"O aplikaciji",padding=15);about.pack(fill="x",pady=(0,12))
         for label,value,url in (("Brend","Tvrtke",None),("Službena web stranica","tvrtke.com.hr","https://tvrtke.com.hr/"),("Izrada i razvoj","Brendigo",None),("Web stranica developera","brendigo.com","https://brendigo.com/")):
             row=ttk.Frame(about);row.pack(fill="x",pady=4)
             ttk.Label(row,text=label,style="Muted.TLabel").pack(side="left")
             if url:ttk.Button(row,text=value,command=lambda url=url:webbrowser.open_new_tab(url)).pack(side="right")
             else:ttk.Label(row,text=value).pack(side="right")
-        backups=ttk.LabelFrame(left,text="Sigurnosne kopije i oporavak",padding=14);backups.pack(fill="x",pady=(0,12))
+        backups=Card(left,"Sigurnosne kopije i oporavak",padding=15);backups.pack(fill="x",pady=(0,12))
         self.backup_choice=tk.StringVar()
         self.backup_selector=ttk.Combobox(backups,textvariable=self.backup_choice,state="readonly")
         self.backup_selector.pack(fill="x",pady=6)
@@ -305,11 +325,11 @@ class Desktop(SecondaryPages):
         ttk.Button(buttons,text="Osvježi",command=self.refresh_settings).pack(side="left",padx=6)
         ttk.Button(backups,text="Vrati u novi prostor",command=self.restore_selected).pack(anchor="w",pady=6)
         self.register_grid(columns,2)
-        connection=ttk.LabelFrame(right,text="Pristup poslovnim podacima",padding=14);connection.pack(fill="x",pady=(0,12))
+        connection=Card(right,"Pristup poslovnim podacima",padding=15);connection.pack(fill="x",pady=(0,12))
         self.access_status=tk.StringVar(value="Provjera pristupa…")
         ttk.Label(connection,textvariable=self.access_status).pack(anchor="w",pady=4)
         ttk.Button(connection,text="Upravljaj pristupom",command=self.sync_dialog).pack(anchor="w",pady=6)
-        cleanup=ttk.LabelFrame(right,text="Uređivanje baze",padding=14);cleanup.pack(fill="x")
+        cleanup=Card(right,"Uređivanje baze",padding=15);cleanup.pack(fill="x")
         ttk.Label(cleanup,text="Pregledajte moguće duplikate prije spajanja.",wraplength=350).pack(anchor="w")
         ttk.Button(cleanup,text="Pregled duplikata",command=self.duplicate_dialog).pack(anchor="w",pady=6)
 
@@ -345,7 +365,7 @@ class Desktop(SecondaryPages):
         self.metric_values={}
         for column,(key,label) in enumerate((("total","Tvrtke u bazi"),("cities","Gradovi"),("phones","S telefonom"),("websites","S web stranicom"))):
             metrics.columnconfigure(column,weight=1,uniform="metric")
-            panel=ttk.Frame(metrics,style="Panel.TFrame",padding=14)
+            panel=Card(metrics,padding=15)
             panel.grid(row=0,column=column,sticky="nsew",padx=(0,10 if column<3 else 0))
             row=ttk.Frame(panel,style="PanelInner.TFrame")
             row.pack(fill="x")
@@ -360,13 +380,13 @@ class Desktop(SecondaryPages):
         charts.pack(fill="x",pady=(0,12))
         charts.columnconfigure(0,weight=6)
         charts.columnconfigure(1,weight=5)
-        city=ttk.Frame(charts,style="Panel.TFrame",padding=14)
+        city=Card(charts,padding=15)
         city.grid(row=0,column=0,sticky="nsew",padx=(0,12))
         ttk.Label(city,text="Najzastupljeniji gradovi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
         ttk.Label(city,text="Broj tvrtki po gradu",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
         self.city_chart=tk.Canvas(city,width=220,height=165,bg=PANEL,highlightthickness=0)
         self.city_chart.pack(fill="x",expand=True,pady=(8,0))
-        coverage=ttk.Frame(charts,style="Panel.TFrame",padding=14)
+        coverage=Card(charts,padding=15)
         coverage.grid(row=0,column=1,sticky="nsew")
         ttk.Label(coverage,text="Dostupnost podataka",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
         ttk.Label(coverage,text="Kontaktni podaci u imeniku",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
@@ -377,7 +397,7 @@ class Desktop(SecondaryPages):
         self.overview_data=None
         for canvas in (self.city_chart,self.coverage_chart):
             canvas.bind("<Configure>",lambda _e:self.draw_charts())
-        recent=ttk.Frame(view,style="Panel.TFrame",padding=14)
+        recent=Card(view,padding=15)
         recent.pack(fill="both",expand=True)
         top=ttk.Frame(recent,style="PanelInner.TFrame")
         top.pack(fill="x")
@@ -467,7 +487,7 @@ class Desktop(SecondaryPages):
 
     def build_directory(self):
         self.section_header(self.body,"ISTRAŽIVANJE PODATAKA","Poslovni imenik","Pretražite i filtrirajte cjelokupnu bazu tvrtki.")
-        filter_panel=ttk.Frame(self.body,style="Panel.TFrame",padding=15)
+        filter_panel=Card(self.body,padding=15)
         filter_panel.pack(fill="x",pady=(0,12))
         ttk.Label(filter_panel,text="Napredni filtri",style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
         filters=ttk.Frame(filter_panel)
@@ -478,33 +498,40 @@ class Desktop(SecondaryPages):
         self.contact=tk.StringVar(value="Svi zapisi")
         self.kind=tk.StringVar(value="Sve vrste")
         self.sort=tk.StringVar(value="Naziv A–Ž")
-        ttk.Label(filters,text="Naziv, OIB ili MBS").grid(row=0,column=0,sticky="w")
+        self.provider=tk.StringVar(value="Svi izvori")
+        self.provider_map={"Svi izvori":""}
+        ttk.Label(filters,text="Pretraživanje").grid(row=0,column=0,sticky="w")
         entry=ttk.Entry(filters,textvariable=self.query)
         entry.grid(row=1,column=0,columnspan=4,sticky="ew",pady=(0,8))
-        for index,label,var,values in ((1,"Grad",self.city,["Svi gradovi"]),(2,"Djelatnost (NKD)",self.industry,["Sve djelatnosti"]),(3,"Kontakt",self.contact,list(CONTACTS))):
+        for index,label,var,values in ((1,"Grad",self.city,["Svi gradovi"]),(2,"Kontakt",self.contact,list(CONTACTS)),(3,"Vrsta subjekta",self.kind,list(KINDS)),(4,"Izvor",self.provider,["Svi izvori"])):
             ttk.Label(filters,text=label).grid(row=2,column=index-1,sticky="w")
             box=ttk.Combobox(filters,textvariable=var,values=values,state="readonly",width=18)
             box.grid(row=3,column=index-1,sticky="ew",padx=(0,8))
             box.bind("<<ComboboxSelected>>",lambda _e:self.schedule_search())
             if index==1:self.citybox=box
-            if index==2:self.industrybox=box
+            if index==4:self.providerbox=box
         for column in range(4):filters.columnconfigure(column,weight=1,uniform="filters")
         ttk.Button(filters,text="Pretraži",style="Accent.TButton",command=self.schedule_search).grid(row=1,column=4,padx=(8,0))
-        for col,label,var,values in ((0,"Vrsta subjekta",self.kind,list(KINDS)),(1,"Sortiranje",self.sort,list(SORTS))):
+        for col,label,var,values in ((0,"Sortiranje",self.sort,list(SORTS)),(1,"Djelatnost (NKD)",self.industry,["Sve djelatnosti"])):
             ttk.Label(filters,text=label).grid(row=4,column=col,sticky="w",pady=(8,0))
             selector=ttk.Combobox(filters,textvariable=var,values=values,state="readonly",width=18)
             selector.grid(row=5,column=col,sticky="ew",padx=(0,8))
             selector.bind("<<ComboboxSelected>>",lambda _e:self.schedule_search())
+            if var is self.industry:self.industrybox=selector
         def reset():
-            for var,value in ((self.query,""),(self.city,"Svi gradovi"),(self.industry,"Sve djelatnosti"),(self.contact,"Svi zapisi"),(self.kind,"Sve vrste"),(self.sort,"Naziv A–Ž")):var.set(value)
+            for var,value in ((self.query,""),(self.city,"Svi gradovi"),(self.industry,"Sve djelatnosti"),(self.contact,"Svi zapisi"),(self.kind,"Sve vrste"),(self.sort,"Naziv A–Ž"),(self.provider,"Svi izvori")):var.set(value)
             self.schedule_search()
         ttk.Button(filters,text="Poništi filtre",command=reset).grid(row=5,column=4)
         self.query.trace_add("write",lambda *_:self.schedule_search())
-        table=ttk.Frame(self.body)
+        results=Card(self.body,padding=15)
+        results.pack(fill="both",expand=True)
+        resultbar=ttk.Frame(results,style="PanelInner.TFrame");resultbar.pack(fill="x",pady=(0,9))
+        ttk.Label(resultbar,textvariable=self.stats,style="PanelTitle.TLabel").pack(side="left")
+        table=ttk.Frame(results,style="PanelInner.TFrame")
         table.pack(fill="both",expand=True)
-        self.tree=ttk.Treeview(table,columns=("name","oib","city","industry","email"),show="headings",selectmode="browse")
-        for key,label,width in (("name","Tvrtka",210),("oib","OIB",90),("city","Grad",90),("industry","Djelatnost",155),("email","E-pošta",140)):
-            self.tree.heading(key,text=label)
+        self.tree=ttk.Treeview(table,columns=("name","city","phone","web","source","action"),show="headings",selectmode="browse",height=7)
+        for key,label,width in (("name","TVRTKA",250),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",75)):
+            self.tree.heading(key,text=label,anchor="w")
             self.tree.column(key,width=width,minwidth=60,stretch=True)
         scroll=ttk.Scrollbar(table,orient="vertical",command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
@@ -512,7 +539,12 @@ class Desktop(SecondaryPages):
         scroll.pack(side="right",fill="y")
         self.tree.bind("<Double-1>",lambda _e:self.open_selected())
         self.tree.bind("<Return>",lambda _e:self.open_selected())
-        footer=ttk.Frame(self.body)
+        def click_detail(event):
+            row=self.tree.identify_row(event.y)
+            if row and self.tree.identify_column(event.x)=="#6":
+                self.tree.selection_set(row);self.open_selected()
+        self.tree.bind("<ButtonRelease-1>",click_detail)
+        footer=ttk.Frame(results,style="PanelInner.TFrame")
         footer.pack(fill="x",pady=(12,0))
         self.previous=ttk.Button(footer,text="Prethodna",command=lambda:self.move(-1),state="disabled")
         self.previous.pack(side="left")
@@ -520,7 +552,6 @@ class Desktop(SecondaryPages):
         ttk.Label(footer,textvariable=self.pagination,padding=10).pack(side="left")
         self.next=ttk.Button(footer,text="Sljedeća",command=lambda:self.move(1),state="disabled")
         self.next.pack(side="left")
-        ttk.Button(footer,text="Otvori profil",command=self.open_selected).pack(side="right")
         ttk.Button(footer,text="Osvježi",command=self.refresh).pack(side="right",padx=8)
         entry.focus_set()
 
@@ -539,7 +570,7 @@ class Desktop(SecondaryPages):
     def directory_filters(self):
         return {"q":self.query.get(),"city":"" if self.city.get()=="Svi gradovi" else self.city.get(),
                 "industry":"" if self.industry.get()=="Sve djelatnosti" else self.industry.get(),
-                "contact":CONTACTS.get(self.contact.get(),""),"entity_kind":KINDS[self.kind.get()]}
+                "contact":CONTACTS.get(self.contact.get(),""),"entity_kind":KINDS[self.kind.get()],"provider":self.provider_map.get(self.provider.get(),"")}
 
     def refresh(self):
         self.search_timer=None
@@ -568,7 +599,7 @@ class Desktop(SecondaryPages):
                 return
             self.tree.delete(*self.tree.get_children())
             for row in data["rows"]:
-                self.tree.insert("","end",iid=str(row["id"]),values=tuple(row.get(k,"") or "—" for k in ("title","oib","city","industry","email")))
+                self.tree.insert("","end",iid=str(row["id"]),values=(*[row.get(k) or "—" for k in ("title","city","phone","website")],"Tvrtke" if "registry" in (row.get("providers") or "").split(",") else "Uvezeni podaci","Detalji →"))
             self.pagination.set(f"Stranica {self.page} / {pages}")
             self.stats.set(f"{self.total:,} rezultata".replace(",","."))
             self.status.set("Nema rezultata." if not self.total else "Spremno.")
