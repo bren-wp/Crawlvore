@@ -47,6 +47,8 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: python tools/ui_e2e.py
       - run: python tools/layout_acceptance.py layout-evidence
+      - name: WordPress PHP syntax verification
+        run: php -l wordpress/tvrtke/tvrtke.php
       - run: python tools/visual_check.py
       - run: python tools/pixel_diff.py > pixel-diff.json
       - name: Exact approved visual comparison (production only)

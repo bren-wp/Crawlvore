@@ -1,0 +1,84 @@
+{
+  "exact": false,
+  "threshold_percent": 30.0,
+  "threshold_passed": false,
+  "views": [
+    {
+      "view": "overview",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 661020,
+      "total_pixels": 896000,
+      "changed_percent": 73.774554,
+      "exact": false
+    },
+    {
+      "view": "directory",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 625645,
+      "total_pixels": 896000,
+      "changed_percent": 69.826451,
+      "exact": false
+    },
+    {
+      "view": "registry",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 639453,
+      "total_pixels": 896000,
+      "changed_percent": 71.367522,
+      "exact": false
+    },
+    {
+      "view": "jobs",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 660819,
+      "total_pixels": 896000,
+      "changed_percent": 73.752121,
+      "exact": false
+    },
+    {
+      "view": "data",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 600265,
+      "total_pixels": 896000,
+      "changed_percent": 66.993862,
+      "exact": false
+    },
+    {
+      "view": "analytics",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 576628,
+      "total_pixels": 896000,
+      "changed_percent": 64.355804,
+      "exact": false
+    },
+    {
+      "view": "settings",
+      "size": [
+        1280,
+        700
+      ],
+      "changed_pixels": 659497,
+      "total_pixels": 896000,
+      "changed_percent": 73.604576,
+      "exact": false
+    }
+  ]
+}

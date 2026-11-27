@@ -62,7 +62,7 @@ jobs:
           if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
           npm run typecheck
           npm run build:frontend
-      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt pip-audit==2.10.1
+      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt pip-audit==2.10.1 pillow==13.0.0
       - run: python -m pip check
       - name: Native build dependency vulnerability audit
         run: python -m pip_audit --strict
@@ -107,7 +107,7 @@ jobs:
             extra=(--add-data "registry-bundle/registry-seed.sqlite3.xz:." --add-data "registry-bundle/registry-seed.size:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
           fi
           mkdir -p native-edition
-          python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
+          python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"],"version":open("VERSION").read().strip()}))' > native-edition/edition.json
           extra+=(--add-data "native-edition/edition.json:.")
           python -m PyInstaller --paths src "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview src/tvrtk_scraper.py
           mkdir -p native-preview
@@ -170,6 +170,14 @@ jobs:
           sudo apt-get install -y ./release-assets/Crawlvora-Linux-amd64.deb
           WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /usr/bin/crawlvora --native-smoke
           sudo apt-get remove -y crawlvora
+      - name: Record tested Linux installer and archive identity
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          ACCEPTED_EDITION: ${{ inputs.edition || 'Online' }}
+        run: |
+          set -euo pipefail
+          python tools/edition_acceptance.py release-assets --edition "$ACCEPTED_EDITION" --platform Linux --source "$GITHUB_SHA" --hr "${CRAWLVORA_EXPECTED_REGISTRY_SHA256:-}"
       - name: Build standalone signed-update client
         shell: bash
         run: |

@@ -26,7 +26,7 @@ if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
     if ($LASTEXITCODE) { throw 'Registry compression failed' }
     $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3.xz;.','--add-data','registry-bundle/registry-seed.size;.','--add-data','registry-bundle/registry-seed.sha256;.','--add-data','registry-bundle/registry-seed.json;.')
 }
-@{edition=$Edition;language=$Language} | ConvertTo-Json -Compress | Set-Content (Join-Path $output 'edition.json') -Encoding ascii
+@{edition=$Edition;language=$Language;version=(Get-Content VERSION -Raw).Trim()} | ConvertTo-Json -Compress | Set-Content (Join-Path $output 'edition.json') -Encoding ascii
 $registryArgs+=@('--add-data',((Join-Path $output 'edition.json')+';.'))
 python -m PyInstaller --paths src @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --exclude-module playwright --exclude-module webview src/tvrtk_scraper.py
 if ($LASTEXITCODE) { throw 'Embedded worker build failed' }

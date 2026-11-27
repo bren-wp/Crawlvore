@@ -43,6 +43,14 @@ def run():
                 page.add_init_script("""document.addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;const name=button.id||['view','go','profileTab','contactFilter'].map(key=>key in button.dataset?key+':'+button.dataset[key]:'').filter(Boolean).join('|')||'dynamic';const seen=JSON.parse(sessionStorage.getItem('cvQAControls')||'[]');if(!seen.includes(name)){seen.push(name);sessionStorage.setItem('cvQAControls',JSON.stringify(seen));}},true)""")
                 page.goto(session,wait_until='domcontentloaded')
                 expect(page.locator('html')).to_have_attribute('lang','hr')
+                expect(page.locator('.brand')).to_contain_text('Tvrtke')
+                expect(page.locator('.brand')).not_to_contain_text('Crawlvora')
+                expect(page.locator('.sidebar')).not_to_contain_text('Lokalni radni prostor')
+                expect(page.locator('.topbar')).not_to_contain_text('Lokalna baza')
+                expect(page.locator('.about-panel a[href="https://tvrtke.com.hr/"]')).to_have_count(1)
+                expect(page.locator('.about-panel a[href="https://brendigo.com/"]')).to_have_count(1)
+                expect(page.locator('.about-panel')).to_contain_text('Brendigo')
+
                 expect(page.locator('#preview-rows .textbtn').first).to_be_visible(timeout=20000)
                 page.locator('#top-export').click()
                 expect(page.locator('#data')).to_be_visible()
@@ -92,7 +100,7 @@ def run():
                 expect(page.locator('#reg-check')).to_be_disabled()
                 expect(page.locator('#reg-stop')).to_be_disabled()
                 expect(page.locator('#diff-run')).to_be_disabled()
-                expect(page.locator('#registry h1')).to_have_text('Crawlvora')
+                expect(page.locator('#registry h1')).to_have_text('Tvrtke')
                 page.locator('#reg-reload').click()
                 expect(page.locator('#reg-categories')).to_contain_text('Nema preuzetih kategorija. Pokrenite sinkronizaciju.')
                 assert page.locator('[data-view="collector"],[data-view="studio"]').count()==0

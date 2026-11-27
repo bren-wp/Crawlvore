@@ -2,6 +2,25 @@
 
 ## 8.1.7
 
+- Harden registry OAuth and HTTP retry handling and correct CI test fixtures and Pillow installation.
+- Add native saved company selection keyed by MBS, restore access credentials to Settings, and introduce an isolated administrator-only WordPress directory prototype.
+
+- Use complete compact 11-file regular releases with database-free installers and portable packages; add opt-in authorized registry refresh on the first launch of each new installed version.
+
+- Enforce an independent mandatory 16-file release contract and verify Linux installer/archive acceptance receipts alongside Windows installer/portable receipts before publication.
+
+- Add procedural native card surfaces, three-panel analytics, source filters, job status cards, readable snapshot comparison and original launcher assets; retain the strict zero-difference gate and add the intermediate 30% check.
+
+- Improve native header, navigation spacing, overview metrics and charts; capture matching 1280×700 lossless reference and native screenshots and add a strict RGB comparator with single-channel regression tests. Current native visual acceptance remains failed.
+
+- Use final reference palette and compact desktop layout; move synchronization above Settings, add native navigation icons and a resizable non-maximized window with adaptive card grids and overflow access.
+- Capture actual native windows separately from reference screenshots and check seven pages at compact window sizes.
+
+- Add native settings, tasks, import/export and analytics candidate views with bounded authenticated streaming transfers.
+
+- Rebrand the visible application to Tvrtke, add official product and developer information, remove workspace badges, retain compatibility identifiers and existing data paths.
+- Add offline verified legacy seed cleanup with a recovery copy and preservation of linked official records.
+
 - Add reviewed duplicate reconciliation, verified pre-merge backup, preservation of alternate fields, history and original records, and reimport protection.
 - Port profile history and additional business data into native widgets; check directory coverage before skipping a completed snapshot.
 

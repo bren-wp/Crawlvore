@@ -32,7 +32,7 @@ class DesktopWorkerTests(unittest.TestCase):
                     self.assertEqual(denied.exception.code,403)
                     denied.exception.close()
                     opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-                    with opener.open(url,timeout=5) as response:self.assertIn(b'Crawlvora',response.read())
+                    with opener.open(url,timeout=5) as response:self.assertIn(b'Tvrtke',response.read())
                     with self.assertRaises(urllib.error.HTTPError) as denied:opener.open(base+'/api/stats?'+('&'.join('x'+str(i)+'=1' for i in range(65))),timeout=5)
                     self.assertEqual(denied.exception.code,400)
                     denied.exception.close()
@@ -63,7 +63,7 @@ class DesktopWorkerTests(unittest.TestCase):
                 opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
                 with opener.open(url,timeout=5) as response:
                     self.assertEqual(response.geturl(),base+'/')
-                    self.assertIn(b'Crawlvora',response.read())
+                    self.assertIn(b'Tvrtke',response.read())
                 with opener.open(base+'/api/stats',timeout=5) as response:
                     self.assertEqual(json.load(response)['total'],0)
                 import re

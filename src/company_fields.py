@@ -12,4 +12,4 @@ def formula_safe(v):
     return "'"+v if v.lstrip().startswith(('=','+','-','@','\t','\r','\n')) or v.startswith(('\t','\r','\n')) else v
 
 
-NAMES = {'registry':'Crawlvora','tvrtke':'Postojeći podaci','companywall':'Postojeći podaci','company':'Postojeći podaci','html':'Uvezeni podaci','json':'Uvezeni podaci','csv':'Uvezeni podaci'}
+NAMES = {'registry':'Tvrtke','tvrtke':'Postojeći podaci','companywall':'Postojeći podaci','company':'Postojeći podaci','html':'Uvezeni podaci','json':'Uvezeni podaci','csv':'Uvezeni podaci'}

@@ -360,7 +360,10 @@ def start_registry(bot,registry,creds,limit=500,check=False,*,pinned_snapshot=No
                 cats=catalog(client.spec()); _,data=client.get('snapshots'); snaps=rows_of(data)
                 if not snaps: raise ValueError('API nije vratio dostupne snimke.')
                 bot.log(f'API dostupan · {len(cats)} kategorija · {len(snaps)} snimki.')
-            else: registry.sync(bot,client,limit,pinned_snapshot=pinned_snapshot); bot.log('Sinkronizacija završena.')
+            else:
+                complete=registry.sync(bot,client,limit,pinned_snapshot=pinned_snapshot,allow_full_refresh=allow_full_refresh)
+                if complete:bot.log('Sinkronizacija završena.')
+                else:bot.log('Dostupna je nova snimka; potrebna je potvrda preuzimanja.')
             bot.update(status='completed')
         except Stopped: bot.update(status='stopped'); bot.log('Zaustavljeno. Spremljene stranice ostaju dostupne.')
         except Exception as e: bot.inc('errors'); bot.update(status='failed',retryable=isinstance(e,TransientRegistryError)); bot.log(str(e) if isinstance(e,(ValueError,PermissionError)) else 'Pogreška: '+type(e).__name__)

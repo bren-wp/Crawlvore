@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory() as tmp:
   for i,name in enumerate(('Atlas Demo','Birch Demo','Cedar Demo','Delta Demo','Elm Demo','Fjord Demo')):
    store.upsert(db,{'title':name,'city':('Zagreb','Rijeka','Split')[i%3],'phone':'012345','website':'https://example.invalid'},provider='csv')
  stats=store.stats(); companies=store.query(limit=5); detail=store.detail(companies["rows"][0]["id"]); providers=[dict(x,label=x['provider']) for x in store.providers()]
-fixtures={'/api/stats':stats,'/api/companies':companies,'/api/cities':['Zagreb','Rijeka'],'/api/providers':providers,'/api/projects':[],'/api/registry':{'runs':[{'snapshot':'22','complete':1},{'snapshot':'21','complete':1}],'categories':[],'configured':False},'/api/jobs':{'jobs':[],'schedule':{'enabled':0,'hour':3}},'/api/status':{'status':'idle','page':0,'last':0,'processed':0,'added':0,'skipped':0,'errors':0,'logs':[]}}
+fixtures={'/api/stats':stats,'/api/companies':companies,'/api/cities':['Zagreb','Rijeka'],'/api/providers':providers,'/api/projects':[],'/api/registry':{'runs':[{'snapshot':'22','complete':1},{'snapshot':'21','complete':1}],'categories':[],'configured':False},'/api/jobs':{'jobs':[],'schedule':{'enabled':0,'hour':3},'update_sync':{'enabled':0,'last_version':''}},'/api/status':{'status':'idle','page':0,'last':0,'processed':0,'added':0,'skipped':0,'errors':0,'logs':[]}}
 fixtures['/api/company/'+str(companies['rows'][0]['id'])]=detail
 fixtures['/api/history/'+str(companies['rows'][0]['id'])]=[]
 fixtures['/api/industries']=[]

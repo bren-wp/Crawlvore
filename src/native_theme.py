@@ -1,0 +1,200 @@
+"""Shared native design tokens, no web renderer."""
+import tkinter as tk
+import math
+import sys
+from pathlib import Path
+from tkinter import ttk
+
+BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
+TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
+
+def nav_icon(root,key,color):
+    image=tk.PhotoImage(master=root,width=20,height=20)
+    def line(x1,y1,x2,y2):
+        steps=max(abs(x2-x1),abs(y2-y1),1)
+        for i in range(steps+1):
+            x=round(x1+(x2-x1)*i/steps);y=round(y1+(y2-y1)*i/steps)
+            image.put(color,(x,y,min(20,x+2),min(20,y+2)))
+    def rect(x,y,w,h):
+        line(x,y,x+w,y);line(x+w,y,x+w,y+h);line(x+w,y+h,x,y+h);line(x,y+h,x,y)
+    if key=="overview":
+        for x in (2,11):
+            for y in (2,11):rect(x,y,5,5)
+    elif key=="directory":
+        rect(3,3,7,14);rect(10,8,6,9)
+        for y in (6,10,14):line(5,y,7,y)
+        line(1,17,18,17)
+    elif key=="jobs":
+        rect(2,5,15,12);line(2,9,17,9);line(6,2,6,6);line(13,2,13,6)
+    elif key=="data":
+        line(2,6,17,6);line(13,2,17,6);line(13,10,17,6)
+        line(17,14,2,14);line(6,10,2,14);line(6,18,2,14)
+    elif key=="analytics":
+        rect(2,12,3,6);rect(8,7,3,11);rect(14,2,3,16)
+    elif key=="registry":
+        line(2,7,9,2);line(9,2,17,7);line(2,7,17,7);line(2,17,17,17)
+        for x in (4,9,14):line(x,8,x,15)
+    else:
+        points=((8,2),(11,2),(12,5),(15,5),(18,8),(15,11),(15,14),(12,15),(11,18),(8,18),(7,15),(4,15),(2,12),(4,9),(4,6),(7,5),(8,2))
+        for start,end in zip(points,points[1:]):line(*start,*end)
+        rect(7,7,5,5)
+    return image
+
+def install(root):
+    style=ttk.Style(root)
+    style.theme_use("clam")
+    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=("Segoe UI",-13),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
+    for name,fill,fg in (("TButton",PANEL2,TEXT),("Accent.TButton",ACCENT,INK),
+                         ("Nav.TButton",SIDE,TEXT),("Active.Nav.TButton",ACTIVE,ACCENT)):
+        style.configure(name,background=fill,foreground=fg,padding=(11,9),
+                        anchor="w" if "Nav" in name else "center",font=("Segoe UI",10,"bold"),borderwidth=1)
+        style.map(name,foreground=[("disabled",MUTED),("active",fg)],background=[("active",fill)])
+    style.configure("Upload.TFrame",background=BG,borderwidth=1,relief="solid")
+    style.configure("Upload.TLabel",background=BG,foreground=TEXT)
+    style.configure("UploadIcon.TLabel",background=BG,foreground=ACCENT,font=("Segoe UI",-28,"bold"))
+    style.configure("Header.TFrame",background=SIDE)
+    style.configure("Header.TLabel",background=SIDE,foreground=MUTED)
+    style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=("Segoe UI",10,"bold"))
+    style.configure("Small.TButton",padding=(9,5),font=("Segoe UI",9,"bold"))
+    style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=("Segoe UI",9))
+    style.configure("Recent.Treeview",rowheight=36)
+    style.configure("Card.TFrame",background=BG,borderwidth=0,relief="flat")
+    style.configure("Panel.TFrame",background=PANEL,borderwidth=0,relief="flat")
+    style.configure("PanelInner.TFrame",background=PANEL)
+    style.configure("Panel.TCheckbutton",background=PANEL,foreground=TEXT,indicatorbackground=BG,indicatorforeground=ACCENT,indicatorcolor=BG,indicatordiameter=12)
+    style.map("Panel.TCheckbutton",indicatorcolor=[("selected",ACCENT)],background=[("active",PANEL)])
+    style.configure("Vertical.TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
+    style.configure("TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
+    style.configure("TSeparator",background=LINE)
+    style.configure("Nav.TButton",borderwidth=0)
+    style.configure("Treeview",font=("Segoe UI",-13))
+    style.configure("Panel.TLabel",background=PANEL)
+    style.configure("Metric.TLabel",background=PANEL,font=("Segoe UI",-30,"bold"))
+    style.configure("Title.TLabel",font=("Segoe UI",-28,"bold"))
+    style.configure("Kicker.TLabel",foreground=ACCENT,font=("Segoe UI",9,"bold"))
+    style.configure("Muted.TLabel",foreground=MUTED)
+    style.configure("PanelTitle.TLabel",background=PANEL,font=("Segoe UI",-16,"bold"),padding=0)
+    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED)
+    style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=43,borderwidth=0)
+    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=("Segoe UI",9,"bold"),padding=(8,8))
+    style.map("Treeview",background=[("selected",ACTIVE)],foreground=[("selected",TEXT)])
+    style.configure("TEntry",fieldbackground=BG,padding=(8,8),bordercolor=LINE)
+    style.configure("TCombobox",fieldbackground=BG,foreground=TEXT,background=PANEL2,padding=(8,7),arrowsize=14)
+    style.map("TCombobox",fieldbackground=[("readonly",BG)],foreground=[("readonly",TEXT)])
+    style.configure("TSpinbox",fieldbackground=BG,padding=(8,7))
+    style.configure("TLabelframe",background=PANEL,bordercolor=LINE,relief="solid")
+    style.configure("TLabelframe.Label",background=PANEL,foreground=TEXT,font=("Segoe UI",12,"bold"))
+    style.configure("TNotebook",background=BG,borderwidth=0)
+    style.configure("TNotebook.Tab",background=PANEL2,foreground=TEXT,padding=(12,8))
+    style.map("TNotebook.Tab",background=[("selected",ACTIVE)],foreground=[("selected",ACCENT)])
+    style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT)
+
+def panel(parent,title=None,padding=15):
+    box=ttk.Frame(parent,style="Panel.TFrame",padding=padding)
+    if title:ttk.Label(box,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
+    return box
+
+def mix(a,b,t):
+    return "#"+"".join(f"{round(int(a[i:i+2],16)*(1-t)+int(b[i:i+2],16)*t):02x}" for i in (1,3,5))
+
+def clip_band(points,projection,bound,keep_above):
+    if not points:return []
+    result=[]
+    prev=points[-1]
+    d0=projection(prev)-bound
+    for point in points:
+        d1=projection(point)-bound
+        inside=(d1>=0 if keep_above else d1<=0)
+        was=(d0>=0 if keep_above else d0<=0)
+        if inside!=was:
+            t=d0/(d0-d1)
+            result.append((prev[0]+t*(point[0]-prev[0]),prev[1]+t*(point[1]-prev[1])))
+        if inside:result.append(point)
+        prev,d0=point,d1
+    return result
+
+def rounded_points(width,height,radius):
+    r=min(radius,width/2,height/2)
+    result=[]
+    for cx,cy,start in ((width-r,r,-90),(width-r,height-r,0),(r,height-r,90),(r,r,180)):
+        for angle in range(start,start+91,15):
+            a=math.radians(angle)
+            result.append((cx+r*math.cos(a),cy+r*math.sin(a)))
+    return result
+
+def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
+    """Draw only procedural surface geometry behind live native controls."""
+    canvas=tk.Canvas(parent,bg=outer,highlightthickness=0,borderwidth=0,takefocus=0)
+    canvas.place(x=0,y=0,relwidth=1,relheight=1,bordermode="outside")
+    canvas.tk.call("lower",canvas._w)
+    last=None
+    pending=None
+    def draw():
+        nonlocal last,pending
+        pending=None
+        w,h=canvas.winfo_width(),canvas.winfo_height()
+        if (w,h)==last or min(w,h)<3:return
+        last=(w,h)
+        canvas.delete("surface")
+        points=rounded_points(w-1,h-1,radius)
+        angle=math.radians(145)
+        dx,dy=math.sin(angle),-math.cos(angle)
+        span=max(1,dx*(w-1)+dy*(h-1))
+        def projection(point):return (dx*point[0]+dy*point[1])/span
+        bands=24
+        for i in range(bands):
+            polygon=clip_band(points,projection,i/bands,True)
+            polygon=clip_band(polygon,projection,min(1,(i+1)/bands+.002),False)
+            if len(polygon)>=3:
+                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(start,end,(i+.5)/bands),outline="",tags="surface")
+        if border:
+            canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
+    def resized(_event):
+        nonlocal pending
+        if pending is not None:canvas.after_cancel(pending)
+        pending=canvas.after(45,draw)
+    def destroyed(_event):
+        nonlocal pending
+        if pending is not None:
+            canvas.after_cancel(pending)
+            pending=None
+    canvas.bind("<Configure>",resized)
+    canvas.bind("<Destroy>",destroyed)
+    return canvas
+
+class Card(ttk.Frame):
+    def __init__(self,parent,title=None,padding=15,outer=BG,**kwargs):
+        super().__init__(parent,style="Card.TFrame",padding=padding,**kwargs)
+        decorate(self,outer=outer)
+        if title:ttk.Label(self,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
+
+def header_glow(parent):
+    """Native procedural header accent; no screenshot or web rendering."""
+    canvas=tk.Canvas(parent,height=119,bg=BG,highlightthickness=0,borderwidth=0,takefocus=0)
+    canvas.place(x=0,y=0,relwidth=1)
+    canvas.tk.call("lower",canvas._w)
+    def draw(event):
+        w,h=event.width,event.height
+        if w<20:return
+        canvas.delete("glow")
+        # Header surface follows the reference's rising diagonal.
+        points=[(.80*w,0),(w,0),(w,h),(.56*w,h),(.70*w,.43*h)]
+        def projection(point):
+            return point[0]/w-(.80-.24*point[1]/h)
+        for i in range(24):
+            lo=i*.44/24;hi=(i+1)*.44/24
+            polygon=clip_band(points,projection,lo,True)
+            polygon=clip_band(polygon,projection,hi+.001,False)
+            if len(polygon)>=3:
+                alpha=.24*math.exp(-lo*13)
+                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(BG,ACCENT,alpha),outline="",tags="glow")
+    canvas.bind("<Configure>",draw)
+    return canvas
+
+def product_icon(root):
+    """Reuse the original launch asset in source and packaged native builds."""
+    bundle=getattr(sys,"_MEIPASS",None)
+    path=Path(bundle)/"assets"/"icon.png" if bundle else Path(__file__).resolve().parents[1]/"desktop"/"src-tauri"/"icons"/"icon.png"
+    icon=tk.PhotoImage(master=root,file=str(path))
+    root.iconphoto(True,icon)
+    return icon

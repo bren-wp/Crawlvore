@@ -1,0 +1,54 @@
+{
+  "captures": [
+    {
+      "view": "overview",
+      "capture": [
+        1280,
+        700
+      ]
+    },
+    {
+      "view": "directory",
+      "capture": [
+        1280,
+        700
+      ]
+    },
+    {
+      "view": "jobs",
+      "capture": [
+        1280,
+        700
+      ]
+    },
+    {
+      "view": "data",
+      "capture": [
+        1280,
+        700
+      ]
+    },
+    {
+      "view": "analytics",
+      "capture": [
+        1280,
+        700
+      ]
+    },
+    {
+      "view": "registry",
+      "capture": [
+        1280,
+        700
+      ]
+    },
+    {
+      "view": "settings",
+      "capture": [
+        1280,
+        700
+      ]
+    }
+  ],
+  "tk_scaling": 1.334646962233169
+}

@@ -25,7 +25,7 @@ function go(view) { if (view !== 'directory') {
 } current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
     e.setAttribute('aria-current', 'page');
 else
-    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), registry: 'Crawlvora', data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
+    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), registry: 'Tvrtke', data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
     refreshAnalytics().catch(fail); if (view === 'settings')
     refreshSettings().catch(fail); if (view === 'jobs')
     refreshJobs(true).catch(fail); if (view === 'overview')
@@ -210,7 +210,7 @@ for (const id of ['city', 'contact', 'sort', 'source-filter', 'entity-kind', 'in
     $(id).onchange = () => { page = 1; directory().catch(fail); };
 $('reset').onclick = () => { for (const id of ['search', 'city', 'contact', 'source-filter', 'entity-kind', 'industry-filter'])
     $(id).value = ''; $('sort').value = 'title'; page = 1; directory().catch(fail); };
-const providerNames = { registry: 'Crawlvora', tvrtke: 'Postojeći podaci', companywall: 'Postojeći podaci', company: 'Postojeći podaci', html: 'Uvezeni podaci', json: 'Uvezeni podaci', csv: 'Uvezeni podaci' };
+const providerNames = { registry: 'Tvrtke', tvrtke: 'Postojeći podaci', companywall: 'Postojeći podaci', company: 'Postojeći podaci', html: 'Uvezeni podaci', json: 'Uvezeni podaci', csv: 'Uvezeni podaci' };
 async function providers() { const list = await api('/api/providers'), select = $('source-filter'), old = select.value; select.replaceChildren(new Option(translate('Svi izvori'), '')); $('source-summary').replaceChildren(); for (const p of list) {
     const label = providerNames[p.provider] || 'Postojeći podaci';
     select.append(new Option(label, p.provider));
@@ -391,6 +391,7 @@ async function refreshJobs(init = false) { const request = ++jobsRefreshSequence
     return; if (init) {
     $('schedule-enabled').checked = !!r.schedule.enabled;
     $('schedule-hour').value = String(r.schedule.hour);
+    $('update-sync-enabled').checked = !!r.update_sync.enabled;
 } $('schedule-state').textContent = r.schedule.enabled ? translate('Aktivno') : translate('Isključeno'); const signature = JSON.stringify(r.jobs); if (signature === jobsRendered)
     return; jobsRendered = signature; const m = $('job-metrics'); m.replaceChildren(); for (const state of ['queued', 'retry_wait', 'running', 'completed', 'failed']) {
     const el = make('div');
@@ -416,6 +417,10 @@ async function refreshJobs(init = false) { const request = ++jobsRefreshSequence
     b.append(tr);
 } }
 $('jobs-refresh').onclick = () => refreshJobs(true).catch(fail);
+$('update-sync-save').onclick = () => { const enabled = $('update-sync-enabled').checked; if (enabled && !window.confirm('Dopuštate automatsko preuzimanje novih poslovnih podataka nakon nadogradnje? Potreban je ovlašteni spremljeni pristup.')) {
+    void refreshJobs(true);
+    return;
+} post('/api/jobs/update-sync', { enabled, permission: enabled }).then(() => refreshJobs(true)).catch(fail); };
 $('schedule-save').onclick = () => post('/api/jobs/schedule', { enabled: $('schedule-enabled').checked, hour: +$('schedule-hour').value, permission: $('schedule-permission').checked }).then(() => { toast(translate('Raspored je spremljen.')); return refreshJobs(true); }).catch(fail);
 $('jobs-registry').onclick = () => post('/api/jobs/add', { kind: 'registry', config: { permission: $('schedule-permission').checked, limit: 500 } }).then(() => refreshJobs()).catch(fail);
 setInterval(() => { if (current === 'jobs' && !document.hidden)
