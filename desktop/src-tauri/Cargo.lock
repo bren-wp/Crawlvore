@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "crawlvora-desktop"
-version = "8.1.5"
+version = "8.1.6"
 dependencies = [
  "open",
  "sha2 0.10.9",

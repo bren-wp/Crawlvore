@@ -64,14 +64,16 @@ Choose English or Croatian and dark or light appearance. Resize the desktop wind
 
 ## Choose your edition
 
-The intended Windows distribution offers four editions. Availability depends on verified release assets and approved data distribution.
+Four national editions are built for Windows and Linux. Each keeps its own bundled catalog scope and initial interface language; an existing language preference is preserved.
 
-| Edition | Included national catalogs |
-|---|---|
-| Full | Croatia + United Kingdom |
-| HR | Croatia |
-| GB | United Kingdom |
-| Online | None; connect or use compatible existing local catalogs |
+| Edition | Initial language | Bundled national catalog |
+|---|---|---|
+| HR Full | Croatian | Croatian Court Registry |
+| EN Full | English | United Kingdom Companies House |
+| HR Online | Croatian | None |
+| EN Online | English | None |
+
+The Croatian catalog is restored from the independently checked private registry archive. The UK catalog is the official monthly live-register data product. No private API credentials are embedded. An edition switch does not remove any previously installed user data.
 
 ## Get Crawlvora
 
@@ -82,7 +84,7 @@ The intended Windows distribution offers four editions. Availability depends on 
 | Windows 10/11 x64 | Portable executable or installer |
 | Linux x86_64 | DEB package or TAR.GZ distribution |
 
-Public Online releases contain the tested application without bundled national catalogs. Check the release notes and accompanying manifest before use. Windows packages may be unsigned. Full, HR and GB offline editions are separate distributions that require complete, reviewed national snapshots.
+Public Online releases contain the tested application without bundled national catalogs. Check the release notes and accompanying manifest before use. Windows packages may be unsigned. HR Full and EN Full are separate distributions that require complete, reviewed national snapshots.
 
 ## Crawlvora for the web
 

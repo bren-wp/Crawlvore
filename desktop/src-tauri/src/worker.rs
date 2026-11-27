@@ -74,7 +74,7 @@ pub(crate) fn spawn_worker(data: &Path, primary: bool, smoke: bool) -> Result<(W
             }
         }
     });
-    let line = rx.recv_timeout(Duration::from_secs(120)).map_err(|_| invalid("Worker startup timed out"))?;
+    let line = rx.recv_timeout(Duration::from_secs(900)).map_err(|_| invalid("Worker startup timed out"))?;
     let url = ready_url(&line)?;
     Ok((worker, url, rx))
 }

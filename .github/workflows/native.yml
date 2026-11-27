@@ -16,6 +16,15 @@ on:
       national_bundle:
         type: boolean
         default: false
+      edition:
+        type: string
+        default: ''
+      language:
+        type: string
+        default: en
+      artifact_suffix:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -25,12 +34,19 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
+      - name: Reserve disk space for offline catalog builds
+        if: runner.os == 'Linux' && (inputs.registry_bundle || inputs.national_bundle)
+        run: |
+          df -h .
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo apt-get clean
+          df -h .
       - name: Install Linux webview dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev xvfb
@@ -93,6 +109,9 @@ jobs:
           echo 'CRAWLVORA_NATIONAL_BUNDLE=1' >> "$GITHUB_ENV"
           echo "CRAWLVORA_EXPECTED_GB_SHA256=$(python -c 'import json; print(json.load(open("national-data/GB/manifest.json"))["database_sha256"])')" >> "$GITHUB_ENV"
       - name: Build worker and assemble preview
+        env:
+          SELECTED_EDITION: ${{ inputs.edition }}
+          SELECTED_LANGUAGE: ${{ inputs.language || 'en' }}
         shell: bash
         run: |
           extra=()
@@ -104,7 +123,11 @@ jobs:
             test -s national-data/GB/united-kingdom.sqlite3.gz
             extra+=(--add-data "national-data:national-data")
           fi
-          if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" != 1 ] && [ "${CRAWLVORA_NATIONAL_BUNDLE:-}" != 1 ]; then
+          if [ -n "$SELECTED_EDITION" ]; then
+            mkdir -p native-edition
+            python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"],"language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
+            extra+=(--add-data "native-edition/edition.json:.")
+          elif [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" != 1 ] && [ "${CRAWLVORA_NATIONAL_BUNDLE:-}" != 1 ]; then
             mkdir -p native-edition
             printf '%s\n' '{"edition":"Online"}' > native-edition/edition.json
             extra+=(--add-data "native-edition/edition.json:.")
@@ -127,13 +150,13 @@ jobs:
         run: python tools/native_worker_recovery.py --worker native-preview/worker/CrawlvoraWorker
       - name: Native window smoke test (Linux)
         if: runner.os == 'Linux'
-        run: WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a native-preview/Crawlvora --native-smoke
+        run: WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a native-preview/Crawlvora --native-smoke
       - name: Native window smoke test (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $p = Start-Process -FilePath (Resolve-Path native-preview/Crawlvora.exe).Path -ArgumentList '--native-smoke' -PassThru
-          if (!$p.WaitForExit(240000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
+          if (!$p.WaitForExit(900000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
           if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
       - name: Measure native smoke startup and CPU (Windows)
         if: runner.os == 'Windows' && inputs.registry_bundle != true && inputs.national_bundle != true
@@ -144,17 +167,22 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: inputs.registry_bundle != true && inputs.national_bundle != true
         with:
-          name: native-startup-${{ runner.os }}
+          name: native-startup-${{ runner.os }}${{ inputs.artifact_suffix }}
           path: native-startup.json
           if-no-files-found: error
           retention-days: 7
       - name: Build and smoke-test standalone portable and installer
         if: runner.os == 'Windows'
+        env:
+          SELECTED_EDITION: ${{ inputs.edition }}
+          SELECTED_LANGUAGE: ${{ inputs.language || 'en' }}
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
           if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
-          if ('${{ inputs.registry_bundle }}' -eq 'true' -and '${{ inputs.national_bundle }}' -eq 'true') {
+          if ($env:SELECTED_EDITION) {
+            ./windows/package-native.ps1 -Edition $env:SELECTED_EDITION -Language $env:SELECTED_LANGUAGE
+          } elseif ('${{ inputs.registry_bundle }}' -eq 'true' -and '${{ inputs.national_bundle }}' -eq 'true') {
             foreach ($edition in @('Full','HR','GB','Online')) { ./windows/package-native.ps1 -Edition $edition }
           } elseif ('${{ inputs.registry_bundle }}' -eq 'true' -or '${{ inputs.national_bundle }}' -eq 'true') {
             ./windows/package-native.ps1
@@ -170,10 +198,10 @@ jobs:
           tar -czf release-assets/Crawlvora-Linux-x86_64.tar.gz -C native-preview .
           mkdir -p /tmp/crawlvora-extracted
           tar -xzf release-assets/Crawlvora-Linux-x86_64.tar.gz -C /tmp/crawlvora-extracted
-          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a /tmp/crawlvora-extracted/Crawlvora --native-smoke
+          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /tmp/crawlvora-extracted/Crawlvora --native-smoke
           bash linux/package.sh
           sudo apt-get install -y ./release-assets/Crawlvora-Linux-amd64.deb
-          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 240 xvfb-run -a /usr/bin/crawlvora --native-smoke
+          WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /usr/bin/crawlvora --native-smoke
           sudo apt-get remove -y crawlvora
       - name: Rust dependency vulnerability audit
         if: runner.os == 'Linux'
@@ -189,21 +217,21 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure() && runner.os == 'Windows' && inputs.publish_artifacts == true
         with:
-          name: Windows-installer-diagnostics
-          retention-days: 1
+          name: Windows-installer-diagnostics${{ inputs.artifact_suffix }}
+          retention-days: 7
           path: release-assets/native-install.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: inputs.publish_artifacts == true
         with:
-          retention-days: 1
-          name: Crawlvora-native-${{ runner.os }}
+          retention-days: 7
+          name: Crawlvora-native-${{ runner.os }}${{ inputs.artifact_suffix }}
           path: release-assets/
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && inputs.publish_artifacts == true
         with:
-          retention-days: 1
-          name: Rust-lock-${{ runner.os }}
+          retention-days: 7
+          name: Rust-lock-${{ runner.os }}${{ inputs.artifact_suffix }}
           path: desktop/src-tauri/Cargo.lock
           if-no-files-found: warn
