@@ -1,0 +1,95 @@
+# Phase 6: performance engineering, increment 1
+
+Baseline c45b7eff976e80401f6e0ada952346302a24c9a8, Windows, isolated synthetic
+workspaces. No national catalogs or user files were benchmarked.
+
+## 100,000 record baseline
+
+Seed 29.282 s; p95 filtered page 5.067 ms, exact MBS 5.154 ms, indexed
+phrase 8.363 ms, equivalent substring phrase 148.511 ms, statistics
+120.557 ms, filtered in-memory JSON 61.833 ms. Verified backup 545.824 ms;
+restored database 2599.281 ms. SQLite integrity and foreign keys passed.
+
+## Targeted optimization
+
+Provider-only counts now start at the indexed origins table, counting
+distinct companies and preserving the existence check for each company.
+Rows and ordering are unchanged; combined filters keep the previous query.
+A 50,000-row exploratory comparison showed that a global IN rewrite would
+slow common-provider plus city filters, so it was not adopted.
+
+In a paired test with 100,000 rows, 200 matching companies, 20 measurements
+on the same connection:
+
+| Count query | p50 ms | p95 ms |
+|---|---:|---:|
+| Previous correlated scan | 65.950 | 73.683 |
+| Optimized provider-index count | 0.141 | 0.528 |
+
+Both counts equal 200; complete provider page p95 20.192 ms. The speedup
+applies to the count SQL statement, not the entire application. No schema
+or durability settings were changed. Regression test covers duplicate
+origins, absent providers, pagination and combined filters.
+
+## Instrumentation and endurance
+
+Benchmark now also reports Python/SQLite versions, provider query plan,
+actual disk-backed JSON export and Python traced allocations (not total
+process RSS). At 100,000 records, exporting 1,000 filtered records wrote
+479,777 bytes in 353.443 ms, peak traced allocations 1,742,572 bytes.
+Backup and restore again passed integrity checks.
+
+Endurance now seeds 25,000 synthetic companies, never the historical CSV.
+10-second smoke passed: 547 writes, 588 searches, 239 statistics requests,
+321 exports (1,695 operations); 25,100 final records, zero foreign-key
+violations, verified recovery. This is not the four-hour acceptance.
+
+The million-record and four-hour workflows now also trigger on changes to
+their benchmark scripts in the existing development branch. They remain
+separate from ordinary short CI and from the production release gate.
+Actual million-record and 14,400-second results, full-export memory,
+national catalog performance and native application measurements remain
+required.
+
+## Verified million-record benchmark
+
+Run 45921653299, commit c67afe57fa9f3b7f2094ca345737d9912b603341,
+Linux, Python 3.12.16 and SQLite 3.46.1: completed successfully.
+Seed 122.503 s. p95 filtered page 1.171 ms, exact MBS 0.628 ms,
+FTS phrase 0.762 ms, equivalent substring phrase 422.919 ms,
+statistics 436.428 ms, rare provider page 9.717 ms. Paired rare-provider
+count p95 417.927 ms before vs 3.761 ms after, equal result 2000.
+Streaming export of 10,000 rows wrote 4,817,777 bytes in 2064.153 ms
+with 1,663,084 peak Python traced allocation bytes. Backup 3199.732 ms;
+restore 16570.016 ms; integrity ok and foreign key check passed.
+Four-hour run 45921653337 remains in progress; this is not full endurance
+acceptance. Keep the existing run intact; no real user data used.
+
+
+## Full export acceptance
+
+100,000 synthetic records, Windows: seed 22.782 s. Full JSON 47,888,896 bytes
+in 2.698 s, baseline process peak RSS 39,002,112 bytes, export peak
+43,286,528 bytes. Full CSV 7,800,284 bytes in 2.093 s, baseline peak
+39,227,392 bytes and export peak 41,402,368 bytes. Separate child process
+for each format, OS lifetime peak working set/RSS, not just Python allocation
+tracking. Every exported row and source verified. SQLite integrity and
+foreign-key checks passed. Full million-record JSON and CSV runs are wired
+into CI; existing four-hour run remains independent. XLSX full-scale and
+native startup/CPU measurements remain outstanding.
+
+
+## Full million exports and XLSX
+
+Verified Linux run 45922947057 (842c900): all 1,000,000 JSON and CSV
+records validated with provenance; JSON 479,888,897 bytes in 17.574 s,
+peak RSS 40,148,992 bytes; CSV 78,000,284 bytes in 11.391 s, peak RSS
+39,747,584 bytes. Integrity and foreign key checks passed. Windows
+100,000-row XLSX run: 7,325,784 bytes in 48.925 s, export peak working
+set 48,279,552 bytes, validation peak 66,420,736 bytes. Every row and
+source validated via read-only workbook iteration; no formula cells.
+Million-record workflow now also exercises XLSX. Native startup tool
+measures launch through smoke readiness and shutdown, and OS CPU time
+(host only on Windows, waited children on Linux); not continuous runtime
+CPU or pure first-paint time. Existing four-hour run 45921653337 remains
+independent and has not been restarted.

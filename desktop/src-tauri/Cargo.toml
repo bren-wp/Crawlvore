@@ -9,7 +9,7 @@ tauri-build = "=2.7.6"
 
 [dependencies]
 tauri = "=2.12.7"
-tauri-plugin-opener = "=2.7.3"
+open = { version = "=5.4.5", default-features = false }
 
 [features]
 portable = ["dep:tempfile", "dep:sha2"]

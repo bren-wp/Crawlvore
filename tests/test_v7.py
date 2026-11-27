@@ -24,12 +24,28 @@ class V7(unittest.TestCase):
         with self.assertRaises(ValueError): compare(self.reg,'21','23')
     def test_retry(self):
         q=Queue(self.store,self.bot,self.reg,lambda:('x','y')); q.schedule(True,3); now=datetime.datetime(2026,11,25,4)
-        def start(*a): self.bot.update(status='running',retryable=False)
+        def start(*a,**kw):
+            self.assertIs(kw.get('allow_full_refresh'),False)
+            self.bot.update(status='running',retryable=False)
         with patch('automation.start_registry',side_effect=start):
             q.tick(now); self.bot.update(status='failed',retryable=True); q.tick(now); self.assertEqual(q.summary()['jobs'][0]['state'],'retry_wait')
             q.tick(now+datetime.timedelta(minutes=14)); self.assertEqual(q.summary()['jobs'][0]['attempts'],1)
             q.tick(now+datetime.timedelta(minutes=15)); self.assertEqual(q.summary()['jobs'][0]['attempts'],2)
             self.bot.update(status='failed',retryable=False); q.tick(now+datetime.timedelta(minutes=16)); self.assertEqual(q.summary()['jobs'][0]['state'],'failed')
+    def test_scheduled_refresh_does_not_claim_a_new_snapshot_download(self):
+        q=Queue(self.store,self.bot,self.reg,lambda:('x','y'))
+        q.schedule(True,3)
+        now=datetime.datetime(2026,11,25,4)
+        def start(*a,**kw):
+            self.assertIs(kw.get('allow_full_refresh'),False)
+            self.bot.update(status='update_available',update_available='22')
+        with patch('automation.start_registry',side_effect=start):
+            q.tick(now)
+            q.tick(now)
+        job=q.summary()['jobs'][0]
+        self.assertEqual(job['state'],'update_available')
+        self.assertEqual(job['attempts'],1)
+
     def test_table_detection(self):
         html='<table><thead><tr><th>OIB</th><th>Naziv</th><th>Grad</th></tr></thead><tbody><tr><td>01234567890</td><td>Alpha</td><td>Zagreb</td></tr><tr><td>01234567891</td><td>Beta</td><td>Split</td></tr></tbody></table>'
         r=inspect_html(html); self.assertEqual(r['preview'][0]['title'],'Alpha'); self.assertEqual(r['preview'][0]['oib'],'01234567890')

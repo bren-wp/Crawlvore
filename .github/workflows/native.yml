@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches: [registry-only-desktop, main]
-    paths: ['desktop/**', 'windows/**', 'linux/**', 'tvrtk_scraper.py', 'static/**', 'frontend/**', 'requirements.txt', 'VERSION', '.github/workflows/native.yml']
+    paths: ['desktop/**', 'windows/**', 'linux/**', '*.py', 'static/**', 'frontend/**', 'tools/**', 'tests/**', 'requirements*.txt', 'package*.json', 'tsconfig*.json', 'VERSION', '.github/workflows/native.yml']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -27,15 +27,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
       - name: Install Linux webview dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev xvfb
       - run: rustup update stable
-      - uses: actions/cache@v5
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/.cargo/registry
@@ -62,7 +62,7 @@ jobs:
       - name: Compile native executable
         working-directory: desktop/src-tauri
         run: cargo +stable build --release --locked
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: inputs.registry_bundle
         with:
           name: verified-public-registry-snapshot
@@ -80,7 +80,7 @@ jobs:
           sha256sum registry-seed.sqlite3 | cut -d ' ' -f 1 > registry-seed.sha256
           echo 'CRAWLVORA_REGISTRY_BUNDLE=1' >> "$GITHUB_ENV"
           echo "CRAWLVORA_EXPECTED_REGISTRY_SHA256=$(cat registry-seed.sha256)" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: inputs.national_bundle
         with:
           name: verified-gb-registry-snapshot
@@ -128,6 +128,19 @@ jobs:
           $p = Start-Process -FilePath (Resolve-Path native-preview/Crawlvora.exe).Path -ArgumentList '--native-smoke' -PassThru
           if (!$p.WaitForExit(240000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
           if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
+      - name: Measure native smoke startup and CPU (Windows)
+        if: runner.os == 'Windows' && inputs.registry_bundle != true && inputs.national_bundle != true
+        run: python tools/native_startup_check.py native-preview/Crawlvora.exe --output native-startup.json
+      - name: Measure native smoke startup and CPU (Linux)
+        if: runner.os == 'Linux' && inputs.registry_bundle != true && inputs.national_bundle != true
+        run: WEBKIT_DISABLE_COMPOSITING_MODE=1 xvfb-run -a python tools/native_startup_check.py native-preview/Crawlvora --output native-startup.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: inputs.registry_bundle != true && inputs.national_bundle != true
+        with:
+          name: native-startup-${{ runner.os }}
+          path: native-startup.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Build and smoke-test standalone portable and installer
         if: runner.os == 'Windows'
         shell: pwsh
@@ -157,28 +170,28 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: desktop/src-tauri
         run: |
-          cargo +stable install cargo-audit --locked
+          cargo +stable install cargo-audit --version 0.23.0 --locked
           cargo audit
       - name: Print Windows installer diagnostics
         if: failure() && runner.os == 'Windows'
         shell: pwsh
         run: |
           if (Test-Path release-assets/native-install.log) { Get-Content release-assets/native-install.log -Tail 100 }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure() && runner.os == 'Windows' && inputs.publish_artifacts == true
         with:
           name: Windows-installer-diagnostics
           retention-days: 1
           path: release-assets/native-install.log
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: inputs.publish_artifacts == true
         with:
           retention-days: 1
           name: Crawlvora-native-${{ runner.os }}
           path: release-assets/
           if-no-files-found: error
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && inputs.publish_artifacts == true
         with:
           retention-days: 1

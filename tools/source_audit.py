@@ -28,6 +28,10 @@ def run():
     unused=[]; clones=collections.defaultdict(list); review=[]; funcs=0
     for path in sorted(ROOT.glob('*.py')):
         tree=ast.parse(path.read_text(encoding='utf-8')); used={n.id for n in ast.walk(tree) if isinstance(n,ast.Name) and isinstance(n.ctx,ast.Load)}
+        # A literal __all__ is an explicit public compatibility contract.
+        for statement in tree.body:
+            if isinstance(statement,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='__all__' for t in statement.targets) and isinstance(statement.value,(ast.List,ast.Tuple)):
+                used.update(v.value for v in statement.value.elts if isinstance(v,ast.Constant) and isinstance(v.value,str))
         for node in ast.walk(tree):
             if isinstance(node,(ast.Import,ast.ImportFrom)):
                 for a in node.names:

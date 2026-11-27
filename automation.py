@@ -63,7 +63,7 @@ class Queue:
         try:
             d=json.loads(r['config']); k=r['kind']
             if k!='registry': raise ValueError('Unsupported collection source.')
-            start_registry(self.bot,self.registry,self.credentials(),d['limit'])
+            start_registry(self.bot,self.registry,self.credentials(),d['limit'],allow_full_refresh=False)
             self.active=r['id']
         except Exception:
             with self.store.db() as c: c.execute("UPDATE jobs SET state='failed',finished=CURRENT_TIMESTAMP WHERE id=?",(r['id'],))

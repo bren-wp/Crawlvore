@@ -64,6 +64,21 @@ class DesktopWorkerTests(unittest.TestCase):
                         self.assertEqual(response.status,400)
                         response.read()
                     finally: conn.close()
+                # Browser cross-origin and ambiguous security headers must fail closed.
+                for name, value in (('Origin','https://example.invalid'),('Host',parsed.netloc),
+                                    ('Cookie',cookie_name+'='+token),('X-Local-Token',token)):
+                    conn=http.client.HTTPConnection(parsed.hostname,parsed.port,timeout=5)
+                    try:
+                        conn.putrequest('POST','/api/preferences/theme')
+                        conn.putheader('Cookie',cookie_name+'='+token)
+                        conn.putheader('X-Local-Token',token)
+                        conn.putheader('Content-Length','2')
+                        conn.putheader(name,value)
+                        conn.endheaders(b'{}')
+                        with conn.getresponse() as response:
+                            self.assertEqual(response.status,403)
+                            response.read()
+                    finally: conn.close()
                 for payload in ([],None,'invalid'):
                     with self.assertRaises(urllib.error.HTTPError) as rejected:
                         post('/api/preferences/theme',payload)

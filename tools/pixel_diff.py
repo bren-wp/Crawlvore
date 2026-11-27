@@ -1,5 +1,6 @@
 """Report against the new approved design reference set, never historical UI screenshots."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from PIL import Image, ImageChops
@@ -14,6 +15,8 @@ def compare(reference,actual):
         row={'screen':path.stem,'identical':False}
         if not path.is_file() or not capture.is_file():
             row.update(missing_reference=not path.is_file(),missing_capture=not capture.is_file())
+        elif hashlib.sha256(path.read_bytes()).hexdigest()!=lock['files'][entry]:
+            row.update(reference_hash_mismatch=True)
         else:
             with Image.open(path) as aa,Image.open(capture) as bb:
                 a,b=aa.convert('RGB'),bb.convert('RGB')
@@ -35,4 +38,4 @@ if __name__=='__main__':
     args=parser.parse_args()
     rows=compare(args.reference,args.actual)
     print(json.dumps(rows,indent=2))
-    raise SystemExit(1 if args.strict and not all(row['identical'] for row in rows) else 0)
+    raise SystemExit(1 if args.strict and (not rows or not all(row['identical'] for row in rows)) else 0)

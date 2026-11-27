@@ -68,3 +68,38 @@ class BulkIOTests(unittest.TestCase):
         self.assertEqual(sum(1 for _ in json_records(io.StringIO(raw))),count)
         with self.assertRaises(ValueError):
             list(json_records(io.StringIO('[{"title":"Synthetic"}, ]')))
+
+    def test_interrupted_receive_removes_only_owned_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); target=root/'upload'
+            with self.assertRaises(ValueError):
+                receive(io.BytesIO(b'a'),target,2)
+            self.assertEqual(list(root.iterdir()),[])
+            target.write_bytes(b'original')
+            with self.assertRaises(FileExistsError):
+                receive(io.BytesIO(b'new'),target,3)
+            self.assertEqual(target.read_bytes(),b'original')
+            self.assertEqual(list(root.iterdir()),[target])
+
+    def test_export_failure_and_existing_destination(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); store=Store(root/'db')
+            store.import_json('[{"title":"Synthetic"}]')
+            target=root/'out.json'
+            original=b'previous export'
+            target.write_bytes(original)
+            with self.assertRaises(FileExistsError):
+                export_file(store,target,'json')
+            self.assertEqual(target.read_bytes(),original)
+            self.assertFalse(list(root.glob('.export-*')))
+            new=root/'new.json'
+            def interrupted(store,path,kind,**filters):
+                Path(path).write_text('[',encoding='utf-8')
+                raise OSError('injected interrupted export')
+            with patch('bulk_io._write_export',side_effect=interrupted):
+                with self.assertRaises(OSError):
+                    export_file(store,new,'json')
+            self.assertFalse(new.exists())
+            self.assertFalse(list(root.glob('.export-*')))
+            self.assertEqual(target.read_bytes(),original)
+            self.assertEqual(store.stats()['total'],1)

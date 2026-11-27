@@ -44,7 +44,12 @@ class NationalCatalogTests(unittest.TestCase):
             self.assertEqual(offline.detail('00000001')['CompanyName'],'Alpha Ltd')
             self.assertEqual(original.read_bytes(),b'unchanged')
             cached=workspace/'national-data'/'GB'/(report['database_sha256']+'.sqlite3')
+            from unittest.mock import patch
+            with patch('national_catalog.hashlib.file_digest',side_effect=AssertionError('Unexpected rehash')):
+                self.assertEqual(offline.search('Al')['rows'][0]['name'],'Alpha Ltd')
             with cached.open('r+b') as out:out.seek(100);out.write(b'corrupted')
+            with self.assertRaisesRegex(ValueError,'checksum mismatch'):
+                offline.search('Al')
             with self.assertRaisesRegex(ValueError,'checksum mismatch'):
                 NationalCatalog(root/'no-bundled-data',workspace).search('Al')
             self.assertTrue(cached.exists())

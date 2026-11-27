@@ -99,6 +99,69 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.reg.browse('21','subjekti')['total'],1)
         self.assertEqual(self.reg.summary()['runs'],[{'snapshot':'21','complete':0}])
 
+    def test_repair_only_missing_page_even_after_completion(self):
+        self.reg.sync(self.bot,Fake(),1)
+        with self.store.db() as c:
+            c.execute("DELETE FROM registry_rows WHERE snapshot='21' AND category='subjekti' AND ordinal=0")
+        client=Fake()
+        self.reg.sync(self.bot,client,2,allow_full_refresh=False)
+        self.assertEqual(client.calls,[('snapshots',None),('subjekti',{'snapshot_id':'21','offset':0,'limit':1})])
+        self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
+        self.assertEqual(self.reg.summary()['runs'][0]['complete'],1)
+        same=Fake()
+        self.reg.sync(self.bot,same,2,allow_full_refresh=False)
+        self.assertEqual(same.calls,[('snapshots',None)])
+
+    def test_repair_refuses_changed_page_without_overwriting(self):
+        self.reg.sync(self.bot,Fake(),1)
+        with self.store.db() as c:
+            c.execute("DELETE FROM registry_rows WHERE snapshot='21' AND category='subjekti' AND ordinal=0")
+        class Changed(Fake):
+            def get(self,name,q=None):
+                h,rows=super().get(name,q)
+                if name=='subjekti': rows[0]['tvrtka_naziv']='Unexpected'
+                return h,rows
+        with self.assertRaisesRegex(ValueError,'checksum mismatch'):
+            self.reg.sync(self.bot,Changed(),1)
+        self.assertEqual(self.reg.browse('21','subjekti')['total'],1)
+        self.assertEqual(self.reg.summary()['runs'][0]['complete'],0)
+        self.assertEqual(self.store.stats()['total'],2)
+
+    def test_new_snapshot_requires_full_refresh_confirmation(self):
+        self.reg.sync(self.bot,Fake(),1)
+        class New(Fake):
+            def get(self,name,q=None):
+                if name=='snapshots':
+                    self.calls.append((name,q));return {},[{'id':22,'staleness':1}]
+                raise AssertionError('Unexpected bulk request')
+        client=New()
+        self.assertFalse(self.reg.sync(self.bot,client,1,allow_full_refresh=False))
+        self.assertEqual(client.calls,[('snapshots',None)])
+        self.assertEqual(self.bot.snapshot()['update_available'],'22')
+        self.assertEqual(self.reg.summary()['runs'],[{'snapshot':'21','complete':1}])
+
+    def test_documented_empty_category_does_not_restart_or_fail(self):
+        class Empty(Fake):
+            def spec(self):
+                result=spec()
+                result['paths']['/sjedista']['get']['parameters'].append({'in':'query','name':'no_data_error'})
+                return result
+            def get(self,name,q=None):
+                if name=='sjedista':
+                    self.calls.append((name,q))
+                    if q.get('no_data_error')!='0':raise AssertionError('Expected empty-response mode')
+                    return {'X-Snapshot-Id':'21','X-Rows-Returned':'0'},{}
+                return super().get(name,q)
+        client=Empty()
+        self.reg.sync(self.bot,client,1)
+        self.assertEqual(self.reg.browse('21','sjedista')['total'],0)
+        self.assertEqual(self.reg.summary()['runs'][0]['complete'],1)
+        same=Empty()
+        self.reg.sync(self.bot,same,1)
+        self.assertEqual(same.calls,[('snapshots',None)])
+        with self.assertRaises(ValueError):
+            self.reg._page_rows({}, {}, {'no_data_error'})
+
     def test_shape(self):
         self.assertEqual(rows_of({'items':[{'a':1}]}),[{'a':1}]); self.assertRaises(ValueError,rows_of,{'a':[],'b':[]})
 
@@ -172,7 +235,7 @@ class CredentialSourceTests(unittest.TestCase):
 
     def test_arbitrary_working_directory_is_not_a_credential_source(self):
         self.write_pair(self.cwd)
-        with patch('registry.Path.cwd',return_value=self.cwd):
+        with patch('registry_access.Path.cwd',return_value=self.cwd):
             self.assertEqual(credentials(self.root,self.data),('',''))
 
     def test_workspace_configuration_precedes_application_configuration(self):
@@ -275,12 +338,12 @@ class RegistryAccessTests(unittest.TestCase):
         self.access().apply(dict(self.data,persist=True,permission=True))
         reopened=self.access()
         self.vault.unavailable=True
-        with patch('registry.time.monotonic',return_value=100.0):
+        with patch('registry_access.time.monotonic',return_value=100.0):
             self.assertFalse(reopened.status()['configured'])
         self.vault.unavailable=False
-        with patch('registry.time.monotonic',return_value=110.0):
+        with patch('registry_access.time.monotonic',return_value=110.0):
             self.assertFalse(reopened.status()['configured'])
-        with patch('registry.time.monotonic',return_value=131.0):
+        with patch('registry_access.time.monotonic',return_value=131.0):
             self.assertEqual(reopened.status(),{'configured':True,'authorized':True})
 
 

@@ -45,3 +45,26 @@ class DownloadSafetyTests(unittest.TestCase):
                 job.start();job.thread.join(5)
             self.assertEqual(job.status()['saved_bytes'],4)
             self.assertEqual((folder/name).read_bytes(),b'abcd')
+
+    def test_installed_snapshot_check_downloads_listing_only(self):
+        from unittest.mock import MagicMock
+        from gb_download import check_update, SOURCE
+        from datetime import date
+        stamp=date.today().isoformat()
+        response=MagicMock()
+        response.status_code=200
+        response.iter_content.return_value=[f'<a>BasicCompanyDataAsOneFile-{stamp}.zip</a>'.encode()]
+        with patch('gb_download.requests.Session') as factory:
+            session=factory.return_value.__enter__.return_value
+            session.get.return_value.__enter__.return_value=response
+            current=check_update(stamp)
+            self.assertFalse(current['update_available'])
+            self.assertEqual(current['downloaded_bytes'],0)
+            self.assertEqual(session.get.call_count,1)
+            self.assertEqual(session.get.call_args.args[0],SOURCE)
+            session.get.reset_mock()
+            newer=check_update('2000-01-01')
+            self.assertTrue(newer['update_available'])
+            self.assertTrue(newer['requires_full_archive'])
+            self.assertEqual(session.get.call_count,1)
+            self.assertEqual(session.get.call_args.args[0],SOURCE)

@@ -1,6 +1,8 @@
 """Disk-backed bulk directory I/O; bounded memory and transactional imports."""
 import csv
 import json
+import os
+import tempfile
 import shutil
 from pathlib import Path
 from core import COLS, FIELDS, formula_safe
@@ -18,12 +20,22 @@ def require_free_space(directory, required):
 def receive(stream,path,size):
     if not 0<size<=MAX_IMPORT: raise ValueError('Invalid import size (maximum 2 GiB).')
     require_free_space(Path(path).parent,size+64*CHUNK)
-    with Path(path).open('xb') as out:
-        remaining=size
-        while remaining:
-            data=stream.read(min(CHUNK,remaining))
-            if not data: raise ValueError('Incomplete request body.')
-            out.write(data); remaining-=len(data)
+    path=Path(path)
+    # Own only a unique staging file; never delete a competing destination.
+    fd,temporary=tempfile.mkstemp(prefix='.receive-',suffix='.partial',dir=path.parent)
+    try:
+        with os.fdopen(fd,'wb') as out:
+            remaining=size
+            while remaining:
+                data=stream.read(min(CHUNK,remaining))
+                if not data or len(data)>remaining: raise ValueError('Incomplete or invalid request body.')
+                out.write(data); remaining-=len(data)
+            out.flush()
+            os.fsync(out.fileno())
+        os.link(temporary,path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
 
 def json_records(stream):
     """Parse a JSON array incrementally; compact only when more data is required."""
@@ -81,10 +93,28 @@ def import_file(store,path,kind):
         return {'read':count,'added':added}
 
 def export_file(store,path,kind,**filters):
+    """Publish only a complete export; preserve an existing destination."""
+    if kind not in ('csv','json','xlsx'): raise ValueError('Invalid export format.')
+    path=Path(path)
+    fd,temporary=tempfile.mkstemp(prefix='.export-',suffix='.'+kind,dir=path.parent)
+    os.close(fd)
+    try:
+        _write_export(store,temporary,kind,**filters)
+        with open(temporary,'rb+') as out:
+            os.fsync(out.fileno())
+        os.link(temporary,path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def _write_export(store,path,kind,**filters):
     where,args=store.where(**filters)
     with store.db() as db:
         db.execute('BEGIN')
-        rows=db.execute("SELECT id,"+','.join(COLUMNS)+",coalesce((SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id),'') AS providers FROM companies"+where+' ORDER BY id',args)  # nosec B608 -- fixed columns, allowlisted filters, bound values
+        projection="SELECT id,"+','.join(COLUMNS)
+        if kind!='json':
+            projection+=",coalesce((SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id),'') AS providers"
+        rows=db.execute(projection+" FROM companies"+where+' ORDER BY id',args)  # nosec B608 -- fixed columns, allowlisted filters, bound values
         if kind=='csv':
             with Path(path).open('w',encoding='utf-8-sig',newline='') as out:
                 writer=csv.writer(out); writer.writerow(FIELDS+['OIB','Email','Industry','Entity Type','Sources'])
@@ -101,7 +131,7 @@ def export_file(store,path,kind,**filters):
                         records[row['company_id']]['alternate_values'].append({k:row[k] for k in ('field','value','provider','observed_at')})
                     for record in records.values():
                         if not first: out.write(',')
-                        first=False; json.dump(record,out,ensure_ascii=False)
+                        first=False; out.write(json.dumps(record,ensure_ascii=False))
                 out.write(']')
         elif kind=='xlsx':
             from openpyxl import Workbook

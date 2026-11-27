@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+import stat
 import shutil
 import tempfile
 import threading
@@ -56,6 +57,17 @@ class NationalCatalog:
         if not isinstance(snapshot,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',snapshot):raise ValueError('Invalid national snapshot date.')
         return report
 
+    @staticmethod
+    def file_identity(path):
+        """Detect changed cached files without hashing gigabytes on every search."""
+        try:
+            info=path.lstat()
+        except FileNotFoundError:
+            return None
+        if not stat.S_ISREG(info.st_mode):
+            return None
+        return (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns)
+
     def cached_file(self,report):
         path=self.root/(report['database_sha256']+'.sqlite3')
         return path.is_file() and not path.is_symlink() and path.stat().st_size==report['database_bytes']
@@ -83,7 +95,11 @@ class NationalCatalog:
             report=self.manifest()
             if not report: raise ValueError('United Kingdom snapshot is not installed.')
             digest=report['database_sha256']
-            if self.ready and self.ready[0]==digest and self.ready[1].is_file(): return self.ready[1],report
+            if self.ready and self.ready[0]==report:
+                path,identity=self.ready[1:]
+                if identity is not None and self.file_identity(path)==identity:
+                    return path,report
+            self.ready=None
             self.root.mkdir(parents=True,exist_ok=True)
             destination=self.root/(digest+'.sqlite3')
             if not destination.exists():
@@ -103,14 +119,17 @@ class NationalCatalog:
                     except FileExistsError: pass
                 finally: Path(tmp).unlink(missing_ok=True)
             # Existing content-addressed files must also match the verified snapshot.
-            if destination.is_symlink() or destination.stat().st_size!=report['database_bytes']: raise ValueError('Invalid local national snapshot.')
+            identity=self.file_identity(destination)
+            if identity is None or identity[2]!=report['database_bytes']: raise ValueError('Invalid local national snapshot.')
             with destination.open('rb') as stream:
                 if hashlib.file_digest(stream,'sha256').hexdigest()!=digest: raise ValueError('Local national snapshot checksum mismatch.')
             with closing(sqlite3.connect(destination.resolve().as_uri()+'?mode=ro&immutable=1',uri=True)) as db:
                 metadata=dict(db.execute('SELECT key,value FROM metadata'))
                 if json.loads(metadata['country'])!='GB' or json.loads(metadata['rows'])!=report['rows'] or json.loads(metadata['snapshot'])!=report['snapshot']: raise ValueError('National snapshot identity mismatch.')
             self.retain_manifest(report)
-            self.ready=(digest,destination)
+            if self.file_identity(destination)!=identity:
+                raise ValueError('National snapshot changed during verification.')
+            self.ready=(report,destination,identity)
             return destination,report
 
     def search(self,q='',page=1):

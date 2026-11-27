@@ -1,7 +1,7 @@
 name: Native secure vault acceptance
 on:
   pull_request:
-    paths: ['native_vault.py','protected_backups.py','backup_replica.py','portable_recovery.py','tests/test_native_vault.py','.github/workflows/vault-acceptance.yml']
+    paths: ['native_vault.py','data_safety.py','backup_transfer.py','encrypted_backup.py','protected_backups.py','backup_replica.py','portable_recovery.py','tests/test_native_vault.py','.github/workflows/vault-acceptance.yml']
   workflow_dispatch:
   workflow_call:
 permissions:
@@ -10,8 +10,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
@@ -19,8 +19,8 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt

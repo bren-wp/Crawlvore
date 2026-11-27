@@ -1,0 +1,57 @@
+let regSelection:RegistryCategory|null=null, regPage=1, regTotal=0;
+let previousRegistryAuthorization=false, registryRefreshAvailable=false;
+let regRefreshBusy=false, regRowsSerial=0, regSearchTimer:ReturnType<typeof setTimeout>;
+async function registryRefresh(){
+ if(regRefreshBusy)return; regRefreshBusy=true;
+ try{
+ const [r,s]=await Promise.all([api<RegistrySummary>('/api/registry'),api<BotStatus>('/api/status')]);
+ const active=['running','stopping'].includes(s.status), ours=['registry','registry-check'].includes(s.kind??'');
+ registryRefreshAvailable=ours&&s.status==='update_available';
+ $('reg-config').textContent=r.configured?translate('Pristup omogućen'):translate('Pristup nije omogućen');
+ $('reg-config').dataset.state=r.configured?'ready':'warning';
+ if(!!r.authorized!==previousRegistryAuthorization){$('reg-permission').checked=!!r.authorized;previousRegistryAuthorization=!!r.authorized;} $('reg-permission').disabled=!!r.authorized;
+ $('reg-start').disabled=!r.configured||active; $('reg-check').disabled=!r.configured||active; $('reg-stop').disabled=!ours||s.status!=='running';
+ $('reg-status').textContent=active&&!ours?translate('Druga operacija je u tijeku'):ours?(({running:translate('Aktivno'),stopping:translate('Zaustavljanje'),completed:translate('Završeno'),update_available:translate('Dostupna nova snimka'),failed:translate('Pogreška'),stopped:translate('Zaustavljeno')})[s.status]||s.status):translate('Spremno');
+ $('reg-start').textContent=registryRefreshAvailable?translate('Preuzmi novu snimku'):translate('Nastavi sinkronizaciju');
+ $('reg-logs').textContent=registryRefreshAvailable?translate('Dostupna je nova snimka. Potpuno preuzimanje zahtijeva potvrdu.')+' '+(s.local_snapshot||'')+' → '+(s.update_available||''):ours&&s.kind==='registry'?translate('Sačuvani redci')+': '+n(s.reused||0)+' · '+translate('Preuzeti redci')+': '+n(s.processed||0)+' · '+translate('Popravljeni redci')+': '+n(s.repaired||0):translate('Nema aktivnog osvježavanja.');
+ const progress=ours&&s.kind==='registry'&&s.last?Math.min(100,s.status==='completed'?100:Math.max(0,(s.page-1)/s.last*100)):0;
+ $('reg-progress-label').textContent=ours&&s.kind==='registry'&&s.last?translate('Kategorija ')+n(s.page)+' / '+n(s.last):translate('Nema aktivne sinkronizacije');
+ $('reg-percent').textContent=progress?Math.floor(progress)+'%':'—'; $('reg-progress-bar').style.width=progress+'%';
+ updateDiffOptions(r.runs); const selected=$('reg-snapshot').value; const options=[make('option',translate('Sve snimke'))]; options[0].value='';
+ for(const run of r.runs){const o=make('option',run.snapshot+' · '+(run.complete?translate('završena'):translate('nedovršena')));o.value=run.snapshot;options.push(o)}
+ $('reg-snapshot').replaceChildren(...options); $('reg-snapshot').value=r.runs.some(x=>x.snapshot===selected)?selected:'';
+ const cats=r.categories.filter(c=>!selected||c.snapshot===selected);
+ $('reg-metrics').replaceChildren();
+ for(const [label,value,sub] of [[translate('Snimke'),r.runs.length,translate('Lokalno pohranjene')],[translate('Dovršene snimke'),r.runs.filter(x=>x.complete).length,translate('Konzistentna preuzimanja')],[translate('Kategorije'),cats.filter(c=>c.done).length,translate('Dovršene u odabiru')],[translate('Izvorni redci'),cats.reduce((a,c)=>a+c.rows,0),translate('Preuzeto po kategorijama')]]){const el=make('article',undefined,'reg-metric panel');el.append(make('span',label,'muted'),make('strong',n(value)),make('small',sub,'muted'));$('reg-metrics').append(el)}
+ $('reg-categories').replaceChildren();
+ for(const c of cats){const tr=make('tr');for(const v of [c.snapshot,c.category,n(c.rows)+(c.total==null?'':' / '+n(c.total))])tr.append(make('td',v));const state=make('td');state.append(make('span',c.done?translate('Preuzeto'):translate('Nedovršeno'),c.done?'registry-pill done':'registry-pill'));tr.append(state);const td=make('td'),b=make('button',translate('Otvori'),'btn secondary small');b.onclick=()=>{regSelection=c;regPage=1;$('reg-search').value='';$('reg-search').disabled=false;registryRows().catch(fail)};td.append(b);tr.append(td);$('reg-categories').append(tr)}
+ if(!cats.length){const tr=make('tr'),td=make('td',translate('Nema preuzetih kategorija. Pokrenite sinkronizaciju.'),'empty-state');td.colSpan=5;tr.append(td);$('reg-categories').append(tr)}
+ }finally{regRefreshBusy=false}
+}
+async function registryRows(){if(!regSelection)return;const serial=++regRowsSerial;const p=new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category,page:String(regPage),q:$('reg-search').value});const r=await api<RegistryPage>('/api/registry/rows?'+p);if(serial!==regRowsSerial)return;regTotal=r.total;const keys=[...new Set(r.rows.flatMap(Object.keys))];const tr=make('tr');for(const k of keys)tr.append(make('th',k));$('reg-head').replaceChildren(tr);$('reg-body').replaceChildren();for(const row of r.rows){const tr=make('tr');for(const k of keys){const v=row[k];let display=v==null?'—':typeof v==='object'?JSON.stringify(v):String(v);if(v!=null&&['oib','mbs'].includes(k.toLowerCase())&&/^\d+$/.test(display))display=display.padStart(k.toLowerCase()==='oib'?11:9,'0');tr.append(make('td',display))}$('reg-body').append(tr)}$('reg-table-title').textContent=regSelection.category+' · '+regSelection.snapshot;$('reg-export').disabled=false;$('reg-export-csv').disabled=false;for(const format of ['xlsx','xml','sql'])$('reg-export-'+format).disabled=false;$('reg-row-count').textContent=n(regTotal)+translate(' rezultata · izvoz cijele kategorije');$('reg-page').textContent=regPage+' / '+Math.max(1,Math.ceil(regTotal/50));$('reg-prev').disabled=regPage<=1;$('reg-next').disabled=regPage*50>=regTotal}
+$('reg-snapshot').onchange=()=>registryRefresh().catch(fail);
+$('reg-search').oninput=()=>{clearTimeout(regSearchTimer);regSearchTimer=setTimeout(()=>{regPage=1;registryRows().catch(fail)},250)};
+$('reg-check').onclick=()=>post('/api/registry/check',{permission:$('reg-permission').checked}).then(registryRefresh).catch(fail);
+$('reg-export-csv').onclick=()=>{if(regSelection)location.href='/api/registry/export-csv?'+new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category})};
+$('reg-start').onclick=()=>{
+ const full=registryRefreshAvailable;
+ if(full&&!confirm(translate('Nova snimka zahtijeva potpuno preuzimanje. Postojeći podaci ostaju sačuvani. Nastaviti?')))return;
+ post('/api/registry/start',{limit:+$('reg-limit').value,permission:$('reg-permission').checked,full_refresh:full}).then(registryRefresh).catch(fail);
+};$('reg-stop').onclick=()=>post('/api/stop',{}).then(registryRefresh).catch(fail);$('reg-reload').onclick=()=>registryRefresh().catch(fail);$('reg-prev').onclick=()=>{if(regPage>1){regPage--;registryRows().catch(fail)}};$('reg-next').onclick=()=>{if(regPage*50<regTotal){regPage++;registryRows().catch(fail)}};setInterval(()=>{if(current==='registry'&&!document.hidden)registryRefresh().catch(()=>{})},2500);
+
+$('reg-export').onclick=()=>{if(regSelection)location.href='/api/registry/export?'+new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category})};
+
+for(const format of ['xlsx','xml','sql'])$('reg-export-'+format).onclick=()=>{if(regSelection)location.href='/api/registry/export-'+format+'?'+new URLSearchParams({snapshot:regSelection.snapshot,category:regSelection.category})};
+const jobLabels:Record<string,string>={update_available:translate('Dostupna nova snimka'),retry_wait:translate('Čeka ponavljanje'),queued:translate('Na čekanju'),running:translate('Aktivno'),completed:translate('Završeno'),completed_with_errors:translate('S pogreškama'),failed:translate('Pogreška'),stopped:translate('Zaustavljeno'),interrupted:translate('Prekinuto'),cancelled:translate('Otkazano')};
+let jobsRefreshSequence=0, jobsRendered='';
+async function refreshJobs(init=false){const request=++jobsRefreshSequence;const r=await api<JobSummary>('/api/jobs');if(request!==jobsRefreshSequence)return;if(init){$('schedule-enabled').checked=!!r.schedule.enabled;$('schedule-hour').value=String(r.schedule.hour);}$('schedule-state').textContent=r.schedule.enabled?translate('Aktivno'):translate('Isključeno');const signature=JSON.stringify(r.jobs);if(signature===jobsRendered)return;jobsRendered=signature;const m=$('job-metrics');m.replaceChildren();for(const state of ['queued','retry_wait','running','completed','failed']){const el=make('div');el.append(make('small',jobLabels[state],'muted'),make('strong',n(r.jobs.filter(x=>x.state===state).length)));m.append(el)}const b=$('job-rows');b.replaceChildren();for(const j of r.jobs){const tr=make('tr');for(const v of [j.id,providerNames[j.kind]||j.kind,jobLabels[j.state]||j.state,j.created,j.finished||'—',String(j.attempts||0)+(j.next_run?' · '+new Date(j.next_run*1000).toLocaleString(UI_LANGUAGE==='hr'?'hr-HR':'en-US'):'')])tr.append(make('td',String(v)));const td=make('td');if(['queued','retry_wait'].includes(j.state)){const cancel=make('button',translate('Otkaži'),'btn secondary small');cancel.onclick=()=>post('/api/jobs/cancel',{id:j.id}).then(()=>refreshJobs()).catch(fail);td.append(cancel)}tr.append(td);b.append(tr)}if(!r.jobs.length){const tr=make('tr');const td=make('td',translate('Nema spremljenih zadataka.'),'empty-state');td.colSpan=7;tr.append(td);b.append(tr)}}
+$('jobs-refresh').onclick=()=>refreshJobs(true).catch(fail);
+$('schedule-save').onclick=()=>post('/api/jobs/schedule',{enabled:$('schedule-enabled').checked,hour:+$('schedule-hour').value,permission:$('schedule-permission').checked}).then(()=>{toast(translate('Raspored je spremljen.'));return refreshJobs(true)}).catch(fail);
+$('jobs-registry').onclick=()=>post('/api/jobs/add',{kind:'registry',config:{permission:$('schedule-permission').checked,limit:500}}).then(()=>refreshJobs()).catch(fail);
+setInterval(()=>{if(current==='jobs'&&!document.hidden)refreshJobs().catch(()=>{})},3000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(current==='registry')registryRefresh().catch(()=>{});if(current==='jobs')refreshJobs().catch(()=>{});}});
+
+function updateDiffOptions(runs:RegistryRun[]){const ids=runs.filter(x=>x.complete).map(x=>String(x.snapshot));for(const [id,idx] of ([['diff-before',1],['diff-after',0]] as const)){const el=$(id),old=el.value;el.replaceChildren(...ids.map(v=>new Option(v,v)));el.value=ids.includes(old)?old:(ids[idx]||'');} $('diff-run').disabled=ids.length<2;}
+$('diff-run').onclick=async()=>{const b=$('diff-run');b.disabled=true;try{const p=new URLSearchParams({before:$('diff-before').value,after:$('diff-after').value});const r=await api<RegistryDiff>('/api/registry/diff?'+p);$('diff-rows').replaceChildren();for(const c of r.categories){const tr=make('tr');for(const v of [c.category,c.comparable?n(c.added):translate('Nije usporedivo'),c.comparable?n(c.removed):'—',c.comparable?n(c.affected_subjects):'—'])tr.append(make('td',v));$('diff-rows').append(tr)}$('diff-status').textContent=translate('Snimke ')+r.before+' → '+r.after+translate(' · izmjena retka prikazuje se kao uklanjanje i dodavanje.');}catch(e){fail(e)}finally{b.disabled=false}};
+
+

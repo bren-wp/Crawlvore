@@ -161,3 +161,37 @@ with workspace_lock(path.parent):
             self.assertEqual(store.query(q='mbs:123')['total'],1)
             self.assertEqual(store.query(q='mbs:000000123')['rows'][0]['title'],'Example company')
             self.assertEqual(len(json.loads(store.export_json(q='mbs:123'))),1)
+
+    def test_backup_publication_failure_preserves_previous_backup(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            original=Path(tmp)/'companies.sqlite3'
+            store=Store(original)
+            store.import_json('[{"title":"Original"}]')
+            backup=verified_backup(original)
+            before=backup.read_bytes()
+            store.import_json('[{"title":"Second"}]')
+            with patch('data_safety.os.link',side_effect=OSError('injected publication failure')):
+                with self.assertRaises(OSError):
+                    verified_backup(original)
+            self.assertEqual(list(backup.parent.iterdir()),[backup])
+            self.assertEqual(backup.read_bytes(),before)
+            self.assertEqual(store.stats()['total'],2)
+
+    def test_failed_restore_publication_cannot_activate_partial_copy(self):
+        from unittest.mock import patch
+        from data_safety import RecoveryCenter
+        with tempfile.TemporaryDirectory() as tmp:
+            original=Path(tmp)/'companies.sqlite3'
+            store=Store(original)
+            store.import_json('[{"title":"Original"}]')
+            center=RecoveryCenter(original)
+            backup=center.backup_path(center.create())
+            before=backup.read_bytes()
+            with patch('data_safety.os.link',side_effect=OSError('injected publication failure')):
+                with self.assertRaises(OSError):
+                    center.restore(backup.name)
+            self.assertEqual(center.summary()['recovered'],[])
+            self.assertEqual(list(center.recovered.rglob('*.pending')),[])
+            self.assertEqual(backup.read_bytes(),before)
+            self.assertEqual(store.stats()['total'],1)

@@ -51,7 +51,8 @@ def verified_backup(database, directory=None):
         with pending.open('r+b') as stream: os.fsync(stream.fileno())
         # Unique name, exclusive creation; never replace a previous backup.
         final=directory/('companies-'+stamp+'-'+pending.stem+'.sqlite3')
-        os.rename(pending,final)
+        os.link(pending,final)
+        pending.unlink()
         if os.name!='nt':
             fd=os.open(directory,os.O_RDONLY)
             try: os.fsync(fd)

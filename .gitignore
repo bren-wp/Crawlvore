@@ -23,3 +23,6 @@ national-data/
 
 # Private local edition builds and payloads
 edition-builds/
+
+# Temporary TypeScript compilation output
+.frontend-build/

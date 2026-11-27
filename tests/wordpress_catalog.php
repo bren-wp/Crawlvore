@@ -32,6 +32,10 @@ try {
     check(Catalog::search($root,'HR','company','',1)['rows']===[],'classification');
     check(Catalog::search($root,'GB','','ab123456',1)['rows'][0]['name']==='Synthetic British Ltd','GB lookup');
     check(Catalog::search($root,'HR','','AB123456',1)['rows']===[],'country separation');
+    check(Catalog::profile($root,'GB','company','AB123456')['name']==='Synthetic British Ltd','exact profile');
+    check(Catalog::profile($root,'GB','company','AB123')===null,'partial profile');
+    check(Catalog::profile($root,'HR','entrepreneur','000000123')===null,'ambiguous profile');
+    check(Catalog::profile($root,'GB','company','../secret')===null,'invalid profile identifier');
     file_put_contents($root.'/HR/manifest.json','{"country":"HR","count":1,"shards":["../../public/secret.json"]}');
     try{Catalog::search($root,'HR','','',1);throw new LogicException('traversal allowed');}catch(RuntimeException $e){check($e->getMessage()==='Invalid shard.','wrong rejection');}
     echo "WORDPRESS_CATALOG_TEST_PASS\n";

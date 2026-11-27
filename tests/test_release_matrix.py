@@ -31,3 +31,45 @@ class ReleaseMatrixTests(unittest.TestCase):
                         {'country':'HR'},{'database_sha256':42}):
             with self.subTest(changes=changes),self.assertRaises(ValueError):
                 validate_snapshots(hr,{**gb,**changes})
+
+    def test_release_zip_rejects_traversal_aliases_and_symlinks(self):
+        import tempfile
+        import zipfile
+        from pathlib import Path
+        from tools.verify_release_assets import validate_zip
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"source.zip"
+            for bad in ("Crawlvora/../secret","Crawlvora/..\\secret",
+                        "Crawlvora/version","Crawlvora/dir//file",
+                        "Crawlvora/file:stream"):
+                with zipfile.ZipFile(path,"w") as archive:
+                    archive.writestr("Crawlvora/VERSION","8.1.4")
+                    archive.writestr("Crawlvora/package.json","{}")
+                    archive.writestr(bad,"bad")
+                with self.subTest(bad=bad),self.assertRaises(ValueError):
+                    validate_zip(path)
+            with zipfile.ZipFile(path,"w") as archive:
+                archive.writestr("Crawlvora/VERSION","8.1.4")
+                archive.writestr("Crawlvora/package.json","{}")
+                info=zipfile.ZipInfo("Crawlvora/link")
+                info.create_system=3
+                info.external_attr=0o120777<<16
+                archive.writestr(info,"../secret")
+            with self.assertRaises(ValueError):validate_zip(path)
+            with zipfile.ZipFile(path,"w") as archive:
+                archive.writestr("Crawlvora/VERSION","8.1.4")
+                archive.writestr("Crawlvora/package.json","{}")
+            validate_zip(path)
+
+    def test_wordpress_package_allowlist(self):
+        import tempfile
+        import zipfile
+        from pathlib import Path
+        from tools.package_wordpress import build
+        from tools.verify_release_assets import validate_zip
+        with tempfile.TemporaryDirectory() as tmp:
+            path=build(Path(tmp)/"plugin.zip")
+            validate_zip(path,wordpress=True)
+            with zipfile.ZipFile(path,"a") as archive:
+                archive.writestr("crawlvora-business-directory/private.json","{}")
+            with self.assertRaises(ValueError):validate_zip(path,wordpress=True)

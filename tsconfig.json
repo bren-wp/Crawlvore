@@ -12,9 +12,13 @@
     "skipLibCheck": false,
     "outDir": "static",
     "rootDir": "frontend",
-    "noEmitOnError": true
+    "noEmitOnError": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
-    "frontend/locale.ts"
+    "frontend/locale.ts",
+    "frontend/api-contracts.d.ts",
+    "frontend/dom-contracts.d.ts"
   ]
 }

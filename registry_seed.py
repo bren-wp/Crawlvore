@@ -49,17 +49,22 @@ def install_seed(root, destination):
         os.unlink(name)
 
 
-def accept_packaged_seed(root, database, installed, expected_sha):
-    """Smoke acceptance of the actual offline seed, never the legacy CSV fallback."""
+def _acceptance_manifest(root, installed, expected_sha, *, preview):
     root=Path(root)
     if not installed:
-        raise ValueError('Complete packaged registry seed was not installed.')
+        raise ValueError('Preview registry seed not installed.' if preview else 'Complete packaged registry seed was not installed.')
     report=json.loads((root/'registry-seed.json').read_text(encoding='utf-8'))
-    if report.get('complete') is False:
-        raise ValueError('Incomplete preview cannot pass complete registry acceptance.')
     declared=(root/'registry-seed.sha256').read_text(encoding='ascii').strip()
     if not expected_sha or expected_sha!=declared or report.get('database_sha256')!=expected_sha:
-        raise ValueError('Packaged registry SHA-256 does not match accepted snapshot.')
+        raise ValueError('Preview registry checksum mismatch.' if preview else 'Packaged registry SHA-256 does not match accepted snapshot.')
+    return report
+
+
+def accept_packaged_seed(root, database, installed, expected_sha):
+    """Smoke acceptance of the actual offline seed, never the legacy CSV fallback."""
+    report=_acceptance_manifest(root,installed,expected_sha,preview=False)
+    if report.get('complete') is False:
+        raise ValueError('Incomplete preview cannot pass complete registry acceptance.')
     # install_seed verified every copied byte against declared before publication.
     with closing(sqlite3.connect(Path(database).resolve().as_uri()+'?mode=ro',uri=True)) as db:
         runs=db.execute('SELECT snapshot,complete FROM registry_runs').fetchall()
@@ -75,14 +80,9 @@ def accept_packaged_seed(root, database, installed, expected_sha):
 
 def accept_preview_seed(root, database, installed, expected_sha):
     """Validate captured partial snapshot without claiming full registry coverage."""
-    root=Path(root)
-    if not installed:
-        raise ValueError('Preview registry seed not installed.')
-    report=json.loads((root/'registry-seed.json').read_text(encoding='utf-8'))
+    report=_acceptance_manifest(root,installed,expected_sha,preview=True)
     if report.get('complete') is not False or report.get('scope')!='all-status':
         raise ValueError('Expected explicitly incomplete registry snapshot.')
-    if report.get('database_sha256')!=expected_sha or (root/'registry-seed.sha256').read_text(encoding='ascii').strip()!=expected_sha:
-        raise ValueError('Preview registry checksum mismatch.')
     with closing(sqlite3.connect(Path(database).resolve().as_uri()+'?mode=ro',uri=True)) as db:
         if db.execute('SELECT snapshot,complete FROM registry_runs').fetchall()!=[(report['snapshot'],0)]:
             raise ValueError('Preview snapshot identity mismatch.')
