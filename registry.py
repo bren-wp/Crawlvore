@@ -1,165 +1,20 @@
-"""Public Croatian court registry v3: schema-driven, checkpointed snapshot mirror."""
-import json, os, re, time, threading, hashlib, sys, csv, io
-from pathlib import Path
+"""Public Croatian registry synchronization and SQLite snapshot repository."""
+import csv
+import hashlib
+import io
+import json
+import re
+import threading
 from contextlib import nullcontext
-from urllib.parse import urlsplit
-import requests
-from network import public_session
-from core import Stopped, UA, formula_safe
-from native_vault import NativeVault, VaultUnavailable
+from core import Stopped, formula_safe
+from registry_access import credentials, configured, RegistryAccess
+from registry_client import BASE, TOKEN_URL, SPEC_URL, Client, TransientRegistryError
 
-BASE='https://sudreg-data.gov.hr/api/javni'
-TOKEN_URL='https://sudreg-data.gov.hr/api/oauth/token'
-SPEC_URL=BASE+'/dokumentacija/open_api'
+__all__ = ['credentials', 'configured', 'RegistryAccess', 'BASE', 'TOKEN_URL',
+           'SPEC_URL', 'Client', 'TransientRegistryError', 'NAME', 'catalog',
+           'rows_of', 'normalized_id', 'Registry', 'start_registry']
+
 NAME=re.compile(r'^[a-z][a-z0-9_]*$')
-
-def credentials(root, data_dir):
-    # Treat each credential source as an indivisible pair. An explicitly supplied
-    # environment configuration must never silently borrow a secret from a file.
-    keys=('SUDREG_CLIENT_ID','SUDREG_CLIENT_SECRET')
-    if any(k in os.environ for k in keys):
-        return tuple(os.environ.get(k,'').strip() for k in keys)
-    paths=[Path(data_dir)/'sudreg.private.json', Path(root)/'sudreg.private.json']
-    if getattr(sys,'frozen',False):
-        paths.append(Path(sys.executable).parent/'sudreg.private.json')
-    for p in dict.fromkeys(paths):
-        if not p.is_file():
-            continue
-        try:
-            d=json.loads(p.read_text(encoding='utf-8-sig'))
-            if not isinstance(d,dict):
-                raise ValueError()
-        except (OSError,ValueError):
-            raise ValueError('Privatna konfiguracija nije valjana.') from None
-        return tuple(v.strip() if isinstance(v,str) else '' for v in (d.get('client_id',''),d.get('client_secret','')))
-    return ('','')
-
-def configured(root,data_dir):
-    try: return all(credentials(root,data_dir))
-    except ValueError: return False
-
-
-class RegistryAccess:
-    """Per-workspace authorization, isolated from the backup vault."""
-    def __init__(self,root,data_dir,vault=None):
-        self.root=root
-        self.data_dir=data_dir
-        self.vault=vault if vault is not None else NativeVault(data_dir,purpose='registry')
-        self.lock=threading.RLock()
-        self.session=None
-        self.saved=None
-        self.loaded=False
-        self.retry_after=0.0
-
-    def _load(self):
-        if not self.loaded and time.monotonic()>=self.retry_after:
-            try:
-                record=self.vault.load()
-                if record is not None and record.get('authorized') is True:
-                    self.saved=self._pair(record)
-            except (VaultUnavailable,ValueError,OSError):
-                # No plaintext fallback is created when the OS vault is unavailable.
-                self.saved=None
-                self.retry_after=time.monotonic()+30.0
-                return
-            self.loaded=True
-
-    @staticmethod
-    def _pair(data):
-        if not isinstance(data,dict):
-            raise ValueError('Invalid credentials.')
-        pair=tuple(data.get(k) for k in ('client_id','client_secret'))
-        if not all(isinstance(v,str) and 0<len(v.strip())<=512 and not any(ord(ch)<32 for ch in v) for v in pair):
-            raise ValueError('Enter valid Client ID and Client Secret.')
-        return tuple(v.strip() for v in pair)
-
-    def current(self):
-        with self.lock:
-            if self.session is not None:
-                return self.session
-            if any(k in os.environ for k in ('SUDREG_CLIENT_ID','SUDREG_CLIENT_SECRET')):
-                return credentials(self.root,self.data_dir),False
-            self._load()
-            if self.saved is not None:
-                return self.saved,True
-            return credentials(self.root,self.data_dir),False
-
-    def credentials(self):
-        return self.current()[0]
-
-    def status(self):
-        try:
-            pair,authorized=self.current()
-            return {'configured':all(pair),'authorized':authorized and all(pair)}
-        except ValueError:
-            return {'configured':False,'authorized':False}
-
-    def apply(self,data):
-        pair=self._pair(data)
-        persist=data.get('persist',False)
-        if type(persist) is not bool:
-            raise ValueError('Invalid secure storage preference.')
-        with self.lock:
-            if persist:
-                if data.get('permission') is not True:
-                    raise ValueError('Potvrdite korištenje javnog API-ja.')
-                try:
-                    self.vault.save({'client_id':pair[0],'client_secret':pair[1],'authorized':True})
-                except (VaultUnavailable,OSError):
-                    raise ValueError('Sigurna pohrana pristupnih podataka nije dostupna.') from None
-                self.saved=pair
-                self.loaded=True
-            self.session=(pair,persist)
-            return self.status()
-
-    def provision_from_environment(self):
-        """Explicit, per-user managed deployment enrollment; never embed a shared secret."""
-        if os.environ.pop('CRAWLVORA_REGISTRY_PROVISION','')!='1':
-            return False
-        # Consume the deployment pair before launching any vault subprocess.
-        data={'client_id':os.environ.pop('SUDREG_CLIENT_ID',''),
-              'client_secret':os.environ.pop('SUDREG_CLIENT_SECRET',''),
-              'persist':True,'permission':True}
-        self.apply(data)
-        return True
-
-    def provision_from_package(self):
-        # Only a frozen private Windows worker can carry an embedded DPAPI capsule.
-        if sys.platform!='win32' or not getattr(sys,'frozen',False) or os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
-            return False
-        capsule=Path(self.root)/'registry-private.dpapi'
-        if not capsule.is_file(): return False
-        with self.lock:
-            try:
-                # Any existing record (including a revocation tombstone) wins.
-                if self.vault.load() is not None: return False
-                if capsule.is_symlink() or not 0<capsule.stat().st_size<=65536:
-                    raise ValueError('Invalid private registry package.')
-                protector=NativeVault(Path.home()/'.crawlvora-private-package-v1',purpose='registry')
-                data=json.loads(protector.crypt(capsule.read_bytes(),decrypt=True))
-                if not isinstance(data,dict) or data.get('version')!=1:
-                    raise ValueError('Invalid private registry package.')
-                self.apply(dict(data,persist=True,permission=True))
-                return True
-            except (VaultUnavailable,OSError,ValueError,TypeError):
-                raise ValueError('Private registry package cannot be authorized on this Windows profile.') from None
-
-    def forget(self):
-        with self.lock:
-            try:
-                self.vault.save({'authorized':False})
-            except (VaultUnavailable,OSError):
-                # Disable access for the current process even when persistent
-                # revocation cannot be confirmed. Never claim the OS record was erased.
-                self.saved=None
-                self.loaded=False
-                self.session=(('', ''),False)
-                return dict(self.status(),revocation_verified=False)
-            self.saved=None
-            self.loaded=True
-            self.session=(('', ''),False)
-            return dict(self.status(),revocation_verified=True)
-
 
 def catalog(spec):
     def resolve(p):
@@ -198,53 +53,6 @@ def rows_of(payload):
 def normalized_id(v,width):
     s=str(v if v is not None else '')
     return s.zfill(width) if s.isascii() and s.isdigit() and len(s)<=width else ''
-
-class TransientRegistryError(ValueError):
-    """Retryable network or server failure; never used for access denials."""
-
-class Client:
-    def __init__(self,bot,creds,delay=3):
-        self.bot=bot; self.creds=creds; self.delay=delay; self.session=public_session(); self.session.trust_env=False; self.token=''; self.expiry=0
-        self.session.headers.update({'User-Agent':UA,'Accept':'application/json','Content-Type':'application/json'})
-    def close(self): self.session.close()
-    def request(self,method,url,**kw):
-        if urlsplit(url).netloc!='sudreg-data.gov.hr' or not url.startswith('https://'): raise ValueError('Nedopušten API host.')
-        for attempt in range(3):
-            self.bot.wait(self.delay-(time.monotonic()-self.bot.last_request)); self.bot.last_request=time.monotonic()
-            try:
-                with self.session.request(method,url,timeout=(10,60),allow_redirects=False,stream=True,**kw) as r:
-                    if r.status_code in (429,403): raise PermissionError(f'Sudski registar: HTTP {r.status_code}. Prikupljanje zaustavljeno.')
-                    if r.status_code>=500:
-                        if attempt<2: self.bot.wait(2**(attempt+1)); continue
-                        raise TransientRegistryError('Privremena pogreška poslužitelja.')
-                    chunks=[]; size=0
-                    for chunk in r.iter_content(65536):
-                        self.bot.wait(0); size+=len(chunk)
-                        if size>10*1024*1024: raise ValueError('Odgovor veći od 10 MB; smanjite veličinu stranice.')
-                        chunks.append(chunk)
-                    try: body=json.loads(b''.join(chunks))
-                    except (ValueError,UnicodeError): raise ValueError(f'Sudski registar: neispravan JSON (HTTP {r.status_code}).') from None
-                    return r.status_code, r.headers, body
-            except requests.RequestException:
-                if attempt==2: raise TransientRegistryError('Mrežna pogreška Sudskog registra.') from None
-                self.bot.wait(2**(attempt+1))
-    def auth(self):
-        code,_,body=self.request('POST',TOKEN_URL,auth=self.creds,data={'grant_type':'client_credentials'},headers={'Content-Type':'application/x-www-form-urlencoded'})
-        if code!=200 or not isinstance(body,dict) or not isinstance(body.get('access_token'),str) or not body['access_token']: raise ValueError(f'OAuth2 autentikacija nije uspjela (HTTP {code}). Provjerite pristupne podatke.')
-        self.token=body['access_token']; self.expiry=time.monotonic()+max(1,int(body.get('expires_in',300))-30)
-    def get(self,name,params=None):
-        for attempt in range(2):
-            if time.monotonic()>=self.expiry: self.auth()
-            code,h,b=self.request('GET',BASE+'/'+name,params=params or {},headers={'Authorization':'Bearer '+self.token})
-            if code==401 and attempt==0: self.expiry=0; continue
-            if code==200: return h,b
-            if code==400 and isinstance(b,dict) and str(b.get('error_code'))=='505': return h,[]
-            raise ValueError(f'Sudski registar: {name} · HTTP {code}.')
-        raise ValueError('Autentikacija nije uspjela.')
-    def spec(self):
-        code,_,body=self.request('GET',SPEC_URL,headers={'Accept':'application/openapi+json, application/json'})
-        if code!=200 or not isinstance(body,dict) or 'paths' not in body: raise ValueError('OpenAPI specifikacija nije dostupna.')
-        return body
 
 class Registry:
     def __init__(self,store):

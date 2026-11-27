@@ -52,3 +52,21 @@ Python response serialization and security headers move to
 `local_http_response.py`. The Windows-only Rust portable extraction moves to
 `portable_payload.rs`, preserving exclusive temporary directories, SHA-256
 verification and the worker-owned extraction lifetime.
+
+
+## Phase 3 ? increment 3
+
+The directory storage class now lives in company_store.py, shared field
+contracts in company_fields.py, and registry authorization and transport in
+registry_access.py and registry_client.py. Existing core and registry imports
+remain available; no schema or migration changes. The Rust window composition
+is isolated in window.rs. The frontend now inherits the full strict TypeScript configuration, including
+noImplicitAny, useUnknownInCatchVariables and strictNullChecks. Shared
+classic-script state remains for compatibility with the deployed asset paths. Acceptance requires native package builds,
+the full isolated regression suite and browser integration, not source
+reorganization alone.
+
+The authenticated HTTP handler is now constructed by local_http_routes.make_handler
+with explicit per-workspace dependencies. Startup, workspace lifecycle and
+shutdown remain in tvrtk_scraper.py. Route behavior, tokens and permissions
+are preserved.

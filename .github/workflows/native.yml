@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches: [registry-only-desktop, main]
-    paths: ['desktop/**', 'windows/**', 'linux/**', 'tvrtk_scraper.py', 'static/**', 'frontend/**', 'requirements.txt', 'VERSION', '.github/workflows/native.yml']
+    paths: ['desktop/**', 'windows/**', 'linux/**', '*.py', 'static/**', 'frontend/**', 'tools/**', 'tests/**', 'requirements*.txt', 'package*.json', 'tsconfig*.json', 'VERSION', '.github/workflows/native.yml']
   workflow_dispatch:
   workflow_call:
     inputs:

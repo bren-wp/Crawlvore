@@ -1,11 +1,11 @@
 let regSelection:RegistryCategory|null=null, regPage=1, regTotal=0;
 let previousRegistryAuthorization=false;
-let regRefreshBusy=false, regRowsSerial=0, regSearchTimer;
+let regRefreshBusy=false, regRowsSerial=0, regSearchTimer:ReturnType<typeof setTimeout>;
 async function registryRefresh(){
  if(regRefreshBusy)return; regRefreshBusy=true;
  try{
  const [r,s]=await Promise.all([api<RegistrySummary>('/api/registry'),api<BotStatus>('/api/status')]);
- const active=['running','stopping'].includes(s.status), ours=['registry','registry-check'].includes(s.kind);
+ const active=['running','stopping'].includes(s.status), ours=['registry','registry-check'].includes(s.kind??'');
  $('reg-config').textContent=r.configured?translate('Pristup omogućen'):translate('Pristup nije omogućen');
  $('reg-config').dataset.state=r.configured?'ready':'warning';
  if(!!r.authorized!==previousRegistryAuthorization){$('reg-permission').checked=!!r.authorized;previousRegistryAuthorization=!!r.authorized;} $('reg-permission').disabled=!!r.authorized;

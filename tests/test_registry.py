@@ -172,7 +172,7 @@ class CredentialSourceTests(unittest.TestCase):
 
     def test_arbitrary_working_directory_is_not_a_credential_source(self):
         self.write_pair(self.cwd)
-        with patch('registry.Path.cwd',return_value=self.cwd):
+        with patch('registry_access.Path.cwd',return_value=self.cwd):
             self.assertEqual(credentials(self.root,self.data),('',''))
 
     def test_workspace_configuration_precedes_application_configuration(self):
@@ -275,12 +275,12 @@ class RegistryAccessTests(unittest.TestCase):
         self.access().apply(dict(self.data,persist=True,permission=True))
         reopened=self.access()
         self.vault.unavailable=True
-        with patch('registry.time.monotonic',return_value=100.0):
+        with patch('registry_access.time.monotonic',return_value=100.0):
             self.assertFalse(reopened.status()['configured'])
         self.vault.unavailable=False
-        with patch('registry.time.monotonic',return_value=110.0):
+        with patch('registry_access.time.monotonic',return_value=110.0):
             self.assertFalse(reopened.status()['configured'])
-        with patch('registry.time.monotonic',return_value=131.0):
+        with patch('registry_access.time.monotonic',return_value=131.0):
             self.assertEqual(reopened.status(),{'configured':True,'authorized':True})
 
 
