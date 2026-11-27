@@ -17,6 +17,11 @@ pub(crate) fn ready_url(line: &str) -> Result<Url, io::Error> {
     Ok(url)
 }
 
+pub(crate) fn allowed_worker_navigation(url: &Url, port: Option<u16>) -> bool {
+    port.is_some() && url.scheme() == "http" && url.host_str() == Some("127.0.0.1")
+        && url.port() == port && url.username().is_empty() && url.password().is_none()
+}
+
 // Only ordinary public-domain HTTP(S) links may leave the local webview.
 // Do not allow file URLs, custom protocols, IP literals, local hostnames or embedded credentials.
 pub(crate) fn allowed_external_url(url: &Url) -> bool {
@@ -45,6 +50,18 @@ mod tests {
             "http://192.168.1.1", "http://[::1]", "https://service.internal/",
             "https://foo.localhost/", "https://foo.local/"] {
             assert!(!allowed_external_url(&Url::parse(value).unwrap()), "{value}");
+        }
+    }
+
+    #[test]
+    fn navigation_requires_exact_worker_origin() {
+        let local = Url::parse("http://127.0.0.1:49152/api/stats").unwrap();
+        assert!(allowed_worker_navigation(&local, Some(49152)));
+        assert!(!allowed_worker_navigation(&local, None));
+        assert!(!allowed_worker_navigation(&local, Some(49153)));
+        for value in ["https://127.0.0.1:49152/", "http://localhost:49152/",
+                      "http://example.invalid:49152/"] {
+            assert!(!allowed_worker_navigation(&Url::parse(value).unwrap(), Some(49152)));
         }
     }
 

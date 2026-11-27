@@ -97,3 +97,11 @@ jobs:
             performance.json
             layout-evidence/layout-report.json
             branding/*fixture.png
+  rust-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned RustSec auditor
+        run: cargo install cargo-audit --version 0.23.0 --locked
+      - name: Audit native dependency lock
+        run: cargo audit --file desktop/src-tauri/Cargo.lock

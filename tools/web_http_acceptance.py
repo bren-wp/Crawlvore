@@ -56,7 +56,23 @@ def run():
                 except HTTPError as error:
                     assert error.code==404
                 else: raise AssertionError('Invalid route accepted')
-                print(json.dumps({'pages':len(PAGES),'search':'PASS','isolation':'PASS','escaping':'PASS','invalid_route':'PASS','scope':'PHP CLI HTTP; Apache access rules not exercised'}))
+                folder=root/'storage/data/HR'
+                shard='HR-entrepreneur-000001.json'
+                record={'country':'HR','kind':'entrepreneur','name':'Synthetic sole trader',
+                        'tax_number':'SYNTHETIC-TAX','as_of':'2026-01-01'}
+                (folder/shard).write_text(json.dumps([record]),encoding='utf-8')
+                (folder/'manifest.json').write_text(json.dumps({'country':'HR','count':1,'shards':[shard]}),encoding='utf-8')
+                html=get(view='pretraga',country='HR')
+                assert 'Synthetic sole trader' in html and 'SYNTHETIC-TAX' not in html
+                assert 'Synthetic sole trader' not in get(view='pretraga',country='HR',q='SYNTHETIC-TAX')
+                (folder/shard).write_text(json.dumps([dict(record,country='GB')]),encoding='utf-8')
+                try:
+                    get(view='pretraga',country='HR')
+                except HTTPError as error:
+                    assert error.code==503
+                    error.close()
+                else: raise AssertionError('Mismatched catalog country accepted')
+                print(json.dumps({'pages':len(PAGES),'search':'PASS','isolation':'PASS','escaping':'PASS','invalid_route':'PASS','privacy_minimization':'PASS','country_validation':'PASS','scope':'PHP CLI HTTP; Apache access rules not exercised'}))
             finally:
                 server.terminate()
                 try: server.wait(timeout=10)
