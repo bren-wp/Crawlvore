@@ -6,7 +6,7 @@ function $(id) {
     return element;
 }
 const token = document.querySelector('meta[name="local-token"]')?.content || document.querySelector('meta[name="csrf-token"]')?.content || '';
-const nf = new Intl.NumberFormat(UI_LANGUAGE === 'hr' ? 'hr-HR' : 'en-US');
+const nf = new Intl.NumberFormat('hr-HR');
 const n = (v) => nf.format(Number(v ?? 0));
 let page = 1, total = 0, serial = 0, timer, current = 'overview';
 const make = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined)
@@ -17,7 +17,7 @@ async function api(path, opts = {}) { const r = await fetch(path, opts); const d
 function toast(msg) { $('toast').textContent = msg; $('toast').hidden = false; clearTimeout(timer); timer = setTimeout(() => $('toast').hidden = true, 5500); }
 const fail = (e) => toast(e instanceof Error ? e.message : translate('Pogreška pri povezivanju.'));
 function post(path, data) { return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token }, body: JSON.stringify(data) }); }
-function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value }); }
+function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value, industry: $('industry-filter').value }); }
 function download(filtered = false) { location.href = '/api/export' + (filtered ? '?' + filters() : ''); }
 function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
     e.setAttribute('aria-current', 'page');
@@ -93,6 +93,14 @@ async function overview() { const [s, p] = await Promise.all([api('/api/stats'),
 } }
 async function cities() { const v = $('city').value; const cs = await api('/api/cities'); $('city').replaceChildren(new Option(translate('Svi gradovi'), '')); for (const c of cs)
     $('city').add(new Option(c, c)); $('city').value = v; }
+async function industries() {
+    const select = $('industry-filter'), old = select.value;
+    const values = await api('/api/industries');
+    select.replaceChildren(new Option('Sve djelatnosti', ''));
+    for (const value of values)
+        select.add(new Option(value, value));
+    select.value = old;
+}
 async function directory() { const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); const d = await api('/api/companies?' + p); if (seq !== serial)
     return; total = d.total; const pages = Math.max(1, Math.ceil(total / 25)); if (page > pages) {
     page = pages;
@@ -155,9 +163,9 @@ $('prev').onclick = () => { page--; directory().catch(fail); };
 $('next').onclick = () => { page++; directory().catch(fail); };
 let debounce;
 $('search').oninput = () => { clearTimeout(debounce); debounce = setTimeout(() => { page = 1; directory().catch(fail); }, 250); };
-for (const id of ['city', 'contact', 'sort', 'source-filter', 'entity-kind'])
+for (const id of ['city', 'contact', 'sort', 'source-filter', 'entity-kind', 'industry-filter'])
     $(id).onchange = () => { page = 1; directory().catch(fail); };
-$('reset').onclick = () => { for (const id of ['search', 'city', 'contact', 'source-filter', 'entity-kind'])
+$('reset').onclick = () => { for (const id of ['search', 'city', 'contact', 'source-filter', 'entity-kind', 'industry-filter'])
     $(id).value = ''; $('sort').value = 'title'; page = 1; directory().catch(fail); };
 const providerNames = { tvrtke: 'Tvrtke.hr', companywall: 'CompanyWall.hr', registry: translate('Crawlvora Sync'), company: 'Company.hr', html: translate('Prilagođeni web'), json: translate('Prilagođeni API'), csv: translate('CSV / postojeći podaci') };
 async function providers() { const list = await api('/api/providers'), select = $('source-filter'), old = select.value; select.replaceChildren(new Option(translate('Svi izvori'), '')); $('source-summary').replaceChildren(); for (const p of list) {
@@ -179,15 +187,15 @@ $('export-clear-all').onclick = () => { for (const field of exportFields)
 $('export-selected').onclick = () => { const selected = exportFields.filter(field => field.checked).map(field => field.value); if (!selected.length)
     return; const p = $('export-filtered').checked ? filters() : new URLSearchParams(); p.set('fields', selected.join(',')); p.set('format', $('export-format').value); p.set('distinct', $('export-distinct').checked ? '1' : '0'); p.set('omit_empty', '1'); location.href = '/api/export-fields?' + p; };
 syncExportFields();
-let themeWrite = Promise.resolve();
-$('theme').onclick = () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = t; themeWrite = themeWrite.then(async () => { await post('/api/preferences/theme', { theme: t }); }).catch(fail); };
 cities().catch(fail);
+industries().catch(fail);
 providers().catch(fail);
 go('overview');
 $('xlsx-export').onclick = () => location.href = '/api/export-xlsx';
 $('filtered-xlsx').onclick = () => location.href = '/api/export-xlsx?' + filters();
 let regSelection = null, regPage = 1, regTotal = 0;
 let previousRegistryAuthorization = false, registryRefreshAvailable = false;
+let lastRegistryActive = false, completionRefresh = false;
 let regRefreshBusy = false, regRowsSerial = 0, regSearchTimer;
 async function registryRefresh() {
     if (regRefreshBusy)
@@ -210,10 +218,13 @@ async function registryRefresh() {
         $('reg-status').textContent = active && !ours ? translate('Druga operacija je u tijeku') : ours ? (({ running: translate('Aktivno'), stopping: translate('Zaustavljanje'), completed: translate('Završeno'), update_available: translate('Dostupna nova snimka'), failed: translate('Pogreška'), stopped: translate('Zaustavljeno') })[s.status] || s.status) : translate('Spremno');
         $('reg-start').textContent = registryRefreshAvailable ? translate('Preuzmi novu snimku') : translate('Nastavi sinkronizaciju');
         $('reg-logs').textContent = registryRefreshAvailable ? translate('Dostupna je nova snimka. Potpuno preuzimanje zahtijeva potvrdu.') + ' ' + (s.local_snapshot || '') + ' → ' + (s.update_available || '') : ours && s.kind === 'registry' ? translate('Sačuvani redci') + ': ' + n(s.reused || 0) + ' · ' + translate('Preuzeti redci') + ': ' + n(s.processed || 0) + ' · ' + translate('Popravljeni redci') + ': ' + n(s.repaired || 0) : translate('Nema aktivnog osvježavanja.');
-        const progress = ours && s.kind === 'registry' && s.last ? Math.min(100, s.status === 'completed' ? 100 : Math.max(0, (s.page - 1) / s.last * 100)) : 0;
-        $('reg-progress-label').textContent = ours && s.kind === 'registry' && s.last ? translate('Kategorija ') + n(s.page) + ' / ' + n(s.last) : translate('Nema aktivne sinkronizacije');
-        $('reg-percent').textContent = progress ? Math.floor(progress) + '%' : '—';
+        const projecting = s.phase === 'projection', finalizing = s.phase === 'finalizing';
+        const completedCategories = r.categories.filter(c => c.snapshot === s.snapshot_id && c.done).length;
+        const progress = ours && s.kind === 'registry' && s.last ? Math.min(100, s.status === 'completed' ? 100 : projecting ? (s.projection_total ? 100 * (s.projected || 0) / s.projection_total : 0) : finalizing ? 100 : 100 * completedCategories / s.last) : 0;
+        $('reg-progress-label').textContent = projecting ? 'Obrada subjekata: ' + n(s.projected) + ' / ' + n(s.projection_total) : finalizing ? 'Završna provjera i spremanje imenika' : ours && s.kind === 'registry' && s.last ? 'Preuzete kategorije: ' + n(completedCategories) + ' / ' + n(s.last) : 'Nema aktivne sinkronizacije';
+        $('reg-percent').textContent = ours && s.kind === 'registry' ? Math.floor(progress) + '%' : '—';
         $('reg-progress-bar').style.width = progress + '%';
+        observeRegistryCompletion(s);
         updateDiffOptions(r.runs);
         const selected = $('reg-snapshot').value;
         const options = [make('option', translate('Sve snimke'))];
@@ -293,8 +304,39 @@ $('reg-next').onclick = () => { if (regPage * 50 < regTotal) {
     regPage++;
     registryRows().catch(fail);
 } };
-setInterval(() => { if (current === 'registry' && !document.hidden)
-    registryRefresh().catch(() => { }); }, 2500);
+function observeRegistryCompletion(s) {
+    if (s.kind !== 'registry')
+        return;
+    const active = ['running', 'stopping'].includes(s.status), completed = lastRegistryActive && s.status === 'completed';
+    lastRegistryActive = active;
+    if (!completed || completionRefresh)
+        return;
+    completionRefresh = true;
+    void Promise.all([cities(), industries(), providers()]).then(() => {
+        if (current === 'registry') {
+            page = 1;
+            go('directory');
+            toast('Sinkronizacija je završena. Poslovni imenik je osvježen.');
+        }
+        else if (current === 'directory')
+            return directory();
+        else if (current === 'overview')
+            return overview();
+    }).catch(fail).finally(() => { completionRefresh = false; });
+}
+let statusPolling = false;
+setInterval(() => {
+    if (document.hidden)
+        return;
+    if (current === 'registry') {
+        registryRefresh().catch(() => { });
+        return;
+    }
+    if (statusPolling)
+        return;
+    statusPolling = true;
+    api('/api/status').then(observeRegistryCompletion).catch(() => { }).finally(() => { statusPolling = false; });
+}, 3500);
 $('reg-export').onclick = () => { if (regSelection)
     location.href = '/api/registry/export?' + new URLSearchParams({ snapshot: regSelection.snapshot, category: regSelection.category }); };
 for (const format of ['xlsx', 'xml', 'sql'])
@@ -313,7 +355,7 @@ async function refreshJobs(init = false) { const request = ++jobsRefreshSequence
     m.append(el);
 } const b = $('job-rows'); b.replaceChildren(); for (const j of r.jobs) {
     const tr = make('tr');
-    for (const v of [j.id, providerNames[j.kind] || j.kind, jobLabels[j.state] || j.state, j.created, j.finished || '—', String(j.attempts || 0) + (j.next_run ? ' · ' + new Date(j.next_run * 1000).toLocaleString(UI_LANGUAGE === 'hr' ? 'hr-HR' : 'en-US') : '')])
+    for (const v of [j.id, providerNames[j.kind] || j.kind, jobLabels[j.state] || j.state, j.created, j.finished || '—', String(j.attempts || 0) + (j.next_run ? ' · ' + new Date(j.next_run * 1000).toLocaleString('hr-HR') : '')])
         tr.append(make('td', String(v)));
     const td = make('td');
     if (['queued', 'retry_wait'].includes(j.state)) {
@@ -403,40 +445,15 @@ async function refreshAnalytics() {
     renderChart('analytics-history', h.days.map(x => ({ label: x.day, n: x.n })));
     await providers();
 }
-function syncSettings() {
-    const dark = document.documentElement.dataset.theme !== 'light';
-    $('settings-dark').setAttribute('aria-pressed', String(dark));
-    $('settings-light').setAttribute('aria-pressed', String(!dark));
-    $('settings-en').setAttribute('aria-pressed', String(UI_LANGUAGE === 'en'));
-    $('settings-hr').setAttribute('aria-pressed', String(UI_LANGUAGE === 'hr'));
-}
 async function refreshSettings() {
-    syncSettings();
     const [s, r] = await Promise.all([api('/api/stats'), api('/api/registry')]);
     $('settings-count').textContent = n(s.total);
     $('settings-api').textContent = translate(r.configured ? 'Pristup omogućen' : 'Pristup nije omogućen');
     await refreshRecovery();
 }
-function syncQuickFilters() {
-    document.querySelectorAll('[data-contact-filter]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.contactFilter === $('contact').value)));
-}
-document.querySelectorAll('[data-contact-filter]').forEach(b => b.addEventListener('click', () => { $('contact').value = b.dataset.contactFilter || ''; $('contact').dispatchEvent(new Event('change')); syncQuickFilters(); }));
-$('contact').addEventListener('change', syncQuickFilters);
-$('reset').addEventListener('click', syncQuickFilters);
-syncQuickFilters();
 $('analytics-export').onclick = () => download();
 $('analytics-xlsx').onclick = () => location.href = '/api/export-xlsx';
 $('analytics-json').onclick = () => location.href = '/api/export-json';
-$('settings-dark').onclick = () => { if (document.documentElement.dataset.theme === 'light')
-    $('theme').click(); syncSettings(); };
-$('settings-light').onclick = () => { if (document.documentElement.dataset.theme !== 'light')
-    $('theme').click(); syncSettings(); };
-$('settings-en').onclick = () => { if (UI_LANGUAGE !== 'en')
-    $('language').click(); };
-$('settings-hr').onclick = () => { if (UI_LANGUAGE !== 'hr')
-    $('language').click(); };
-$('theme').addEventListener('click', syncSettings);
-syncSettings();
 function setProfileTab(tab) {
     const dialog = $('detail');
     dialog.dataset.profileTab = tab;
@@ -475,6 +492,7 @@ $('import-btn').onclick = async () => { const f = $('file').files?.[0]; if (!f |
     const r = await api(f.name.toLowerCase().endsWith('.json') ? '/api/import-json' : '/api/import', { method: 'POST', headers: { 'X-Local-Token': token }, body: f });
     toast(translate('Učitano ') + n(r.read) + translate(' · novih ') + n(r.added));
     await cities();
+    await industries();
     await providers();
     $('file').value = '';
     $('file-name').textContent = translate('Nije odabrana datoteka.');

@@ -17,6 +17,11 @@ class IdentifierSearchTests(unittest.TestCase):
     def titles(self,query,**filters):
         return [row['title'] for row in self.store.query(q=query,**filters)['rows']]
 
+    def test_email_filter_excludes_missing_addresses(self):
+        with self.store.db() as db:
+            self.store.upsert(db,{'title':'Synthetic e-mail contact','email':'contact@example.invalid'})
+        self.assertEqual(self.titles('',contact='email'),['Synthetic e-mail contact'])
+
     def test_name_search(self):
         self.assertEqual(self.titles('ČELIK'),['Čelik primjer'])
         self.assertEqual(self.titles('primjer'),['Čelik primjer'])

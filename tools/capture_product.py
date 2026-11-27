@@ -52,7 +52,7 @@ def capture(output):
                         executable_path=os.getenv("CRAWLVORA_TEST_CHROMIUM") or None)
                     page = browser.new_page(viewport={"width": 1440, "height": 900})
                     page.goto(line.strip().split(" ", 1)[1], wait_until="domcontentloaded")
-                    expect(page.locator("html")).to_have_attribute("lang", "en")
+                    expect(page.locator("html")).to_have_attribute("lang", "hr")
                     expect(page.locator("#preview-rows .textbtn").first).to_be_visible(timeout=20000)
                     expect(page.locator("#preview-rows")).to_contain_text("Demo")
                     def shot(name):
@@ -67,12 +67,6 @@ def capture(output):
                     expect(page.locator("#detail")).to_be_visible()
                     shot("profile-dark")
                     page.locator("#close-detail").click()
-                    page.locator('[data-view="settings"]').click()
-                    page.locator("#settings-light").click()
-                    expect(page.locator("html")).to_have_attribute("data-theme", "light")
-                    page.locator('[data-view="overview"]').click()
-                    expect(page.locator("#overview")).to_be_visible()
-                    shot("overview-light")
                     browser.close()
                 worker.stdin.close()
                 if worker.wait(timeout=25) != 0:

@@ -52,12 +52,9 @@ Actual desktop application interface, captured from a disposable synthetic works
 |---|---|
 | ![Analytics](docs/screenshots/analytics-dark.jpg) | ![Settings](docs/screenshots/settings-dark.jpg) |
 
-### Light appearance
-
-![Light appearance](docs/screenshots/overview-light.jpg)
 <!-- PRODUCT_SCREENSHOTS_END -->
 
-Choose English or Croatian and dark or light appearance. Resize the desktop window to fit your workspace.
+Hrvatsko sučelje s jedinstvenom tamnom temom.
 
 ## Choose your edition
 
@@ -68,7 +65,7 @@ Two Croatian editions are built for Windows and Linux.
 | HR Full | Verified Croatian Court Registry snapshot |
 | HR Online | Empty workspace on first launch |
 
-Croatian is the default interface language; English remains optional. Existing user databases are preserved during upgrades. Full distribution uses only the verified Croatian data archive and never embeds API credentials.
+The interface is exclusively Croatian with a fixed dark appearance. Existing user databases are preserved during upgrades. Full distribution uses only the verified Croatian data archive and never embeds API credentials.
 
 ## Get Crawlvora
 

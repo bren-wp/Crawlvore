@@ -1,4 +1,4 @@
-"""Check real worker layouts in both languages and themes with synthetic long contact values."""
+"""Check real worker layouts in the Croatian dark theme with synthetic long contact values."""
 import argparse
 import json
 import os
@@ -53,7 +53,7 @@ def capture(output):
                         executable_path=os.getenv("CRAWLVORA_TEST_CHROMIUM") or None)
                     page = browser.new_page(viewport={"width": 1440, "height": 900})
                     page.goto(line.strip().split(" ", 1)[1], wait_until="domcontentloaded")
-                    expect(page.locator("html")).to_have_attribute("lang", "en")
+                    expect(page.locator("html")).to_have_attribute("lang", "hr")
                     expect(page.locator("#preview-rows .textbtn").first).to_be_visible(timeout=20000)
                     expect(page.locator("#preview-rows")).to_contain_text("Demo")
                     findings=[]
@@ -62,11 +62,10 @@ def capture(output):
                     cdp=page.context.new_cdp_session(page)
                     errors=[]
                     page.on("pageerror",lambda error:errors.append(str(error)))
-                    for lang in ("en","hr"):
-                        page.evaluate("(lang)=>post('/api/preferences/language',{language:lang})",lang)
+                    for lang in ("hr",):
                         page.reload()
                         expect(page.locator("html")).to_have_attribute("lang",lang)
-                        for theme in ("dark","light"):
+                        for theme in ("dark",):
                             page.evaluate("(theme)=>document.documentElement.dataset.theme=theme",theme)
                             for width,height,scale in ((360,300,1),(390,844,1),(768,480,1),(1024,600,1),(1120,720,1),(1440,900,1),(1152,720,1.25),(960,600,1.5),(822,514,1.75),(720,450,2)):
                                 page.set_viewport_size({"width":width,"height":height})

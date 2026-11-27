@@ -209,8 +209,9 @@ class Registry:
                 return False
             if old and old['manifest']!=manifest: raise ValueError('Specifikacija se promijenila tijekom snimke; potreban je novi snapshot.')
             was_complete=bool(old and old['complete'])
+            projected_current=bool(c.execute('SELECT 1 FROM meta WHERE key=? AND value=?',('registry_projection:'+snap,'2')).fetchone())
             c.execute('INSERT OR IGNORE INTO registry_runs(snapshot,manifest) VALUES (?,?)',(snap,manifest))
-        bot.update(last=len(cats)); bot.log(f'Snimka {snap} · {len(cats)} skupnih kategorija')
+        bot.update(last=len(cats),phase='download',snapshot_id=snap); bot.log(f'Snimka {snap} · {len(cats)} skupnih kategorija')
         repaired=False
         for index,(name,params) in enumerate(cats.items(),1):
             bot.update(page=index); bot.log(f'{name} · {index}/{len(cats)}')
@@ -246,11 +247,19 @@ class Registry:
                 with bot.lock: bot.state['processed']+=len(rows)
                 offset=nxt
                 if done: break
-        if was_complete and not repaired:
-            bot.log('Latest registry snapshot already downloaded.')
+        if was_complete and not repaired and projected_current:
+            bot.log('Snimka registra već je preuzeta i obrađena.')
+            bot.update(phase='complete')
             return True
-        self.merge(snap,bot)
-        with self.store.db() as c: c.execute('UPDATE registry_runs SET complete=1 WHERE snapshot=?',(snap,))
+        # The directory projection and completed marker commit atomically.
+        # Existing readers retain their previous consistent SQLite snapshot.
+        with self.store.db() as c:
+            self.merge(snap,bot,connection=c)
+            bot.update(phase='finalizing')
+            missing=c.execute("SELECT count(*) FROM registry_rows r WHERE r.snapshot=? AND r.category='subjekti' AND r.mbs<>'' AND NOT EXISTS (SELECT 1 FROM companies c WHERE c.mbs=r.mbs)",(snap,)).fetchone()[0]
+            if missing: raise ValueError('Poslovni imenik nije potpun: '+str(missing))
+            c.execute('UPDATE registry_runs SET complete=1 WHERE snapshot=?',(snap,))
+        bot.update(phase='complete')
         return True
     def merge(self,snap,bot,connection=None):
         # Keep original payloads; project documented v3 fields into the directory.
@@ -270,9 +279,23 @@ class Registry:
                 yield json.loads(rr[0])
         with (self.store.db() if connection is None else nullcontext(connection)) as c:
             # Avoid millions of empty index probes in partial/offline snapshots.
-            available={name for name in ('tvrtke','nazivi','skracene_tvrtke','sjedista','email_adrese') if c.execute('SELECT 1 FROM registry_rows WHERE snapshot=? AND category=? LIMIT 1',(snap,name)).fetchone()}
-            for r in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND category='subjekti' ORDER BY ordinal",(snap,)):
+            available={name for name in ('tvrtke','nazivi','skracene_tvrtke','sjedista','email_adrese','pretezite_djelatnosti') if c.execute('SELECT 1 FROM registry_rows WHERE snapshot=? AND category=? LIMIT 1',(snap,name)).fetchone()}
+            # The official codebook is small (6,400 rows in snapshot 1370).
+            # Keep its revision alongside each code; never mix different NKD revisions.
+            nkd={}
+            for rr in c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND category='nacionalna_klasifikacija_djelatnosti' ORDER BY ordinal",(snap,)):
+                reference=json.loads(rr[0])
+                key=value(reference,'id')
+                label=' · '.join(filter(None,[value(reference,'verzija'),value(reference,'sifra'),value(reference,'puni_naziv')]))
+                if key and label:
+                    if len(nkd)>=50000 and key not in nkd: raise ValueError('Prevelik NKD šifrarnik.')
+                    if key in nkd and nkd[key]!=label: raise ValueError('Proturječan NKD šifrarnik.')
+                    nkd[key]=label
+            total=c.execute("SELECT count(*) FROM registry_rows WHERE snapshot=? AND category='subjekti'",(snap,)).fetchone()[0]
+            bot.update(phase='projection',projected=0,projection_total=total,snapshot_id=snap)
+            for projected,r in enumerate(c.execute("SELECT payload FROM registry_rows WHERE snapshot=? AND category='subjekti' ORDER BY ordinal",(snap,)),1):
                 bot.wait(0)
+                if projected%512==0: bot.update(projected=projected-1)
                 d=json.loads(r[0]); mbs=normalized_id(d.get('mbs'),9); oib=normalized_id(d.get('oib'),11)
                 if not mbs:
                     bot.inc('skipped')
@@ -308,7 +331,14 @@ class Registry:
                 email=next((address for e in related(c,mbs,'email_adrese')
                             if str(e.get('status',1))=='1' and (address:=value(e,'adresa'))),'')
                 if email: row['email']=email
+                # Assign a category only when the authoritative relation is unambiguous.
+                if nkd:
+                    industries={nkd[key] for relation in related(c,mbs,'pretezite_djelatnosti')
+                                if (key:=value(relation,'nacionalna_klasifikacija_djelatnosti_id')) in nkd}
+                    if len(industries)==1: row['industry']=next(iter(industries))
                 if self.store.upsert(c,row,provider='registry',origin=BASE+'/subjekti'): bot.inc('added')
+            c.execute("INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('registry_projection:'+snap,'2'))
+            bot.update(projected=total)
 
 def start_registry(bot,registry,creds,limit=500,check=False,*,pinned_snapshot=None,allow_full_refresh=True):
     if not all(creds): raise ValueError('Nedostaje privatna konfiguracija Sudskog registra.')

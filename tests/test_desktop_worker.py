@@ -90,9 +90,9 @@ class DesktopWorkerTests(unittest.TestCase):
                     self.assertNotIn(credentials['client_id'].encode(),raw)
                     self.assertNotIn(credentials['client_secret'].encode(),raw)
                     self.assertTrue(json.loads(raw)['configured'])
-                self.assertEqual(post('/api/preferences/theme',{'theme':'light'})['theme'],'light')
+                self.assertEqual(post('/api/preferences/theme',{'theme':'dark'})['theme'],'dark')
                 with opener.open(base+'/',timeout=5) as response:
-                    self.assertIn(b'data-theme="light"',response.read())
+                    self.assertIn(b'data-theme="dark"',response.read())
                 self.assertTrue(post('/api/ui-ready',{})['ok'])
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     future=executor.submit(p.stdout.readline)

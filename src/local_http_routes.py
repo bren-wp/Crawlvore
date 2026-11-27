@@ -38,14 +38,10 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 return self.send_data(b'',status=303,extra={'Location':'/','Set-Cookie':self.cookie_name()+'='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict'})
             if not self.session_authorized(): return self.send_data({'error':'Access denied.'},status=403)
             params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
-            filters={k:get(k) for k in ('q','city','contact','provider','entity_kind')}
+            filters={k:get(k) for k in ('q','city','contact','provider','entity_kind','industry')}
             try:
                 if p.path=='/':
-                    with store.db() as db:
-                        preferred=db.execute("SELECT value FROM meta WHERE key='ui_language'").fetchone()
-                        theme_row=db.execute("SELECT value FROM meta WHERE key='ui_theme'").fetchone()
-                    lang='hr' if preferred and preferred[0]=='hr' else 'en'
-                    theme='light' if theme_row and theme_row[0]=='light' else 'dark'
+                    lang='hr'; theme='dark'
                     return self.send_data((ROOT/'static/index.html').read_text(encoding='utf-8').replace('__TOKEN__',TOKEN).replace('__LANGUAGE__',lang).replace('data-theme="dark"','data-theme="'+theme+'"',1).encode(),'text/html; charset=utf-8')
                 if p.path in ('/app.js','/locale.js','/style.css','/logo.svg'):
                     return self.send_data((ROOT/'static'/p.path[1:]).read_bytes(),'text/javascript; charset=utf-8' if p.path.endswith('js') else ('image/svg+xml' if p.path.endswith('svg') else 'text/css; charset=utf-8'))
@@ -117,6 +113,7 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
                 if p.path=='/api/cities': return self.send_data(store.cities())
+                if p.path=='/api/industries': return self.send_data(store.industries())
                 if p.path=='/api/status': return self.send_data(collector.snapshot())
                 if p.path=='/api/companies': return self.send_data(store.query(**filters,page=max(1,min(100000,int(get('page','1')))),limit=max(1,min(100,int(get('limit','25')))),sort=get('sort','title')))
                 if p.path.startswith('/api/company-registry/'):
@@ -215,13 +212,13 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                     return self.send_data({'ok':True})
                 if self.path=='/api/preferences/theme':
                     theme=data.get('theme') if isinstance(data,dict) else None
-                    if theme not in ('dark','light'): raise ValueError('Invalid theme.')
+                    if theme != 'dark': raise ValueError('Invalid theme.')
                     with store.db() as db:
                         db.execute("INSERT INTO meta(key,value) VALUES('ui_theme',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(theme,))
                     return self.send_data({'ok':True,'theme':theme})
                 if self.path=='/api/preferences/language':
                     lang=data.get('language') if isinstance(data,dict) else None
-                    if lang not in ('en','hr'): raise ValueError('Invalid language.')
+                    if lang != 'hr': raise ValueError('Invalid language.')
                     with store.db() as db:
                         db.execute("INSERT INTO meta(key,value) VALUES('ui_language',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(lang,))
                     return self.send_data({'ok':True,'language':lang})

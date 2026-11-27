@@ -2,6 +2,12 @@
 
 ## 8.1.7
 
+- Project official primary NKD activity codes with revision labels and add a directory/export activity filter.
+
+- Separate download and directory-projection progress, commit completion atomically, and refresh the business directory immediately after successful synchronization.
+
+- Fixed Croatian dark interface, remove duplicate contact shortcuts and add an e-mail contact filter.
+
 - Move the runtime entry point into src without changing source workspace or packaged data paths.
 - Introduce Croatian NSIS installer with isolated install, upgrade and uninstall acceptance.
 

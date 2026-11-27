@@ -22,6 +22,7 @@ class Store:
             for col in ('oib','email','industry','entity_kind'):
                 if col not in existing: c.execute(f"ALTER TABLE companies ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
             c.execute("CREATE INDEX IF NOT EXISTS idx_entity_kind ON companies(entity_kind)")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_industry ON companies(industry)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_oib ON companies(oib)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_mbs ON companies(mbs)")
             c.execute("CREATE TABLE IF NOT EXISTS origins (company_id INTEGER NOT NULL, provider TEXT NOT NULL, url TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,provider,url), FOREIGN KEY(company_id) REFERENCES companies(id))")
@@ -188,7 +189,7 @@ class Store:
             r=c.execute("SELECT count(*) total,count(DISTINCT NULLIF(city,'')) cities,count(NULLIF(phone,'')) phones,count(NULLIF(website,'')) websites FROM companies").fetchone()
             cities=[dict(x) for x in c.execute("SELECT city,count(*) n FROM companies WHERE city<>'' GROUP BY city ORDER BY n DESC,city LIMIT 6")]
             return dict(r,top_cities=cities)
-    def where(self,q='',city='',contact='',provider='',entity_kind=''):
+    def where(self,q='',city='',contact='',provider='',entity_kind='',industry=''):
         # SQL fragments below are fixed literals; user input is only bound as parameters.
         clauses=[]; args=[]
         # Recognize plain identifiers automatically; retain explicit legacy prefixes.
@@ -216,18 +217,20 @@ class Store:
             if entity_kind not in ENTITY_KINDS: raise ValueError('Invalid entity classification.')
             if entity_kind=='unknown': clauses.append("entity_kind IN ('','unknown')")
             else: clauses.append('entity_kind=?'); args.append(entity_kind)
+        if industry: clauses.append('industry=?'); args.append(industry)
         if city: clauses.append('city=?'); args.append(city)
         if provider: clauses.append('EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider=?)'); args.append(provider)
         if contact=='phone': clauses.append("phone<>''")
         elif contact=='web': clauses.append("website<>''")
+        elif contact=='email': clauses.append("email<>''")
         elif contact=='missing': clauses.append("phone='' AND website=''")
         return (' WHERE '+' AND '.join(clauses) if clauses else ''),args
-    def query(self,q='',city='',contact='',page=1,limit=25,sort='title',provider='',entity_kind=''):
-        where,args=self.where(q,city,contact,provider,entity_kind)
+    def query(self,q='',city='',contact='',page=1,limit=25,sort='title',provider='',entity_kind='',industry=''):
+        where,args=self.where(q,city,contact,provider,entity_kind,industry)
         order={'title':'title COLLATE NOCASE ASC,id','title_desc':'title COLLATE NOCASE DESC,id','city':'city COLLATE NOCASE,title COLLATE NOCASE,id','new':'id DESC'}.get(sort,'id')
         with self.db() as c:
             c.execute('BEGIN')
-            if provider and not (q or city or contact or entity_kind):
+            if provider and not (q or city or contact or entity_kind or industry):
                 # Drive the provider-only count from the narrower provenance index.
                 # DISTINCT preserves one result per company with multiple source URLs.
                 total=c.execute('SELECT count(DISTINCT company_id) FROM origins WHERE provider=? AND EXISTS (SELECT 1 FROM companies WHERE id=origins.company_id)',(provider,)).fetchone()[0]
@@ -237,6 +240,9 @@ class Store:
             return {'total':total,'rows':[dict(r) for r in rows]}
     def cities(self):
         with self.db() as c: return [r[0] for r in c.execute("SELECT DISTINCT city FROM companies WHERE city<>'' ORDER BY city COLLATE NOCASE")]
+    def industries(self):
+        with self.db() as c:
+            return [r[0] for r in c.execute("SELECT DISTINCT industry FROM companies WHERE industry<>'' ORDER BY industry COLLATE NOCASE LIMIT 10000")]
     def detail(self,i):
         with self.db() as c:
             c.execute('BEGIN')

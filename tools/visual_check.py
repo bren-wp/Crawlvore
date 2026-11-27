@@ -15,6 +15,7 @@ with tempfile.TemporaryDirectory() as tmp:
 fixtures={'/api/stats':stats,'/api/companies':companies,'/api/cities':['Zagreb','Rijeka'],'/api/providers':providers,'/api/projects':[],'/api/registry':{'runs':[{'snapshot':'22','complete':1},{'snapshot':'21','complete':1}],'categories':[],'configured':False},'/api/jobs':{'jobs':[],'schedule':{'enabled':0,'hour':3}},'/api/status':{'status':'idle','page':0,'last':0,'processed':0,'added':0,'skipped':0,'errors':0,'logs':[]}}
 fixtures['/api/company/'+str(companies['rows'][0]['id'])]=detail
 fixtures['/api/history/'+str(companies['rows'][0]['id'])]=[]
+fixtures['/api/industries']=[]
 fixtures['/api/analytics']={'days':[]}
 fixtures['/api/recovery']={'backups':[],'recovered':[],'active':'primary','selected':'primary'}
 fixtures['/api/recovery/protected']={'configured':False,'unlocked':False,'status':'locked','archives':[],'orphans':[],'interval_hours':6,'vault':'not-enrolled','vault_backend':'secret-service','replica':'not-configured','replica_directory':''}
@@ -22,7 +23,7 @@ fixtures['/api/recovery/integrity']={'running':False,'search':'ok','workspaces':
 fixtures['/api/registry/diff']={'before':'21','after':'22','categories':[{'category':'subjekti','comparable':True,'added':4,'removed':2,'affected_subjects':3}]}
 with sync_playwright() as p:
  b=p.chromium.launch(executable_path=os.getenv('CRAWLVORA_TEST_CHROMIUM') or None,headless=True)
- for lang in ['hr','en']:
+ for lang in ['hr']:
   page=b.new_page(viewport={'width':1440,'height':900}); page.on('pageerror',lambda e:errors.append(str(e)))
   page.set_content(html.replace('__LANGUAGE__',lang)); page.add_style_tag(content=css)
   page.evaluate('(data)=>{window.fetch=async (path)=>({ok:true,json:async()=>data[path.split("?")[0]]??{}})}',fixtures)
@@ -30,11 +31,10 @@ with sync_playwright() as p:
   page.locator('#preview-rows tr .textbtn').first.wait_for(timeout=10000)
   assert page.locator('#preview-rows tr .textbtn').count()>0
   assert page.locator('html').get_attribute('lang')==lang
-  assert page.locator('#overview h1').inner_text()==('Overview' if lang=='en' else 'Pregled imenika')
-  assert page.locator('[data-view="directory"]').inner_text().endswith('Business Directory' if lang=='en' else 'Poslovni imenik')
-  assert page.locator('#top-export').inner_text()==('⇄ Import / Export' if lang=='en' else '⇄ Uvoz i izvoz')
+  assert page.locator('#overview h1').inner_text()=='Pregled imenika'
+  assert page.locator('[data-view="directory"]').inner_text().endswith('Poslovni imenik')
   prefix='en-' if lang=='en' else ''
-  for theme in ['dark','light']:
+  for theme in ['dark']:
    page.evaluate('(t)=>document.documentElement.dataset.theme=t',theme)
    for width,height in [(1440,900),(390,844),(360,300),(768,480),(1024,600),(1120,720),(1280,720),(1920,1080)]:
     page.set_viewport_size({'width':width,'height':height})

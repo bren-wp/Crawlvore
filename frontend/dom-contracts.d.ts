@@ -1,5 +1,6 @@
 // DOM bindings shared by the classic-script frontend. No emitted runtime code.
 interface InterfaceElements {
+  "industry-filter":HTMLSelectElement;
   "entity-kind":HTMLSelectElement;
   "export-selected":HTMLButtonElement;
   "export-select-all":HTMLButtonElement;
@@ -63,13 +64,6 @@ interface InterfaceElements {
   "analytics-json": HTMLElementTagNameMap["button"];
   "settings-count": HTMLElementTagNameMap["div"];
   "settings-api": HTMLElementTagNameMap["div"];
-  "settings-dark": HTMLElementTagNameMap["button"];
-  "settings-light": HTMLElementTagNameMap["button"];
-  "settings-en": HTMLElementTagNameMap["button"];
-  "settings-hr": HTMLElementTagNameMap["button"];
-  "language": HTMLElementTagNameMap["button"];
-  "language-label": HTMLElementTagNameMap["span"];
-  "theme": HTMLElementTagNameMap["button"];
   "crumb": HTMLElementTagNameMap["strong"];
   "top-export": HTMLElementTagNameMap["button"];
   "overview": HTMLElementTagNameMap["section"];
