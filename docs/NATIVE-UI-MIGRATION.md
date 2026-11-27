@@ -13,7 +13,7 @@ The smoke test creates a temporary synthetic workspace, reads the real API, open
 
 ## Feature parity gate
 
-Implemented in candidate: original dark palette, 242px sidebar, dashboard metrics, city and contact coverage charts, recent companies, paginated company directory; debounced search; OIB/MBS, city, NKD and contact filters; grouped profile; secure access configuration; synchronization controls and completion refresh; basic backup creation.
+Implemented in candidate: original dark palette, 242px sidebar, dashboard metrics, city and contact coverage charts, recent companies, paginated company directory; debounced search; OIB/MBS, city, NKD and contact filters; grouped profile, history and paginated additional business data; reviewed duplicate reconciliation; secure access configuration; synchronization controls and completion refresh; basic backup creation.
 
 Remaining: detailed analytics, full job scheduling and history, complete registry category browsing and export, import/export tools, mail and history, protected backup catalog and restore/replication/integrity tools, complete application settings, update integration, keyboard and layout parity, crash recovery, long-duration CPU/RAM measurements, complete Windows/Linux packaging and edition acceptance.
 

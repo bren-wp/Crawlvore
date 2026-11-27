@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Add reviewed duplicate reconciliation, verified pre-merge backup, preservation of alternate fields, history and original records, and reimport protection.
+- Port profile history and additional business data into native widgets; check directory coverage before skipping a completed snapshot.
+
 - Port the original dark palette, sidebar, dashboard metrics/charts and additional directory filters into the native candidate.
 - Require the complete Windows/Linux edition matrix in one stable release; allow Online updater selection from the combined signed release.
 

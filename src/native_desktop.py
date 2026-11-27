@@ -1,5 +1,6 @@
 """Crawlvora native desktop migration: Tcl/Tk widgets, no browser renderer."""
 import argparse
+import json
 from contextlib import nullcontext
 import os
 import queue
@@ -33,6 +34,7 @@ class Desktop:
         self.root, self.smoke = root, smoke
         self.cancel_start=threading.Event()
         self.worker = None
+        self.merge_active = False
         self.sync_active = False
         self.sync_polling = False
         self.client = None
@@ -95,6 +97,7 @@ class Desktop:
         nav("registry","Crawlvora",self.sync_dialog)
         nav_label("UPRAVLJANJE")
         nav("backup","Izrada sigurnosne kopije",self.backup_dialog)
+        nav("duplicates","Pregled duplikata",self.duplicate_dialog)
         tk.Label(sidebar,text="●  Lokalni radni prostor",bg=SIDE,fg=ACCENT,font=("Segoe UI",10)).pack(side="bottom",anchor="w",padx=20,pady=24)
         main=ttk.Frame(shell)
         main.pack(side="left",fill="both",expand=True)
@@ -386,20 +389,171 @@ class Desktop:
         ttk.Label(dialog,text=company["title"],style="Title.TLabel",wraplength=650,padding=18).pack(fill="x")
         notebook=ttk.Notebook(dialog)
         notebook.pack(fill="both",expand=True,padx=18,pady=8)
+        details=ttk.Frame(notebook,padding=10)
+        notebook.add(details,text="Detalji")
         for group,fields in GROUPS.items():
-            frame=ttk.Frame(notebook,padding=12)
-            notebook.add(frame,text=group)
-            for key,label in fields:
-                ttk.Label(frame,text=label,style="Muted.TLabel").pack(anchor="w")
-                value=tk.Text(frame,height=2,wrap="word",background=PANEL,foreground=TEXT,relief="flat",font=("Segoe UI",10))
+            section=ttk.LabelFrame(details,text=group,padding=8)
+            section.pack(fill="x",pady=(0,7))
+            for idx,(key,label) in enumerate(fields):
+                col=idx%3;row=(idx//3)*2
+                section.columnconfigure(col,weight=1,uniform="field")
+                ttk.Label(section,text=label,style="Muted.TLabel").grid(row=row,column=col,sticky="w")
+                value=tk.Text(section,height=1,wrap="word",background=PANEL,foreground=TEXT,relief="flat",font=("Segoe UI",10))
                 value.insert("1.0",str(company.get(key) or "—"))
                 value.configure(state="disabled")
-                value.pack(fill="x",pady=(0,5))
+                value.grid(row=row+1,column=col,sticky="ew",padx=(0,8),pady=(0,5))
+        history=ttk.Frame(notebook,padding=10)
+        notebook.add(history,text="Povijest promjena")
+        history_text=tk.Text(history,bg=PANEL,fg=TEXT,wrap="word",relief="flat")
+        history_text.pack(fill="both",expand=True)
+        history_text.insert("end","Učitavanje…")
+        history_text.configure(state="disabled")
+        def fill_history(rows):
+            if not dialog.winfo_exists():return
+            history_text.configure(state="normal");history_text.delete("1.0","end")
+            for row in rows:
+                history_text.insert("end",str(row.get("changed_at",""))+"\n")
+                for field,change in row.get("changes",{}).items():
+                    history_text.insert("end",f"{field}: {change.get('before','')} → {change.get('after','')}\n")
+                history_text.insert("end","\n")
+            alternatives=company.get("alternate_values",[])
+            if alternatives:
+                history_text.insert("end","Dodatne vrijednosti\n")
+                for row in alternatives:history_text.insert("end",f"{row['field']}: {row['value']}\n")
+            if not rows and not alternatives:history_text.insert("end","Nema evidentiranih promjena.")
+            history_text.configure(state="disabled")
+        extra=ttk.Frame(notebook,padding=10)
+        notebook.add(extra,text="Dodatni poslovni podaci")
+        snap=tk.StringVar();snapbox=ttk.Combobox(extra,textvariable=snap,state="readonly")
+        snapbox.pack(fill="x",pady=(0,8))
+        extra_text=tk.Text(extra,bg=PANEL,fg=TEXT,wrap="word",relief="flat")
+        extra_text.pack(fill="both",expand=True)
+        extra_text.configure(state="disabled")
+        offset=0
+        generation=0
+        nav=ttk.Frame(extra);nav.pack(fill="x",pady=8)
+        prev=ttk.Button(nav,text="Prethodna",state="disabled")
+        next_page=ttk.Button(nav,text="Sljedeća",state="disabled")
+        prev.pack(side="left");next_page.pack(side="right")
+        def load():
+            nonlocal generation
+            generation+=1
+            seq=generation
+            prev.configure(state="disabled");next_page.configure(state="disabled")
+            def done(data):
+                if not dialog.winfo_exists() or seq!=generation:return
+                snapbox.configure(values=[item["snapshot"] for item in data["snapshots"]])
+                snap.set(data["snapshot"])
+                extra_text.configure(state="normal");extra_text.delete("1.0","end")
+                for row in data["rows"]:
+                    extra_text.insert("end",row["category"].replace("_"," ").capitalize()+"\n")
+                    for field,value in row["data"].items():
+                        extra_text.insert("end",field.replace("_"," ")+": "+(json.dumps(value,ensure_ascii=False) if isinstance(value,(dict,list)) else str(value or "—"))+"\n")
+                    extra_text.insert("end","\n")
+                if not data["rows"]:extra_text.insert("end","Nema dodatnih poslovnih zapisa.")
+                extra_text.configure(state="disabled")
+                prev.configure(state="normal" if offset else "disabled")
+                next_page.configure(state="normal" if data["next"] else "disabled")
+            params={"snapshot":snap.get(),"offset":offset}
+            self.submit(lambda:self.client.request(f"/api/company-registry/{company['id']}",params),done)
+        def move(delta):
+            nonlocal offset
+            offset=max(0,offset+delta)
+            load()
+        def changed(_event):
+            nonlocal offset
+            offset=0
+            load()
+        snapbox.bind("<<ComboboxSelected>>",changed)
+        prev.configure(command=lambda:move(-25));next_page.configure(command=lambda:move(25))
+        loaded=set()
+        def tab_changed(_event):
+            index=notebook.index(notebook.select())
+            if index in loaded:return
+            loaded.add(index)
+            if index==1:self.submit(lambda:self.client.request(f"/api/history/{company['id']}"),fill_history)
+            if index==2:load()
+        notebook.bind("<<NotebookTabChanged>>",tab_changed)
         ttk.Button(dialog,text="Zatvori",command=dialog.destroy).pack(anchor="e",padx=18,pady=10)
         if self.smoke:
             self.result=0 if company.get("title")=="Sintetička tvrtka" else 1
             dialog.destroy()
             self.close()
+
+    def duplicate_dialog(self):
+        if not self.client or self.merge_active:return
+        dialog=tk.Toplevel(self.root)
+        dialog.title("Crawlvora – pregled duplikata")
+        dialog.geometry("900x650")
+        dialog.minsize(720,460)
+        dialog.configure(bg=BG)
+        dialog.transient(self.root)
+        frame=ttk.Frame(dialog,padding=18)
+        frame.pack(fill="both",expand=True)
+        ttk.Label(frame,text="Pregled mogućih duplikata",style="Title.TLabel").pack(anchor="w")
+        status=tk.StringVar(value="Provjera podataka…")
+        ttk.Label(frame,textvariable=status,wraplength=800).pack(anchor="w",pady=8)
+        table=ttk.Treeview(frame,columns=("name","city","address"),show="headings",selectmode="extended",height=7)
+        for key,label,width in (("name","Tvrtka",330),("city","Grad",140),("address","Adresa",280)):
+            table.heading(key,text=label)
+            table.column(key,width=width)
+        table.pack(fill="both",expand=True)
+        preview=tk.Text(frame,height=9,bg=PANEL,fg=TEXT,wrap="word",relief="flat")
+        preview.pack(fill="both",expand=True,pady=8)
+        preview.configure(state="disabled")
+        pairs={}
+        busy=False
+        def selected(_event=None):
+            preview.configure(state="normal");preview.delete("1.0","end")
+            selection=table.selection()
+            if selection:
+                row=pairs[selection[0]]
+                for key,label in (("legacy","Raniji zapis"),("canonical","Zapis koji ostaje")):
+                    item=row[key]
+                    preview.insert("end",label+"\n"+"\n".join(f"{name}: {item[field] or '—'}" for field,name in (("title","Naziv"),("city","Grad"),("address","Adresa"),("oib","OIB"),("mbs","MBS"),("email","E-pošta"),("phone","Telefon")))+"\n\n")
+            preview.configure(state="disabled")
+            apply.configure(state="normal" if selection and not busy else "disabled")
+        table.bind("<<TreeviewSelect>>",selected)
+        def loaded(data):
+            if not dialog.winfo_exists():return
+            pairs.clear();table.delete(*table.get_children())
+            for row in data["pairs"]:
+                item=row["legacy"];identifier=str(item["id"]);pairs[identifier]=row
+                table.insert("","end",iid=identifier,values=(item["title"],item["city"],item["address"]))
+            status.set(f"Pronađeno mogućih duplikata: {data['count']}. Odaberite samo potvrđene parove. Jednaki naziv i adresa nisu dokaz jednakog identiteta.")
+            selected()
+        def failed(_error):
+            nonlocal busy
+            busy=False
+            self.merge_active=False
+            if dialog.winfo_exists():
+                status.set("Operacija nije uspjela. Podaci nisu označeni kao spojeni.")
+                selected()
+        def merge_selected():
+            nonlocal busy
+            if busy or self.merge_active:return
+            chosen=[pairs[x] for x in table.selection()]
+            if not chosen or len(chosen)>100:return
+            if not messagebox.askyesno("Crawlvora",f"Potvrđujete da {len(chosen)} odabranih parova predstavlja iste poslovne subjekte? Prije spajanja izradit će se provjerena sigurnosna kopija.",parent=dialog):return
+            data={"confirmed":True,"pairs":[{"legacy":r["legacy"]["id"],"canonical":r["canonical"]["id"],"fingerprint":r["fingerprint"]} for r in chosen]}
+            busy=True
+            self.merge_active=True
+            apply.configure(state="disabled")
+            status.set("Izrada sigurnosne kopije i spajanje…")
+            def complete(result):
+                self.merge_active=False
+                if dialog.winfo_exists():
+                    messagebox.showinfo("Crawlvora",f"Spojeno zapisa: {result['merged']}. Sigurnosna kopija: {result['backup']}",parent=dialog)
+                    dialog.destroy()
+                if self.current_view=="overview":self.refresh_overview()
+                else:self.refresh()
+            self.submit(lambda:self.client.request("/api/duplicates/merge",data=data,timeout=900),complete,failed)
+        buttons=ttk.Frame(frame);buttons.pack(fill="x")
+        apply=ttk.Button(buttons,text="Spoji potvrđene parove",style="Accent.TButton",command=merge_selected,state="disabled")
+        apply.pack(side="left")
+        ttk.Button(buttons,text="Zatvori",command=lambda:dialog.destroy() if not busy else None).pack(side="right")
+        dialog.protocol("WM_DELETE_WINDOW",lambda:dialog.destroy() if not busy else None)
+        self.submit(lambda:self.client.request("/api/duplicates"),loaded,failed)
 
     def sync_dialog(self):
         if not self.client:return
@@ -494,6 +648,9 @@ class Desktop:
         ttk.Button(frame,text="Zatvori",command=dialog.destroy).pack(anchor="e",pady=12)
 
     def close(self):
+        if self.merge_active:
+            self.status.set("Pričekajte završetak sigurne obrade duplikata.")
+            return
         if self.closed:
             return
         if self.worker is None and not self.smoke:

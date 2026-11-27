@@ -16,6 +16,7 @@ from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
 from cryptography.exceptions import InvalidTag
 from crawlvora_mail import MailService, TEMPLATES
+from duplicate_review import preview as duplicate_preview, merge as duplicate_merge
 
 
 def make_handler(*, ROOT, TOKEN, args, active, collector, database,
@@ -53,6 +54,7 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 if p.path=='/api/mail/settings': return self.send_data(mail.settings())
                 if p.path=='/api/mail/templates': return self.send_data(TEMPLATES)
                 if p.path=='/api/mail/history': return self.send_data(mail.history(int(get('company_id','0'))))
+                if p.path=='/api/duplicates': return self.send_data(duplicate_preview(store))
                 if p.path=='/api/jobs': return self.send_data(queue.summary())
                 if p.path.startswith('/api/history/'): return self.send_data(store.history(int(p.path.rsplit('/',1)[1])))
                 if p.path in ('/api/registry/export-xlsx','/api/registry/export-xml','/api/registry/export-sql'):
@@ -165,9 +167,9 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                             return self.send_data(import_file(store,staged,'json' if self.path=='/api/import-json' else 'csv'))
                     finally:
                         import_lock.release()
-                if self.path.startswith('/api/mail/') and n>65536:
+                if (self.path.startswith('/api/mail/') or self.path=='/api/duplicates/merge') and n>65536:
                     self.close_connection=True
-                    return self.send_data({'error':'Prevelik zahtjev e-pošte.'},status=413)
+                    return self.send_data({'error':'Prevelik zahtjev.'},status=413)
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 self.connection.settimeout(120)
                 raw=self.rfile.read(n)
@@ -212,6 +214,17 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 if self.path=='/api/recovery/select':
                     if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm workspace selection first.')
                     return self.send_data({'selected':selection.choose(data.get('id'))})
+                if self.path=='/api/duplicates/merge':
+                    if data.get('confirmed') is not True:raise ValueError('Potvrdite spajanje.')
+                    if not import_lock.acquire(blocking=False):raise ValueError('Uvoz je aktivan.')
+                    try:
+                        def merge_reviewed():
+                            if collector.snapshot()['status'] in ('running','stopping'):
+                                raise ValueError('Zaustavite sinkronizaciju.')
+                            # Make a verified recovery copy before any destructive operation.
+                            return duplicate_merge(store,data.get('pairs'),recovery.create())
+                        return self.send_data(queue.direct(merge_reviewed))
+                    finally:import_lock.release()
                 if self.path=='/api/recovery/create': return self.send_data({'id':recovery.create()})
                 if self.path=='/api/recovery/restore':
                     if not isinstance(data,dict) or data.get('confirmed') is not True: raise ValueError('Confirm recovery first.')

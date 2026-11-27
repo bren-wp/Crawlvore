@@ -27,7 +27,7 @@ class NativeClient:
             raise ValueError("Radni proces nije spreman.")
         return cls(int(match[1]), match[2])
 
-    def request(self, route, params=None, data=None):
+    def request(self, route, params=None, data=None, timeout=90):
         if not re.fullmatch(r"/api/[a-z0-9/-]+", route):
             raise ValueError("Nedopuštena lokalna ruta.")
         path = route + ("?" + urlencode(params) if params else "")
@@ -37,7 +37,7 @@ class NativeClient:
         if data is not None:
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
             headers["Content-Type"] = "application/json"
-        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=90)
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=max(1,min(900,timeout)))
         try:
             connection.request("POST" if body is not None else "GET", path, body=body, headers=headers)
             with connection.getresponse() as response:

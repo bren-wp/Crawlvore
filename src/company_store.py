@@ -6,6 +6,7 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from company_fields import COLS, FIELDS, ENTITY_KINDS, norm, formula_safe
+from duplicate_review import archived_target
 
 class Store:
     def __init__(self,path):
@@ -105,6 +106,8 @@ class Store:
         if not old and provider=='registry' and vals['mbs']:
             old=c.execute("SELECT * FROM companies WHERE mbs=? AND EXISTS (SELECT 1 FROM origins WHERE company_id=companies.id AND provider='registry')",(vals['mbs'],)).fetchone()
             identity='registry\x1f'+vals['mbs']
+        if not old and provider!='registry':
+            old=archived_target(c,identity,source,vals,entity_kind)
         if not old and (provider!='registry' or not vals['mbs']):
             old=c.execute('SELECT * FROM companies WHERE identity=?',(identity,)).fetchone()
             if old and vals['oib'] and old['oib'] and vals['oib']!=old['oib']:

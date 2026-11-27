@@ -248,6 +248,12 @@ class Registry:
                 offset=nxt
                 if done: break
         if was_complete and not repaired and projected_current:
+            with self.store.db() as c:
+                missing=c.execute("SELECT count(*) FROM registry_rows r WHERE r.snapshot=? AND r.category='subjekti' AND r.mbs<>'' AND NOT EXISTS (SELECT 1 FROM companies c WHERE c.mbs=r.mbs)",(snap,)).fetchone()[0]
+            if missing:
+                with self.store.db() as c:c.execute('UPDATE registry_runs SET complete=0 WHERE snapshot=?',(snap,))
+                projected_current=False
+        if was_complete and not repaired and projected_current:
             bot.log('Snimka registra već je preuzeta i obrađena.')
             bot.update(phase='complete')
             return True

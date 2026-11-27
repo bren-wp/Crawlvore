@@ -28,6 +28,18 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.bot.snapshot()['phase'],'complete')
         self.assertEqual(self.bot.snapshot()['projected'],2)
         self.reg.sync(self.bot,f,1); self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
+    def test_completed_snapshot_repairs_missing_projection_without_redownload(self):
+        self.reg.sync(self.bot,Fake(),1)
+        with self.store.db() as c:
+            identifier=c.execute("SELECT id FROM companies WHERE mbs='000000002'").fetchone()[0]
+            c.execute("DELETE FROM origins WHERE company_id=?",(identifier,))
+            c.execute("DELETE FROM companies WHERE id=?",(identifier,))
+        f=Fake()
+        self.reg.sync(self.bot,f,1)
+        self.assertEqual(self.store.query(q='000000002')['total'],1)
+        self.assertEqual(self.store.stats()['total'],2)
+        self.assertFalse(any(name=='subjekti' for name,_ in f.calls))
+        self.assertEqual(self.reg.summary()['runs'][0]['complete'],1)
     def test_mismatch(self):
         with self.assertRaises(ValueError): self.reg.sync(self.bot,Fake(True),1)
         self.assertEqual(self.reg.browse('21','subjekti')['total'],0)
