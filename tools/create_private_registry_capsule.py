@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from native_vault import NativeVault
 from registry import RegistryAccess
 from live_registry_check import check

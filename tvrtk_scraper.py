@@ -7,6 +7,7 @@ import time
 import webbrowser
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent/'src'))
 from core import Store, Collector
 from local_http_routes import make_handler
 from registry import Registry, RegistryAccess, start_registry
@@ -16,8 +17,6 @@ import threading
 import tempfile
 from automation import Queue
 from data_safety import workspace_lock, verified_backup, RecoveryCenter
-from national_catalog import NationalCatalog
-from gb_download import GBDownload
 from workspace_selection import WorkspaceSelection
 from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
@@ -49,8 +48,9 @@ def main():
             from openpyxl import Workbook
             if getattr(sys,'frozen',False): import webview
             with tempfile.TemporaryDirectory() as td:
-                test_store=Store(Path(td)/'smoke.db'); test_store.seed(ROOT/'tvrtk_output.csv')
-                if test_store.stats()['total']!=26261: raise RuntimeError('Bundled data failed')
+                test_store=Store(Path(td)/'smoke.db')
+                with test_store.db() as db: test_store.upsert(db,{'title':'Synthetic smoke record','mbs':'000000001'},provider='registry')
+                if test_store.stats()['total']!=1: raise RuntimeError('Database smoke failed')
             if not all((ROOT/'static'/f).is_file() for f in ('index.html','style.css','app.js','locale.js','logo.svg')): raise RuntimeError('Missing assets')
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(headless=True,executable_path=None if getattr(sys,'frozen',False) else os.getenv('CRAWLVORA_TEST_CHROMIUM'))
@@ -58,7 +58,7 @@ def main():
                     page=browser.new_page(); page.set_content('<h1>Crawlvora</h1>')
                     if page.locator('h1').inner_text()!='Crawlvora': raise RuntimeError('Browser smoke test failed.')
                 finally: browser.close()
-            Workbook().close(); result={'ok':True,'records':26261,'browser':True}
+            Workbook().close(); result={'ok':True,'records':1,'browser':True}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
         args.self_test.write_text(json.dumps(result),encoding='utf-8'); return 0 if result['ok'] else 1
     root=args.data_dir
@@ -71,20 +71,18 @@ def main():
             return run_workspace(args,selection,active)
 
 def run_workspace(args,selection,active):
-    national=NationalCatalog(ROOT,args.data_dir)
-    gb_download=GBDownload(national.downloaded)
     database=args.data_dir/'companies.sqlite3'
     edition=None
-    default_language='en'
+    default_language='hr'
     edition_path=ROOT/'edition.json'
     if edition_path.is_file():
         edition_config=json.loads(edition_path.read_text(encoding='utf-8'))
         edition=edition_config['edition']
-        default_language=edition_config.get('language','en')
+        default_language=edition_config.get('language','hr')
         if default_language not in ('en','hr'): raise ValueError('Invalid edition language.')
-        if edition not in ('Full','HR','GB','Online'): raise ValueError('Invalid edition.')
+        if edition not in ('HR','Online'): raise ValueError('Invalid edition.')
         if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
-            if (ROOT/'registry-seed.sqlite3').is_file()!=(edition in ('Full','HR')) or (ROOT/'national-data/GB/manifest.json').is_file()!=(edition in ('Full','GB')) or (ROOT/'tvrtk_output.csv').exists():
+            if ((ROOT/'registry-seed.sqlite3').is_file() or (ROOT/'registry-seed.sqlite3.gz').is_file())!=(edition=='HR') or (ROOT/'tvrtk_output.csv').exists():
                 raise ValueError('Edition payload mismatch.')
     installed=active=='primary' and install_seed(ROOT,database)
     expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')
@@ -93,12 +91,6 @@ def run_workspace(args,selection,active):
             accept_preview_seed(ROOT,database,installed,expected)
         else:
             accept_packaged_seed(ROOT,database,installed,expected)
-    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and os.environ.get('CRAWLVORA_EXPECTED_GB_SHA256'):
-        _,gb_report=national.database()
-        if gb_report['database_sha256']!=os.environ['CRAWLVORA_EXPECTED_GB_SHA256']:
-            raise ValueError('Embedded GB snapshot mismatch.')
-        if not national.search()['rows']:
-            raise ValueError('Embedded GB catalog is empty.')
     # Fail closed before schema changes or seed imports if a backup cannot be verified.
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
     if not installed: verified_backup(database)
@@ -109,10 +101,7 @@ def run_workspace(args,selection,active):
     transfers=BackupTransfer(recovery)
     protected=ProtectedBackups(database,recovery)
     integrity=WorkspaceIntegrity(selection,recovery)
-    seed=ROOT/'tvrtk_output.csv'
-    # Full registry distributions use the verified snapshot, not the legacy CSV.
-    if edition is None and active=='primary' and seed.exists() and not (ROOT/'registry-seed.sqlite3').exists(): store.seed(seed)
-    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and edition in ('GB','Online') and store.stats()['total']!=0:
+    if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1' and edition=='Online' and store.stats()['total']!=0:
         raise ValueError('Database-free Croatian workspace was not empty.')
     search_integrity=check_search_index(store,repair=True)
     integrity.start()
@@ -143,8 +132,8 @@ def run_workspace(args,selection,active):
     queue=Queue(store,collector,registry,registry_access.credentials); queue.start()
     protected.start()
     Handler=make_handler(ROOT=ROOT, TOKEN=TOKEN, args=args, active=active,
-        collector=collector, database=database, gb_download=gb_download,
-        import_lock=import_lock, integrity=integrity, national=national,
+        collector=collector, database=database,
+        import_lock=import_lock, integrity=integrity,
         protected=protected, queue=queue, recovery=recovery, registry=registry,
         registry_access=registry_access, search_integrity=search_integrity,
         selection=selection, store=store, transfers=transfers, ui_ready=ui_ready,
@@ -161,7 +150,7 @@ def run_workspace(args,selection,active):
         threading.Thread(target=parent_watch,daemon=True).start()
         try: server.serve_forever()
         finally:
-            gb_download.close(); queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
+            queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
     if args.desktop or getattr(sys,'frozen',False):
@@ -172,10 +161,10 @@ def run_workspace(args,selection,active):
             webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
             webview.start(gui='edgechromium')
         finally:
-            gb_download.close(); queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
+            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
         return 0
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: gb_download.close(); queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
+    finally: queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
 if __name__=='__main__': sys.exit(main())

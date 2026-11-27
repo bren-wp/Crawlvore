@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.1.7
+
+- Focus exclusively on Croatian Court Registry desktop editions for Windows and Linux.
+- Move Python runtime modules into src and separate legacy data resources.
+- Retain existing workspaces and verified snapshot archive.
+
 ## 8.1.6
 
 - Separate Croatian and English national and database-free editions.

@@ -9,10 +9,19 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'src'))
+from core import Store
 
 def run():
     with tempfile.TemporaryDirectory() as tmp:
         data=Path(tmp)/'data'
+        data.mkdir()
+        store=Store(data/'companies.sqlite3')
+        with store.db() as db:
+            for i in range(60):
+                store.upsert(db,{'title':f'Demo company {i:03d}','mbs':f'{i+1:09d}','city':'Zagreb' if i%2 else 'Rijeka','phone':'012345' if i%3==0 else '', 'website':'https://example.invalid' if i%4==0 else ''},provider='csv')
+            db.execute("INSERT INTO meta(key,value) VALUES ('ui_language','en')")
+
         env={k:v for k,v in os.environ.items() if not k.startswith(('SUDREG_','CRAWLVORA_REGISTRY_'))}
         # Do not leave an unread stderr pipe that can block a worker during shutdown.
         worker_log=(Path(tmp)/'worker-stderr.log').open('w+b')
@@ -109,13 +118,6 @@ def run():
                 expect(page.locator('.profile-registry')).to_contain_text('No linked registry records.')
                 expect(page.locator('.profile-property').first).not_to_be_visible()
                 page.locator('#close-detail').click()
-                page.locator('[data-go="national"]').click()
-                expect(page.locator('#national-status')).to_have_text('National database is not included in this edition.')
-                expect(page.locator('#national-country option')).to_have_count(1)
-                page.locator('#national-search').click()
-                expect(page.locator('#national-status')).to_have_text('National database is not included in this edition.')
-                expect(page.locator('#national-prev')).to_be_disabled()
-                expect(page.locator('#national-next')).to_be_disabled()
                 page.locator('[data-view="data"]').click()
                 page.locator('#export-clear-all').click()
                 expect(page.locator('#export-selected')).to_be_disabled()

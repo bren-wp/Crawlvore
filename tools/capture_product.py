@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from core import Store
 
 
@@ -27,6 +28,7 @@ def capture(output):
                 store.upsert(conn, {"title": name, "city": ("Zagreb", "Rijeka", "Split")[index % 3],
                                     "website": "https://example.invalid", "entity_kind": "company"})
             conn.execute("INSERT INTO meta(key,value) VALUES ('seeded','1')")
+            conn.execute("INSERT INTO meta(key,value) VALUES ('ui_language','en')")
         env = {k: v for k, v in os.environ.items()
                if not k.startswith(("SUDREG_", "CRAWLVORA_"))}
         with (Path(tmp) / "worker.log").open("w+b") as log:
@@ -65,10 +67,6 @@ def capture(output):
                     expect(page.locator("#detail")).to_be_visible()
                     shot("profile-dark")
                     page.locator("#close-detail").click()
-                    page.locator('#directory [data-go="national"]').click()
-                    expect(page.locator("#national")).to_be_visible()
-                    expect(page.locator("#national-status")).to_contain_text("not included")
-                    shot("uk-dark")
                     page.locator('[data-view="settings"]').click()
                     page.locator("#settings-light").click()
                     expect(page.locator("html")).to_have_attribute("data-theme", "light")

@@ -1,4 +1,5 @@
 """Initialize a fresh workspace from a verified, embedded registry database."""
+import gzip
 import hashlib
 import json
 import sqlite3
@@ -10,14 +11,30 @@ from pathlib import Path
 
 
 def install_seed(root, destination):
-    source=Path(root)/'registry-seed.sqlite3'
+    root=Path(root)
+    raw=root/'registry-seed.sqlite3'
+    packed=root/'registry-seed.sqlite3.gz'
+    source=packed if packed.exists() else raw
+    compressed=source==packed
     checksums=Path(root)/'registry-seed.sha256'
     destination=Path(destination)
     if destination.exists() or not source.exists():
         return False
     if source.is_symlink() or not source.is_file():
         raise ValueError('Invalid registry seed file.')
-    if shutil.disk_usage(destination.parent).free < source.stat().st_size + 64*1024**2:
+    if compressed:
+        size_path=root/'registry-seed.size'
+        if not size_path.is_file() or size_path.is_symlink() or size_path.stat().st_size>32:
+            raise ValueError('Missing compressed registry size.')
+        declared=size_path.read_text(encoding='ascii').strip()
+        if not declared.isascii() or not declared.isdigit():
+            raise ValueError('Invalid compressed registry size.')
+        size=int(declared)
+        if not 0<size<=16*1024**3:
+            raise ValueError('Invalid compressed registry size.')
+    else:
+        size=source.stat().st_size
+    if shutil.disk_usage(destination.parent).free < size + 64*1024**2:
         raise ValueError('Insufficient free disk space for registry seed.')
     if not checksums.is_file():
         raise ValueError('Registry seed checksum is missing.')
@@ -26,13 +43,17 @@ def install_seed(root, destination):
         raise ValueError('Invalid registry seed checksum.')
     fd,name=tempfile.mkstemp(prefix='registry-seed-',dir=destination.parent)
     try:
-        with os.fdopen(fd,'wb') as output,source.open('rb') as data:
+        with os.fdopen(fd,'wb') as output,(gzip.open(source,'rb') if compressed else source.open('rb')) as data:
             digest=hashlib.sha256()
+            copied=0
             while chunk:=data.read(1024*1024):
+                copied+=len(chunk)
+                if copied>size: raise ValueError('Registry seed size mismatch.')
                 digest.update(chunk)
                 output.write(chunk)
             output.flush()
             os.fsync(output.fileno())
+        if copied!=size: raise ValueError('Registry seed size mismatch.')
         if digest.hexdigest()!=expected:
             raise ValueError('Embedded registry seed checksum mismatch.')
         # Atomic exclusive publication: never replace an existing workspace.

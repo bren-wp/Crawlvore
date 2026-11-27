@@ -19,16 +19,15 @@ const fail = (e) => toast(e instanceof Error ? e.message : translate('Pogreška 
 function post(path, data) { return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token }, body: JSON.stringify(data) }); }
 function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value }); }
 function download(filtered = false) { location.href = '/api/export' + (filtered ? '?' + filters() : ''); }
-function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === (view === 'national' ? 'directory' : view); e.classList.toggle('active', selected); if (selected)
+function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
     e.setAttribute('aria-current', 'page');
 else
-    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), national: translate('Crawlvora UK'), registry: translate('Crawlvora Sync'), data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
+    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), registry: translate('Crawlvora Sync'), data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
     refreshAnalytics().catch(fail); if (view === 'settings')
     refreshSettings().catch(fail); if (view === 'jobs')
     refreshJobs(true).catch(fail); if (view === 'overview')
     overview().catch(fail); if (view === 'directory')
-    directory().catch(fail); if (view === 'national')
-    nationalSearch(1).catch(fail); if (view === 'registry')
+    directory().catch(fail); if (view === 'registry')
     registryRefresh().catch(fail); window.scrollTo(0, 0); }
 function safeLink(value) { if (typeof value !== 'string')
     return null; try {
@@ -704,137 +703,6 @@ $('protected-restore-test').onclick = () => recoveryAction(async () => {
     $('recovery-status').textContent = translate('Test oporavka uspješan') + ' · ' + translate('Zapisa') + ': ' + n(r.records);
 });
 $('protected-manifest').onclick = () => { const a = document.createElement('a'), id = $('protected-archive').value; a.href = '/api/recovery/protected-manifest?' + new URLSearchParams({ id }); a.download = id + '.manifest.json'; document.body.append(a); a.click(); a.remove(); };
-let nationalPage = 1, nationalSequence = 0, nationalInstalled = false;
-function showNationalDownload(state) {
-    const paused = ['paused', 'cancelled', 'failed'].includes(state.status), running = state.status === 'running';
-    $('national-download').disabled = running;
-    $('national-download').textContent = translate(paused && state.saved_bytes ? 'Nastavi preuzimanje' : 'Preuzmi britansku bazu');
-    const message = running ? translate('Preuzimanje i priprema baze…') : paused ? (state.saved_bytes ? translate('Prethodno preuzeti podaci su sačuvani.') : translate('Preuzimanje nije uspjelo. Pokušajte ponovno.')) : translate('Nacionalna baza nije ugrađena u ovo izdanje.');
-    const saved = state.saved_bytes || 0, total = state.total || 0;
-    $('national-status').textContent = message + (saved && total ? ' · ' + translate('Spremljeno na disk') + ': ' + n(Math.floor(saved / 1048576)) + ' / ' + n(Math.ceil(total / 1048576)) + ' MiB' : '');
-}
-async function nationalSearch(nextPage) {
-    const seq = ++nationalSequence, country = $('national-country').value;
-    $('national-status').textContent = translate('Učitavanje…');
-    $('national-rows').replaceChildren();
-    $('national-prev').disabled = true;
-    $('national-next').disabled = true;
-    $('national-search').disabled = true;
-    try {
-        const status = await api('/api/national/status');
-        if (seq !== nationalSequence)
-            return;
-        nationalInstalled = Boolean(status[country]?.available);
-        $('national-download').hidden = false;
-        $('national-download').textContent = translate(nationalInstalled ? 'Provjeri ažuriranja' : 'Preuzmi britansku bazu');
-        if (!status[country]?.available) {
-            const state = await api('/api/national/gb/download');
-            if (seq !== nationalSequence)
-                return;
-            showNationalDownload(state);
-            $('national-page').textContent = '';
-            return;
-        }
-        const result = await api('/api/national/gb/search?' + new URLSearchParams({ q: $('national-query').value, page: String(nextPage) }));
-        if (seq !== nationalSequence)
-            return;
-        nationalPage = result.page;
-        $('national-status').textContent = n(result.total_snapshot) + ' · ' + result.snapshot;
-        $('national-page').textContent = translate('Stranica ') + nationalPage;
-        for (const record of result.rows) {
-            const row = make('tr');
-            for (const value of [record.name, record.registration_number, record.city, record.status])
-                row.append(make('td', value || '—'));
-            const action = make('td'), button = make('button', translate('Detalji →'), 'textbtn');
-            button.onclick = () => nationalDetail(record.registration_number).catch(fail);
-            action.append(button);
-            row.append(action);
-            $('national-rows').append(row);
-        }
-        if (!result.rows.length) {
-            const row = make('tr'), td = make('td', translate('Nema rezultata za odabrane kriterije.'));
-            td.colSpan = 5;
-            row.append(td);
-            $('national-rows').append(row);
-        }
-        $('national-prev').disabled = nationalPage <= 1;
-        $('national-next').disabled = !result.next;
-    }
-    finally {
-        if (seq === nationalSequence)
-            $('national-search').disabled = false;
-    }
-}
-async function nationalDetail(number) {
-    const data = await api('/api/national/gb/detail?' + new URLSearchParams({ number }));
-    $('national-title').textContent = data.CompanyName;
-    const body = $('national-detail-body');
-    body.replaceChildren();
-    for (const [key, value] of Object.entries(data)) {
-        if (!value)
-            continue;
-        const line = make('div', undefined, 'detail-field');
-        line.append(make('small', key), make('p', value));
-        body.append(line);
-    }
-    $('national-detail').showModal();
-}
-$('national-country').onchange = () => nationalSearch(1).catch(fail);
-$('national-search').onclick = () => nationalSearch(1).catch(fail);
-$('national-download').onclick = async () => {
-    if (nationalInstalled) {
-        $('national-download').disabled = true;
-        try {
-            const r = await post('/api/national/gb/update-check', {});
-            $('national-status').textContent = r.update_available
-                ? translate('Dostupna je nova britanska snimka. Potreban je cijeli novi arhiv.') + ' ' + r.installed + ' ? ' + r.latest
-                : translate('Britanska baza je aktualna. Nema ponovnog preuzimanja.') + ' ? ' + r.installed;
-        }
-        catch (e) {
-            fail(e);
-        }
-        finally {
-            $('national-download').disabled = false;
-        }
-        return;
-    }
-    if (!confirm(translate('Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.')))
-        return;
-    $('national-download').disabled = true;
-    try {
-        await post('/api/national/gb/download', { confirmed: true });
-        $('national-status').textContent = translate('Preuzimanje i priprema baze…');
-        const timer = setInterval(async () => {
-            try {
-                const state = await api('/api/national/gb/download');
-                if (state.status === 'running') {
-                    showNationalDownload(state);
-                    return;
-                }
-                clearInterval(timer);
-                $('national-download').disabled = false;
-                if (state.status === 'complete')
-                    await nationalSearch(1);
-                else
-                    showNationalDownload(state);
-            }
-            catch (e) {
-                clearInterval(timer);
-                $('national-download').disabled = false;
-                fail(e);
-            }
-        }, 2000);
-    }
-    catch (e) {
-        $('national-download').disabled = false;
-        fail(e);
-    }
-};
-$('national-query').onkeydown = event => { if (event.key === 'Enter')
-    nationalSearch(1).catch(fail); };
-$('national-prev').onclick = () => nationalSearch(nationalPage - 1).catch(fail);
-$('national-next').onclick = () => nationalSearch(nationalPage + 1).catch(fail);
-$('national-close').onclick = () => $('national-detail').close();
 function addRegistryProfile(id, body) {
     const panel = make('div', undefined, 'detail-field profile-registry');
     panel.append(make('h3', translate('Dodatni poslovni podaci')));

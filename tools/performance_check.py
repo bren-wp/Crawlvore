@@ -2,6 +2,7 @@
 import argparse,json,platform,sqlite3,statistics,sys,tempfile,time,tracemalloc
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from core import Store
 from bulk_io import export_file,json_records
 from data_safety import verified_backup,restore_workspace

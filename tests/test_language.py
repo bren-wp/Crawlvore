@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 class LanguageTests(unittest.TestCase):
-    def test_english_default_croatian_persistence(self):
+    def test_croatian_default_english_persistence(self):
         with tempfile.TemporaryDirectory() as directory:
             p=subprocess.Popen([sys.executable,str(ROOT/'tvrtk_scraper.py'),'--worker','--port','0','--data-dir',directory],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             try:
@@ -24,11 +24,11 @@ class LanguageTests(unittest.TestCase):
                 base=url.split('/session/',1)[0]
                 opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
                 with opener.open(url,timeout=5) as response: html=response.read().decode()
-                self.assertIn('data-language="en"',html)
+                self.assertIn('data-language="hr"',html)
                 token=re.search(r'name="local-token" content="([0-9a-f]+)"',html).group(1)
-                request=urllib.request.Request(base+'/api/preferences/language',data=b'{"language":"hr"}',headers={'Content-Type':'application/json','X-Local-Token':token})
-                with opener.open(request,timeout=5) as response: self.assertEqual(json.load(response)['language'],'hr')
-                with opener.open(base+'/',timeout=5) as response: self.assertIn(b'data-language="hr"',response.read())
+                request=urllib.request.Request(base+'/api/preferences/language',data=b'{"language":"en"}',headers={'Content-Type':'application/json','X-Local-Token':token})
+                with opener.open(request,timeout=5) as response: self.assertEqual(json.load(response)['language'],'en')
+                with opener.open(base+'/',timeout=5) as response: self.assertIn(b'data-language="en"',response.read())
                 p.stdin.close()
                 self.assertEqual(p.wait(timeout=20),0)
             finally:

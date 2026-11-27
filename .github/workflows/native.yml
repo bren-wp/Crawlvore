@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches: [registry-only-desktop, main]
-    paths: ['desktop/**', 'windows/**', 'linux/**', '*.py', 'static/**', 'frontend/**', 'tools/**', 'tests/**', 'requirements*.txt', 'package*.json', 'tsconfig*.json', 'VERSION', '.github/workflows/native.yml']
+    paths: ['desktop/**', 'windows/**', 'linux/**', '*.py', 'src/**', 'resources/**', 'static/**', 'frontend/**', 'tools/**', 'tests/**', 'requirements*.txt', 'package*.json', 'tsconfig*.json', 'VERSION', '.github/workflows/native.yml']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -13,18 +13,17 @@ on:
       registry_bundle:
         type: boolean
         default: false
-      national_bundle:
-        type: boolean
-        default: false
       edition:
         type: string
         default: ''
       language:
         type: string
-        default: en
+        default: hr
       artifact_suffix:
         type: string
         default: ''
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
 permissions:
   contents: read
 jobs:
@@ -41,7 +40,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Reserve disk space for offline catalog builds
-        if: runner.os == 'Linux' && (inputs.registry_bundle || inputs.national_bundle)
+        if: runner.os == 'Linux' && inputs.registry_bundle
         run: |
           df -h .
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
@@ -96,45 +95,21 @@ jobs:
           sha256sum registry-seed.sqlite3 | cut -d ' ' -f 1 > registry-seed.sha256
           echo 'CRAWLVORA_REGISTRY_BUNDLE=1' >> "$GITHUB_ENV"
           echo "CRAWLVORA_EXPECTED_REGISTRY_SHA256=$(cat registry-seed.sha256)" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        if: inputs.national_bundle
-        with:
-          name: verified-gb-registry-snapshot
-          path: national-data/GB
-      - name: Accept GB bundle identity
-        if: inputs.national_bundle
-        shell: bash
-        run: |
-          python -c "from national_catalog import NationalCatalog; from pathlib import Path; import tempfile; t=tempfile.TemporaryDirectory(); n=NationalCatalog(Path('.'),Path(t.name)); p,m=n.database(); print(m['rows']); t.cleanup()"
-          echo 'CRAWLVORA_NATIONAL_BUNDLE=1' >> "$GITHUB_ENV"
-          echo "CRAWLVORA_EXPECTED_GB_SHA256=$(python -c 'import json; print(json.load(open("national-data/GB/manifest.json"))["database_sha256"])')" >> "$GITHUB_ENV"
       - name: Build worker and assemble preview
         env:
           SELECTED_EDITION: ${{ inputs.edition }}
-          SELECTED_LANGUAGE: ${{ inputs.language || 'en' }}
+          SELECTED_LANGUAGE: ${{ inputs.language || 'hr' }}
         shell: bash
         run: |
           extra=()
           if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" = 1 ]; then
-            extra=(--add-data "registry-bundle/registry-seed.sqlite3:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
+            python tools/compress_registry_seed.py registry-bundle
+            extra=(--add-data "registry-bundle/registry-seed.sqlite3.gz:." --add-data "registry-bundle/registry-seed.size:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
           fi
-          if [ "${CRAWLVORA_NATIONAL_BUNDLE:-}" = 1 ]; then
-            test -s national-data/GB/manifest.json
-            test -s national-data/GB/united-kingdom.sqlite3.gz
-            extra+=(--add-data "national-data:national-data")
-          fi
-          if [ -n "$SELECTED_EDITION" ]; then
-            mkdir -p native-edition
-            python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"],"language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
-            extra+=(--add-data "native-edition/edition.json:.")
-          elif [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" != 1 ] && [ "${CRAWLVORA_NATIONAL_BUNDLE:-}" != 1 ]; then
-            mkdir -p native-edition
-            printf '%s\n' '{"edition":"Online"}' > native-edition/edition.json
-            extra+=(--add-data "native-edition/edition.json:.")
-          else
-            extra+=(--add-data "tvrtk_output.csv:.")
-          fi
-          python -m PyInstaller "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+          mkdir -p native-edition
+          python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
+          extra+=(--add-data "native-edition/edition.json:.")
+          python -m PyInstaller --paths src "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview tvrtk_scraper.py
           mkdir -p native-preview
           cp -R dist/CrawlvoraWorker native-preview/worker
           if [ "$RUNNER_OS" = Windows ]; then
@@ -143,10 +118,10 @@ jobs:
             cp desktop/src-tauri/target/release/crawlvora-desktop native-preview/Crawlvora
           fi
       - name: Packaged worker forced-restart acceptance (Windows)
-        if: runner.os == 'Windows' && inputs.registry_bundle != true && inputs.national_bundle != true
+        if: runner.os == 'Windows' && inputs.registry_bundle != true
         run: python tools/native_worker_recovery.py --worker native-preview/worker/CrawlvoraWorker.exe
       - name: Packaged worker forced-restart acceptance (Linux)
-        if: runner.os == 'Linux' && inputs.registry_bundle != true && inputs.national_bundle != true
+        if: runner.os == 'Linux' && inputs.registry_bundle != true
         run: python tools/native_worker_recovery.py --worker native-preview/worker/CrawlvoraWorker
       - name: Native window smoke test (Linux)
         if: runner.os == 'Linux'
@@ -159,13 +134,13 @@ jobs:
           if (!$p.WaitForExit(900000)) { Stop-Process -Id $p.Id -Force; throw 'Native smoke timed out' }
           if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
       - name: Measure native smoke startup and CPU (Windows)
-        if: runner.os == 'Windows' && inputs.registry_bundle != true && inputs.national_bundle != true
+        if: runner.os == 'Windows' && inputs.registry_bundle != true
         run: python tools/native_startup_check.py native-preview/Crawlvora.exe --output native-startup.json
       - name: Measure native smoke startup and CPU (Linux)
-        if: runner.os == 'Linux' && inputs.registry_bundle != true && inputs.national_bundle != true
+        if: runner.os == 'Linux' && inputs.registry_bundle != true
         run: WEBKIT_DISABLE_COMPOSITING_MODE=1 xvfb-run -a python tools/native_startup_check.py native-preview/Crawlvora --output native-startup.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: inputs.registry_bundle != true && inputs.national_bundle != true
+        if: inputs.registry_bundle != true
         with:
           name: native-startup-${{ runner.os }}${{ inputs.artifact_suffix }}
           path: native-startup.json
@@ -175,21 +150,13 @@ jobs:
         if: runner.os == 'Windows'
         env:
           SELECTED_EDITION: ${{ inputs.edition }}
-          SELECTED_LANGUAGE: ${{ inputs.language || 'en' }}
+          SELECTED_LANGUAGE: ${{ inputs.language || 'hr' }}
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
           if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
-          if ($env:SELECTED_EDITION) {
-            ./windows/package-native.ps1 -Edition $env:SELECTED_EDITION -Language $env:SELECTED_LANGUAGE
-          } elseif ('${{ inputs.registry_bundle }}' -eq 'true' -and '${{ inputs.national_bundle }}' -eq 'true') {
-            foreach ($edition in @('Full','HR','GB','Online')) { ./windows/package-native.ps1 -Edition $edition }
-          } elseif ('${{ inputs.registry_bundle }}' -eq 'true' -or '${{ inputs.national_bundle }}' -eq 'true') {
-            ./windows/package-native.ps1
-            ./windows/package-native.ps1 -Edition Online
-          } else {
-            ./windows/package-native.ps1 -Edition Online
-          }
+          $edition = if ($env:SELECTED_EDITION) { $env:SELECTED_EDITION } else { 'Online' }
+          ./windows/package-native.ps1 -Edition $edition -Language $env:SELECTED_LANGUAGE
       - name: Archive tested Linux package
         if: runner.os == 'Linux'
         shell: bash

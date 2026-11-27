@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from core import Collector, Store
 from data_safety import workspace_lock
 from native_vault import NativeVault, VaultUnavailable

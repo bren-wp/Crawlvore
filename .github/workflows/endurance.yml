@@ -5,6 +5,8 @@ on:
     paths: ['.github/workflows/endurance.yml', 'tools/endurance.py']
   workflow_dispatch:
   workflow_call:
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
 permissions:
   contents: read
 jobs:

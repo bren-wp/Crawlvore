@@ -36,7 +36,7 @@ class DesktopWorkerTests(unittest.TestCase):
                     self.assertEqual(response.geturl(),base+'/')
                     self.assertIn(b'Crawlvora',response.read())
                 with opener.open(base+'/api/stats',timeout=5) as response:
-                    self.assertEqual(json.load(response)['total'],26261)
+                    self.assertEqual(json.load(response)['total'],0)
                 import re
                 with opener.open(base+'/',timeout=5) as response:
                     html=response.read().decode()

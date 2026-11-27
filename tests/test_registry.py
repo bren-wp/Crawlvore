@@ -67,6 +67,18 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.reg.browse('21','email_adrese')['total'],2)
         self.assertEqual(self.store.query(q='Deleted Example')['total'],1)
 
+    def test_subject_without_published_name_is_not_dropped(self):
+        class Nameless(Fake):
+            def get(self,name,q=None):
+                headers,rows=super().get(name,q)
+                if name=='subjekti':
+                    for row in rows: row.pop('tvrtka_naziv',None)
+                return headers,rows
+        self.reg.sync(self.bot,Nameless(),1)
+        self.assertEqual(self.store.stats()['total'],2)
+        self.assertEqual(self.store.query(q='000000002')['rows'][0]['title'],'MBS 000000002')
+        self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
+
     def test_all_subjects_explicit_scope(self):
         class AllSubjects(Fake):
             def spec(self):

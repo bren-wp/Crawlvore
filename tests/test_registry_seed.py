@@ -1,3 +1,4 @@
+import gzip
 import hashlib
 import json
 import sqlite3
@@ -32,6 +33,20 @@ class SeedTests(unittest.TestCase):
                 install_seed(self.root,self.dest)
         self.assertFalse(self.dest.exists())
         self.assertEqual(self.source.read_bytes(),b'synthetic test data')
+
+    def test_compressed_seed_is_bounded_and_verified(self):
+        raw=self.source.read_bytes()
+        (self.root/'registry-seed.sqlite3.gz').write_bytes(gzip.compress(raw))
+        self.source.unlink()
+        size=self.root/'registry-seed.size'
+        size.write_text(str(len(raw)),encoding='ascii')
+        self.assertTrue(install_seed(self.root,self.dest))
+        self.assertEqual(self.dest.read_bytes(),raw)
+        self.dest.unlink()
+        size.write_text(str(len(raw)-1),encoding='ascii')
+        with self.assertRaisesRegex(ValueError,'size mismatch'):
+            install_seed(self.root,self.dest)
+        self.assertFalse(self.dest.exists())
 
     def test_existing_workspace_preserved(self):
         self.dest.write_bytes(b'existing user database')

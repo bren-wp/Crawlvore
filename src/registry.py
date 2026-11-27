@@ -286,8 +286,10 @@ class Registry:
                 if not title:
                     title=value(d,'tvrtka_kod_brisanja')
                 if not title:
-                    bot.inc('skipped')
-                    continue
+                    # Some official subjects have no published name. Preserve the subject
+                    # with its real identifier; never invent a legal company name.
+                    known=c.execute('SELECT title FROM companies WHERE mbs=? LIMIT 1',(mbs,)).fetchone()
+                    title=known[0] if known and known[0] else 'MBS '+mbs
                 row={'title':title,'mbs':mbs,'oib':oib}
                 founded=value(d,'datum_osnivanja')
                 if re.match(r'^\d{4}(?:-|$)',founded): row['year']=founded[:4]

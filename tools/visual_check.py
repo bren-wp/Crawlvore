@@ -4,9 +4,14 @@ import json, os, sys, tempfile
 root=Path(__file__).resolve().parents[1]; out=root/'branding'; out.mkdir(exist_ok=True); views=['overview','directory','registry','jobs','data','analytics','settings']; errors=[]; results=[]
 html=(root/'static/index.html').read_text(encoding='utf-8'); css=(root/'static/style.css').read_text(encoding='utf-8'); js=(root/'static/app.js').read_text(encoding='utf-8'); locale_js=(root/'static/locale.js').read_text(encoding='utf-8'); html=html.replace('<link rel="stylesheet" href="/style.css">','').replace('<script defer src="/app.js"></script>','').replace('<script defer src="/locale.js"></script>','').replace('<link rel="icon" href="/logo.svg" type="image/svg+xml">','')
 sys.path.insert(0,str(root))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from core import Store
 with tempfile.TemporaryDirectory() as tmp:
- store=Store(Path(tmp)/'test.sqlite3'); store.seed(root/'tvrtk_output.csv'); stats=store.stats(); companies=store.query(limit=5); detail=store.detail(companies["rows"][0]["id"]); providers=[dict(x,label=x['provider']) for x in store.providers()]
+ store=Store(Path(tmp)/'test.sqlite3')
+ with store.db() as db:
+  for i,name in enumerate(('Atlas Demo','Birch Demo','Cedar Demo','Delta Demo','Elm Demo','Fjord Demo')):
+   store.upsert(db,{'title':name,'city':('Zagreb','Rijeka','Split')[i%3],'phone':'012345','website':'https://example.invalid'},provider='csv')
+ stats=store.stats(); companies=store.query(limit=5); detail=store.detail(companies["rows"][0]["id"]); providers=[dict(x,label=x['provider']) for x in store.providers()]
 fixtures={'/api/stats':stats,'/api/companies':companies,'/api/cities':['Zagreb','Rijeka'],'/api/providers':providers,'/api/projects':[],'/api/registry':{'runs':[{'snapshot':'22','complete':1},{'snapshot':'21','complete':1}],'categories':[],'configured':False},'/api/jobs':{'jobs':[],'schedule':{'enabled':0,'hour':3}},'/api/status':{'status':'idle','page':0,'last':0,'processed':0,'added':0,'skipped':0,'errors':0,'logs':[]}}
 fixtures['/api/company/'+str(companies['rows'][0]['id'])]=detail
 fixtures['/api/history/'+str(companies['rows'][0]['id'])]=[]

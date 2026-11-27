@@ -6,7 +6,7 @@
 
 ### Business intelligence. On your terms.
 
-Explore official business registers, discover company information and turn local data into useful insights — in one carefully designed desktop workspace.
+Explore the Croatian Court Registry, discover company information and turn local data into useful insights — in one carefully designed desktop workspace.
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-52D6B0?style=flat-square&logo=windows&logoColor=white)](https://github.com/bren-wp/Crawlvore/releases)
 [![Linux](https://img.shields.io/badge/Linux-x86__64-263746?style=flat-square&logo=linux&logoColor=white)](https://github.com/bren-wp/Crawlvore/releases)
@@ -25,7 +25,6 @@ Explore official business registers, discover company information and turn local
 |---|---|
 | 🏢 **Business Directory** | Search by name, location, OIB or MBS; filter records and explore company profiles. |
 | 🇭🇷 **Crawlvora Sync** | Synchronize authorized Croatian Court Registry records, resume interrupted downloads and preserve source provenance. |
-| 🇬🇧 **Crawlvora UK** | Search the separate Companies House monthly catalog when installed locally. |
 | 🔑 **Crawlvora Connect** | Manage authorized registry access with operating-system-protected credential storage. |
 | 📊 **Analytics & Reports** | Understand available data and export structured reports. |
 | 🗓️ **Tasks & Schedule** | Manage synchronization tasks and scheduled updates while the application is running. |
@@ -35,7 +34,7 @@ Explore official business registers, discover company information and turn local
 ## Explore the workspace
 
 <!-- PRODUCT_SCREENSHOTS_START -->
-Actual Crawlvora interface, captured from the running 8.1.4 application worker and compiled frontend on Windows using a disposable synthetic catalog.
+Actual desktop application interface, captured from a disposable synthetic workspace.
 
 ![Crawlvora Overview](docs/screenshots/overview-dark.jpg)
 
@@ -43,9 +42,7 @@ Actual Crawlvora interface, captured from the running 8.1.4 application worker a
 |---|---|
 | ![Business Directory](docs/screenshots/directory-dark.jpg) | ![Company Profile](docs/screenshots/profile-dark.jpg) |
 
-| Crawlvora Sync | Crawlvora UK |
-|---|---|
-| ![Crawlvora Sync](docs/screenshots/registry-dark.jpg) | ![Crawlvora UK](docs/screenshots/uk-dark.jpg) |
+![Crawlvora Sync](docs/screenshots/registry-dark.jpg)
 
 | Tasks & Schedule | Import & Export |
 |---|---|
@@ -64,16 +61,14 @@ Choose English or Croatian and dark or light appearance. Resize the desktop wind
 
 ## Choose your edition
 
-Four national editions are built for Windows and Linux. Each keeps its own bundled catalog scope and initial interface language; an existing language preference is preserved.
+Two Croatian editions are built for Windows and Linux.
 
-| Edition | Initial language | Bundled national catalog |
-|---|---|---|
-| HR Full | Croatian | Croatian Court Registry |
-| EN Full | English | United Kingdom Companies House |
-| HR Online | Croatian | None |
-| EN Online | English | None |
+| Edition | Included data |
+|---|---|
+| HR Full | Verified Croatian Court Registry snapshot |
+| HR Online | Empty workspace on first launch |
 
-The Croatian catalog is restored from the independently checked private registry archive. The UK catalog is the official monthly live-register data product. No private API credentials are embedded. An edition switch does not remove any previously installed user data.
+Croatian is the default interface language; English remains optional. Existing user databases and language preferences are preserved during upgrades. Full distribution uses only the verified Croatian data archive and never embeds API credentials.
 
 ## Get Crawlvora
 
@@ -84,19 +79,12 @@ The Croatian catalog is restored from the independently checked private registry
 | Windows 10/11 x64 | Portable executable or installer |
 | Linux x86_64 | DEB package or TAR.GZ distribution |
 
-Public Online releases contain the tested application without bundled national catalogs. Check the release notes and accompanying manifest before use. Windows packages may be unsigned. HR Full and EN Full are separate distributions that require complete, reviewed national snapshots.
-
-## Crawlvora for the web
-
-🌐 **Crawlvora Web** provides a shared-hosting PHP business directory for approved catalog data.
-
-🧩 **WordPress Business Directory** integrates approved catalog search and company profiles into WordPress. These components are separately packaged when verified; availability is determined by the release assets.
+Check the release manifest and SHA-256 checksums before installing. Windows packages may be unsigned.
 
 ## Your data stays yours
 
-Crawlvora keeps local workspaces on your device. Authorized registry access requires valid credentials; secure storage uses Windows DPAPI or Linux Secret Service when available. Coverage and data freshness depend on the installed snapshot and synchronization status. Crawlvora is independent of the Croatian Court Registry and Companies House.
+Crawlvora keeps local workspaces on your device. Authorized registry access requires valid credentials; secure storage uses Windows DPAPI or Linux Secret Service when available. Coverage and data freshness depend on the installed snapshot and synchronization status. Crawlvora is independent of the Croatian Court Registry.
 
-[Croatian Court Registry](https://sudreg-data.gov.hr/) · [Companies House data](https://download.companieshouse.gov.uk/en_output.html) · [User guide](docs/USER-GUIDE.md) · [License](LICENSE)
 
 ---
 

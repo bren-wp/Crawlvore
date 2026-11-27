@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 const source = '.frontend-build';
 const order = ['app', 'registry-controller', 'analytics-settings',
-  'recovery-controller', 'protected-backups-controller', 'national-controller',
+  'recovery-controller', 'protected-backups-controller',
   'registry-profile'];
 const expected = [...order, 'locale'].map(name => name + '.js').sort();
 const actual = readdirSync(source).sort();

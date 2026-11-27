@@ -11,15 +11,14 @@ from local_http_security import token_matches, allowed_host, session_cookie_name
 from sources import NAMES
 from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import start_registry
-from gb_download import check_update as check_gb_update
 from snapshot_diff import compare
 from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
 from cryptography.exceptions import InvalidTag
 
 
-def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
-                 import_lock, integrity, national, protected, queue, recovery,
+def make_handler(*, ROOT, TOKEN, args, active, collector, database,
+                 import_lock, integrity, protected, queue, recovery,
                  registry, registry_access, search_integrity, selection, store,
                  transfers, ui_ready, ui_ready_lock):
     class Handler(LocalResponseHandler):
@@ -114,12 +113,6 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
                         self.send_response(200); self.send_header('Content-Type','application/octet-stream'); self.send_header('Content-Length',str(os.fstat(stream.fileno()).st_size)); self.send_header('Content-Disposition',f'attachment; filename="{path.name}"'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers()
                         shutil.copyfileobj(stream,self.wfile)
                     return
-                if p.path=='/api/national/status': return self.send_data(national.status())
-                if p.path=='/api/national/gb/download': return self.send_data(gb_download.status())
-                if p.path=='/api/national/gb/search': return self.send_data(national.search(get('q'),int(get('page','1'))))
-                if p.path=='/api/national/gb/detail':
-                    record=national.detail(get('number'))
-                    return self.send_data(record if record else {'error':'Record not found.'},status=200 if record else 404)
                 if p.path=='/api/analytics': return self.send_data(store.analytics())
                 if p.path=='/api/stats': return self.send_data(store.stats())
                 if p.path=='/api/providers': return self.send_data([dict(x,label=NAMES.get(x['provider'],x['provider'])) for x in store.providers()])
@@ -174,14 +167,6 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
                 if len(raw)!=n: raise ValueError('Incomplete request body.')
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
-                if self.path=='/api/national/gb/update-check':
-                    status=national.status()['GB']
-                    if not status['available']:raise ValueError('Install the UK catalog first.')
-                    return self.send_data(check_gb_update(status['snapshot']))
-                if self.path=='/api/national/gb/download':
-                    if data.get('confirmed') is not True: raise ValueError('Confirm UK catalog download.')
-                    if national.status()['GB']['available']: raise ValueError('UK catalog already installed.')
-                    return self.send_data(gb_download.start())
                 if self.path=='/api/recovery/encrypt':
                     if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
                     password=data.get('password')

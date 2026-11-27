@@ -4,6 +4,8 @@ on:
     branches: [data-safety-release]
     paths: ['Crawlvora-Design-References-10.zip']
   workflow_dispatch:
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
 permissions:
   contents: write
 jobs:
