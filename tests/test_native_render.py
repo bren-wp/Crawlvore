@@ -1,7 +1,7 @@
 import io
 import unittest
 from PIL import Image
-from native_render import rounded_surface,stroke_icon
+from native_render import rounded_surface,stroke_icon,surface_color
 
 class RoundedSurfaceTests(unittest.TestCase):
     def test_antialiased_edge_and_opaque_center(self):
@@ -27,3 +27,11 @@ class RoundedSurfaceTests(unittest.TestCase):
         self.assertEqual(image.getpixel((9,9))[:3],(54,235,186))
         self.assertTrue(any(0<a<255 for a in image.getchannel("A").get_flattened_data()))
         with self.assertRaises(ValueError):stroke_icon((),"#123456",100)
+
+    def test_surface_sampling_matches_reference_gradient(self):
+        args=("#101f2d","#0c1a26",400,200)
+        self.assertEqual(surface_color(*args,0,0),"#101f2d")
+        self.assertEqual(surface_color(*args,400,200),"#0c1a26")
+        self.assertEqual(surface_color(*args,200,100),"#0e1c2a")
+        self.assertEqual(surface_color(*args,-100,-100),"#101f2d")
+        self.assertEqual(surface_color(*args,600,300),"#0c1a26")

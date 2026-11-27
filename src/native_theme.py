@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk
-from native_render import rounded_surface, stroke_icon
+from native_render import rounded_surface, stroke_icon, surface_color
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -124,18 +124,60 @@ def rounded_points(width,height,radius):
             result.append((cx+r*math.cos(a),cy+r*math.sin(a)))
     return result
 
+def shade_children(parent,canvas,start,end,width,height):
+    """Match opaque native label and chart backgrounds to the local card color.
+    Retain the original ttk geometry, interaction, and custom foreground states.
+    """
+    style=ttk.Style(parent)
+    px,py=canvas.winfo_rootx(),canvas.winfo_rooty()
+    def visit(widget):
+        for child in widget.winfo_children():
+            if child is canvas or not child.winfo_ismapped():continue
+            if isinstance(child,Card):continue
+            if isinstance(child,ttk.Widget):
+                current=child.cget("style")
+                base=getattr(child,"_surface_base",current)
+                if base in ("Panel.TLabel","PanelMuted.TLabel","PanelTitle.TLabel","Metric.TLabel","PanelInner.TFrame"):
+                    x=child.winfo_rootx()-px+child.winfo_width()/2
+                    y=child.winfo_rooty()-py+child.winfo_height()/2
+                    color=surface_color(start,end,width,height,x,y)
+                    name="Shade"+color[1:]+"."+base
+                    if current!=name:
+                        child._surface_base=base
+                        style.configure(name,background=color)
+                        child.configure(style=name)
+            elif isinstance(child,tk.Canvas) and not getattr(child,"_surface_decoration",False):
+                if not hasattr(child,"_surface_original_bg"):
+                    child._surface_original_bg=child.cget("background")
+                if child._surface_original_bg==PANEL:
+                    x=child.winfo_rootx()-px+child.winfo_width()/2
+                    y=child.winfo_rooty()-py+child.winfo_height()/2
+                    color=surface_color(start,end,width,height,x,y)
+                    if child.cget("background")!=color:child.configure(background=color)
+            visit(child)
+    visit(parent)
+
 def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
     """Draw only procedural surface geometry behind live native controls."""
     canvas=tk.Canvas(parent,bg=outer,highlightthickness=0,borderwidth=0,takefocus=0)
+    canvas._surface_decoration=True
     canvas.place(x=0,y=0,relwidth=1,relheight=1,bordermode="outside")
     canvas.tk.call("lower",canvas._w)
     last=None
     pending=None
+    shade_pending=None
+    def shade():
+        nonlocal shade_pending
+        shade_pending=None
+        if isinstance(parent,Card):shade_children(parent,canvas,start,end,canvas.winfo_width(),canvas.winfo_height())
     def draw():
-        nonlocal last,pending
+        nonlocal last,pending,shade_pending
         pending=None
         w,h=canvas.winfo_width(),canvas.winfo_height()
-        if (w,h)==last or min(w,h)<3:return
+        if min(w,h)<3:return
+        if shade_pending is not None:canvas.after_cancel(shade_pending)
+        shade_pending=canvas.after(60,shade)
+        if (w,h)==last:return
         last=(w,h)
         canvas.delete("surface")
         points=rounded_points(w-1,h-1,radius)
@@ -156,11 +198,15 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         if pending is not None:canvas.after_cancel(pending)
         pending=canvas.after(45,draw)
     def destroyed(_event):
-        nonlocal pending
+        nonlocal pending,shade_pending
         if pending is not None:
             canvas.after_cancel(pending)
             pending=None
+        if shade_pending is not None:
+            canvas.after_cancel(shade_pending)
+            shade_pending=None
     canvas.bind("<Configure>",resized)
+    canvas.bind("<Map>",resized,add="+")
     canvas.bind("<Destroy>",destroyed)
     return canvas
 

@@ -23,3 +23,7 @@ Wide windows use an overlay vertical scrollbar in the outer margin, retaining th
 ## Native raster assets
 
 The logo surface and navigation line icons now use bounded, supersampled RGBA PNG generation in the Python standard library. The runtime has no new graphics dependency. Keep the existing ttk button control layout: the experimental nine-slice button element caused invisible labels initially and excessive CPU activity during full-window resize testing even after fixing label stacking. It is not shipped. The accepted icon-only candidate completed the seven-view capture and responsive checks, but the strict 30% and exact RGB thresholds remain unmet. Tiny RGB regressions are recorded, not masked. Reference captures remain unchanged.
+
+## Local gradient sampling
+
+Native card labels, nested panel frames and chart canvases now sample the local gradient color instead of displaying uniform panel-colored rectangles. Styles inherit their existing font, foreground and control semantics. Sampling occurs after layout settles and pending callbacks are cancelled on destruction. The original controls remain interactive; nested card decorations are excluded. All seven views reduced changed pixels at the measured 1280x700 viewport. The 30% gate is still failing; no production readiness or DPI equivalence is inferred. Reference images remain unchanged.

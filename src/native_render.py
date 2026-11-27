@@ -79,3 +79,10 @@ def stroke_icon(segments,color,size=20):
             row.extend((*ink,round(total*255/(sample*sample))))
         rows.append(bytes(row))
     return png(size,size,rows)
+
+def surface_color(start,end,width,height,x,y):
+    """Sample the reference 145-degree linear gradient at a logical point."""
+    angle=math.radians(145)
+    dx,dy=math.sin(angle),-math.cos(angle)
+    fraction=max(0,min(1,(dx*x+dy*y)/max(1,dx*width+dy*height)))
+    return "#"+"".join(f"{channel:02x}" for channel in blend(rgb(start),rgb(end),fraction))
