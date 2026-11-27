@@ -61,3 +61,7 @@ CI records the exact source SHA, accepted country snapshot hashes and final EXE 
 ## Portable artifact publication safety
 
 Portable assembly checks free space, writes to an invocation-owned unique staging file, validates the assembled size and worker SHA-256, and publishes by an exclusive hard link. A competing destination is never overwritten; only the current invocation's temporary file is cleaned up. Unsupported filesystems fail closed. Native acceptance must still validate the resulting executable.
+
+## Separate shared-hosting package
+
+The verified candidate workflow also archives Crawlvora-Web.zip separately from the desktop matrix. It is built from the exact committed source, allows only reviewed site paths and empty catalog manifests, and includes the Apache storage deny rule. It never includes local SQLite data, catalog shards or credentials. Extract the archive into a fresh hosting root; preserve existing approved catalogs during upgrades. Actual hosting access controls and operator/legal details still require independent acceptance. The fourteen production release assets remain unchanged.

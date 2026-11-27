@@ -61,6 +61,15 @@ jobs:
         if: inputs.strict_visual == true
         run: python tools/pixel_diff.py --strict
       - run: python tools/performance_check.py --records 100000 > performance.json
+      - name: Build verified shared-hosting candidate
+        run: python tools/package_web.py "${{ runner.temp }}/Crawlvora-Web.zip" --ref "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'pull_request'
+        with:
+          name: Crawlvora-Web-PR
+          path: ${{ runner.temp }}/Crawlvora-Web.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Record audit evidence in job summary
         if: always()
         shell: bash
