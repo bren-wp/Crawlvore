@@ -1,121 +1,96 @@
 <div align="center">
 
-<img src="static/logo.svg" width="100" alt="Crawlvora">
+<img src="static/logo.svg" width="104" alt="Crawlvora">
 
 # Crawlvora
 
-### Croatian business intelligence. One powerful desktop workspace.
+### Business intelligence. On your terms.
 
-Discover companies, explore official Court Registry records and turn business data into actionable information — all from a beautifully organized, local-first workspace.
+Explore official business registers, discover company information and turn local data into useful insights — in one carefully designed desktop workspace.
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-52D6B0?style=flat-square&logo=windows&logoColor=white)](https://github.com/bren-wp/Crawlvore/releases)
 [![Linux](https://img.shields.io/badge/Linux-x86__64-263746?style=flat-square&logo=linux&logoColor=white)](https://github.com/bren-wp/Crawlvore/releases)
-![Local first](https://img.shields.io/badge/Local--first-SQLite-52D6B0?style=flat-square&logo=sqlite&logoColor=white)
+![Local data](https://img.shields.io/badge/Local%20data-SQLite-52D6B0?style=flat-square&logo=sqlite&logoColor=white)
 [![License](https://img.shields.io/github/license/bren-wp/Crawlvore?style=flat-square)](LICENSE)
 
-**[Download Crawlvora](https://github.com/bren-wp/Crawlvore/releases)** · [Explore the workspace](#explore-the-workspace) · [Get started](#get-started)
+**[Explore releases](https://github.com/bren-wp/Crawlvore/releases)** · [Discover the workspace](#explore-the-workspace) · [User guide](docs/USER-GUIDE.md)
 
 </div>
 
 ---
 
-## Your business data, under your control
-
-Crawlvora brings the Croatian Court Registry and your existing company directory together in a single desktop application. Find the right business, examine its official identity, keep track of changes and export the information you need — without sending your private workspace to a cloud service.
+## Make business data useful
 
 | | |
 |---|---|
-| 🏢 **26,261 included directory records** | Start with the bundled directory in a fresh workspace, without having to configure an online connection first. |
-| 🏛️ **Official registry integration** | Access the Croatian Court Registry public v3 API with your authorized account. |
-| 🔎 **Precision search** | Find companies by name, location, OIB, MBS or indexed text. |
-| 🔒 **Local-first by design** | Keep your directory, registry snapshots and working data on your device. |
+| 🏢 **Business Directory** | Search by name, location, OIB or MBS; filter records and explore company profiles. |
+| 🇭🇷 **Crawlvora Sync** | Synchronize authorized Croatian Court Registry records, resume interrupted downloads and preserve source provenance. |
+| 🇬🇧 **Crawlvora UK** | Search the separate Companies House monthly catalog when installed locally. |
+| 🔑 **Crawlvora Connect** | Manage authorized registry access with operating-system-protected credential storage. |
+| 📊 **Analytics & Reports** | Understand available data and export structured reports. |
+| 🗓️ **Tasks & Schedule** | Manage synchronization tasks and scheduled updates while the application is running. |
+| 📥 **Import & Export** | Import CSV or JSON; export directory records to CSV, JSON or Excel and registry categories to additional formats. |
+| 🛡️ **Data protection** | Keep your working database local, create verified backups and recover into a separate workspace. |
 
 ## Explore the workspace
 
-Crawlvora combines a dedicated business directory, official registry browser, task manager, analytics and data management in one consistent interface.
-
 <!-- PRODUCT_SCREENSHOTS_START -->
-Actual application interface rendered in English with controlled sample data.
+The following interface captures are existing English browser fixture views; they are not native Windows screenshots or evidence of current visual acceptance.
 
 | Overview | Business Directory |
 |---|---|
 | ![Overview](branding/en-overview-dark-1440-fixture.png) | ![Business Directory](branding/en-directory-dark-1440-fixture.png) |
 
-| Court Registry | Tasks & Schedule |
+| Crawlvora Sync | Tasks & Schedule |
 |---|---|
-| ![Court Registry](branding/en-registry-dark-1440-fixture.png) | ![Tasks & Schedule](branding/en-jobs-dark-1440-fixture.png) |
+| ![Sync](branding/en-registry-dark-1440-fixture.png) | ![Tasks](branding/en-jobs-dark-1440-fixture.png) |
 
 | Import & Export | Analytics & Reports |
 |---|---|
-| ![Import & Export](branding/en-data-dark-1440-fixture.png) | ![Analytics & Reports](branding/en-analytics-dark-1440-fixture.png) |
+| ![Import and export](branding/en-data-dark-1440-fixture.png) | ![Analytics](branding/en-analytics-dark-1440-fixture.png) |
 
 | Settings | Company Profile |
 |---|---|
-| ![Settings](branding/en-settings-dark-1440-fixture.png) | ![Company Profile](branding/en-detail-dark-1440-fixture.png) |
+| ![Settings](branding/en-settings-dark-1440-fixture.png) | ![Company profile](branding/en-detail-dark-1440-fixture.png) |
+
+![Light appearance](branding/en-overview-light-1440-fixture.png)
 <!-- PRODUCT_SCREENSHOTS_END -->
 
-### Find the information that matters
+Choose English or Croatian and dark or light appearance. Resize the desktop window to fit your workspace.
 
-**Business directory.** Search and filter your collection, open individual company profiles and explore their available identity and contact information. Source links and preserved alternative values help you understand where information came from.
+## Choose your edition
 
-**Court Registry.** Connect directly to the official public API using authorized OAuth2 access. Synchronize available bulk categories, browse consistent snapshots, resume interrupted downloads and compare completed snapshots.
+The intended Windows distribution offers four editions. Availability depends on verified release assets and approved data distribution.
 
-**Tasks & Schedule.** Organize synchronization jobs and schedule weekday updates while Crawlvora is running. Keep your workflow in one place.
-
-**Analytics & Reports.** Explore your available business data through the dedicated analytics workspace, then export structured records for further analysis.
-
-### Work with data on your terms
-
-| Capability | What you can do |
+| Edition | Included national catalogs |
 |---|---|
-| 📥 **Import** | Bring existing CSV and JSON company datasets into your directory. |
-| 📤 **Export** | Save directory records as CSV, JSON or Excel. Registry category exports also support XML, JSONL and SQLite SQL. |
-| 🔄 **Synchronize** | Retrieve authorized official records, with snapshot-aware pagination and resumable progress. |
-| 🧩 **Consolidate** | Merge compatible business identities using OIB and MBS while preserving existing contact information and provenance. |
-| 🗂️ **Explore history** | Review completed registry snapshots and locally observed changes. |
+| Full | Croatia + United Kingdom |
+| HR | Croatia |
+| GB | United Kingdom |
+| Online | None; connect or use compatible existing local catalogs |
 
-### Designed for everyday work
+## Get Crawlvora
 
-<div align="center">
+[**Browse published releases**](https://github.com/bren-wp/Crawlvore/releases)
 
-<img src="branding/en-overview-light-1440-fixture.png" alt="Crawlvora overview in the light theme" width="100%">
+| Platform | Package |
+|---|---|
+| Windows 10/11 x64 | Portable executable or installer |
+| Linux x86_64 | DEB package or TAR.GZ distribution |
 
-*The same Crawlvora workspace, in a refined light appearance.*
+The current 8.1.4 public download is a non-production candidate. Check the release notes and accompanying manifest before use; it does not contain a verified complete national catalog. Windows packages may be unsigned. Production editions must pass their respective acceptance checks before distribution.
 
-</div>
+## Crawlvora for the web
 
-Choose the dark or light theme and switch between English and Croatian. A resizable desktop window and responsive layouts keep the workspace comfortable across different screen sizes.
+🌐 **Crawlvora Web** provides a shared-hosting PHP business directory for approved catalog data.
 
-### Keep your information protected
+🧩 **WordPress Business Directory** integrates approved catalog search and company profiles into WordPress. These components are separately packaged when verified; availability is determined by the release assets.
 
-Crawlvora offers verified SQLite backups, encrypted backup exports, isolated recovery workspaces and operating-system-protected credential storage. Existing databases are preserved when upgrading; recovery creates a separate workspace rather than replacing the only copy.
+## Your data stays yours
 
-Your authorized registry credentials can be retained through Windows DPAPI or Linux Secret Service. Once enrolled, use **Synchronize** to access the official registry without re-entering the pair on every launch.
+Crawlvora keeps local workspaces on your device. Authorized registry access requires valid credentials; secure storage uses Windows DPAPI or Linux Secret Service when available. Coverage and data freshness depend on the installed snapshot and synchronization status. Crawlvora is independent of the Croatian Court Registry and Companies House.
 
-## Get started
-
-[**Browse available desktop releases**](https://github.com/bren-wp/Crawlvore/releases)
-
-| Platform | Package | How to open |
-|---|---|---|
-| Windows 10/11 x64 | `Portable.exe` | Launch directly with Microsoft WebView2 Runtime available. |
-| Windows 10/11 x64 | `Setup.exe` | Install Crawlvora and the required WebView2 runtime if missing. |
-| Linux x86_64 | `Crawlvora-Linux-amd64.deb` | Install with your package manager (Ubuntu 24.04 baseline). |
-| Linux x86_64 | `Crawlvora-Linux-x86_64.tar.gz` | Extract and launch Crawlvora with system runtime dependencies installed. |
-
-The native desktop packages do not require a separate Python installation or a manually launched local server.
-
-**Connect the Court Registry:** open Settings → API Access and enroll your authorized credentials once, unless your installation is already securely provisioned. Then open Court Registry and select Synchronize. Offline access to existing local records does not require a live API connection.
-
-## Data and availability
-
-The Croatian Court Registry is the sole online collection source. Crawlvora also supports your own imported CSV and JSON datasets. The official API requires valid authorization and is subject to the provider's terms, availability and applicable data-use obligations.
-
-The included directory and a fully synchronized official snapshot are different datasets. Check the release's accompanying registry manifest, when supplied, for the exact snapshot and verified record counts. A preview without that manifest should not be assumed to contain a complete registry mirror.
-
-Crawlvora is an independent application, not an official service of the Croatian Court Registry.
-
-[Official registry API](https://sudreg-data.gov.hr/) · [User guide](docs/USER-GUIDE.md) · [License](LICENSE)
+[Croatian Court Registry](https://sudreg-data.gov.hr/) · [Companies House data](https://download.companieshouse.gov.uk/en_output.html) · [User guide](docs/USER-GUIDE.md) · [License](LICENSE)
 
 ---
 
@@ -125,8 +100,6 @@ Crawlvora is an independent application, not an official service of the Croatian
 
 **Crawlvora — Business Data Intelligence**
 
-Discover. Organize. Synchronize.
-
-[Download](https://github.com/bren-wp/Crawlvore/releases) · [Support & feedback](https://github.com/bren-wp/Crawlvore/issues)
+[Releases](https://github.com/bren-wp/Crawlvore/releases) · [Support](https://github.com/bren-wp/Crawlvore/issues)
 
 </div>
