@@ -37,3 +37,18 @@ schema, credential storage, DOM identifiers or feature behavior is changed.
 
 Next: split worker route handlers and TypeScript feature controllers with
 integration coverage, then progressively enable strict compiler options.
+
+
+## Phase 3 ? increment 2
+
+The classic-script frontend source is split by feature: registry and jobs,
+analytics and settings, recovery, protected backups, national catalog and
+registry profile. The build assembles the existing two public assets in
+explicit initialization order, so the authenticated HTTP allowlist, native
+packaging, and browser harness remain compatible. Shared globals are retained
+for now; this is a staged source split, not independent ES modules.
+
+Python response serialization and security headers move to
+`local_http_response.py`. The Windows-only Rust portable extraction moves to
+`portable_payload.rs`, preserving exclusive temporary directories, SHA-256
+verification and the worker-owned extraction lifetime.

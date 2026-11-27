@@ -5,10 +5,11 @@ import secrets
 import sys
 import time
 import webbrowser
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 from core import Store, Collector
+from local_http_response import LocalResponseHandler
 from local_http_security import token_matches, allowed_host, session_cookie_name, valid_session_cookie, content_length, InvalidFraming
 from sources import NAMES
 from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
@@ -144,14 +145,7 @@ def run_workspace(args,selection,active):
     ui_ready_lock=threading.Lock()
     queue=Queue(store,collector,registry,registry_access.credentials); queue.start()
     protected.start()
-    class Handler(BaseHTTPRequestHandler):
-        def send_data(self,data,kind='application/json; charset=utf-8',status=200,extra=None):
-            if not isinstance(data,bytes): data=json.dumps(data,ensure_ascii=False).encode()
-            self.send_response(status); self.send_header('Content-Type',kind); self.send_header('Content-Length',str(len(data)))
-            self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Frame-Options','DENY')
-            self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
-            for k,v in (extra or {}).items(): self.send_header(k,v)
-            self.end_headers(); self.wfile.write(data)
+    class Handler(LocalResponseHandler):
         def authorized(self):
             return allowed_host(self.headers.get('Host'),self.server.server_port)
         def cookie_name(self):

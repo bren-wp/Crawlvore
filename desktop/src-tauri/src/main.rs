@@ -2,6 +2,8 @@
 
 mod security_policy;
 mod worker;
+#[cfg(all(feature = "portable", windows))]
+mod portable_payload;
 
 use std::{sync::Mutex, thread, time::Duration};
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
