@@ -104,3 +104,7 @@ hosting, WPCS or extended endurance certification. Code-only companion web
 and plugin packages are included with these limitations disclosed.
 
 The non-distribution candidate now builds only the explicit Online Windows pair and database-free Linux packages; the older Legacy pair is not rebuilt or republished by public CI. The private single-registry and full-edition workflows retain their existing naming and data review requirements.
+
+## Draft publication recovery
+
+GitHub's release-by-tag endpoint may return 404 for an unpublished draft. Locate the exact draft through the authenticated releases list, verify its numeric ID, source, tag, asset count, sizes and digests, then promote using PATCH by release ID. Never overwrite assets or move an existing release tag. The one-time 8.1.5 recovery workflow reconstructs the exact verified original build from its retained CI artifacts and confirms all acceptance jobs succeeded before promoting the existing draft. It does not rebuild or publish national data.

@@ -79,6 +79,9 @@ jobs:
       - run: echo "Candidate archived; complete national-data distribution remains a separate release." >> "$GITHUB_STEP_SUMMARY"
 
   public_release:
+    concurrency:
+      group: public-online-publication
+      cancel-in-progress: false
     needs: publish
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -128,9 +131,6 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$VERSION-online"
-          # Authenticate lookup for both public and private repositories.
-          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" > "$RUNNER_TEMP/public-tags.json"
-          python -c 'import json,sys; refs=json.load(open(sys.argv[1])); assert isinstance(refs,list); assert not any(r["ref"]=="refs/tags/"+sys.argv[2] for r in refs), "Tag already exists"' "$RUNNER_TEMP/public-tags.json" "$tag"
           cat > "$RUNNER_TEMP/public-notes.md" <<EOF
           ## Crawlvora $VERSION - Online
           Tested Windows and Linux application packages, without embedded national catalogs.
@@ -146,10 +146,4 @@ jobs:
 
           Source commit: $GITHUB_SHA
           EOF
-          gh release create "$tag" --target "$GITHUB_SHA" --draft --title "Crawlvora $VERSION - Online" --notes-file "$RUNNER_TEMP/public-notes.md" public-assets/*
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$RUNNER_TEMP/public-release.json"
-          python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p["tag_name"]==sys.argv[2] and p["target_commitish"]==sys.argv[3]' "$RUNNER_TEMP/public-release.json" "$tag" "$GITHUB_SHA"
-          python tools/public_release.py public-assets --remote "$RUNNER_TEMP/public-release.json"
-          gh release edit "$tag" --draft=false --prerelease=false --latest
-          gh release view "$tag" --json url,isDraft,isPrerelease,tagName | tee "$RUNNER_TEMP/public-result.json"
-          python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert not p["isDraft"] and not p["isPrerelease"]' "$RUNNER_TEMP/public-result.json"
+          bash tools/publish_public_release.sh public-assets "$VERSION" "$GITHUB_SHA" "$RUNNER_TEMP/public-notes.md"
