@@ -37,7 +37,9 @@ def main():
     ap.add_argument('--worker',action='store_true',help='Run the authenticated desktop worker on loopback')
     ap.add_argument('--self-test',type=Path,help='Write packaged runtime smoke test result and exit')
     ap.add_argument('--no-browser',action='store_true')
+    ap.add_argument('--native-api-only',action='store_true')
     args=ap.parse_args()
+    if args.native_api_only and not args.worker:ap.error('Native API mode requires worker mode.')
     if args.worker and (args.registry_sync or args.self_test):
         ap.error('Worker mode cannot be combined with other modes.')
     if args.self_test:

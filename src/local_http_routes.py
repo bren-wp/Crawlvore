@@ -34,6 +34,8 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
             if not self.authorized(): return self.send_data({'error':'Nedopušten host.'},status=403)
             try: p=urlsplit(self.path)
             except ValueError: return self.send_data({'error':'Invalid request target.'},status=400)
+            if getattr(args,'native_api_only',False) and not p.path.startswith('/api/'):
+                return self.send_data({'error':'Nepoznata adresa.'},status=404)
             if p.path.startswith('/session/'):
                 if not token_matches(p.path,'/session/'+TOKEN):
                     return self.send_data({'error':'Access denied.'},status=403)

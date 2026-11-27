@@ -38,7 +38,7 @@ class ClientTests(unittest.TestCase):
         with patch("update_client.subprocess.run") as run:
             run.return_value.returncode=0
             self.assertEqual(install_staged(staging,"8.1.7","windows","setup","Online"),0)
-            run.assert_called_once_with([str(staging/"Setup-HR-Online.exe")],check=False)
+            run.assert_called_once_with([str((staging/"Setup-HR-Online.exe").resolve())],check=False)
             (staging/"Setup-HR-Online.exe").write_bytes(b"tampered")
             with self.assertRaises(ValueError):install_staged(staging,"8.1.7","windows","setup","Online")
             self.assertEqual(run.call_count,1)

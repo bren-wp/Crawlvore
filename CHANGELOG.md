@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Begin WebView-free native migration with real Tcl/Tk directory, filters, profiles, synchronization, and backup creation, authenticated API-only worker mode and independent Windows/Linux build acceptance.
+- Normalize the expected Windows installer path in updater acceptance tests.
+
 - Polish loading, focus and profile dialogs; repair obsolete visual-test navigation.
 - Build standalone Windows and Linux update clients with pinned Ed25519 trust anchor, bounded HTTPS downloads, signed manifests and explicit installer confirmation.
 
