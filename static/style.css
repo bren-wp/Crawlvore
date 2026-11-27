@@ -155,3 +155,18 @@ dialog{max-width:calc(100% - 24px);max-height:calc(100vh - 24px);overscroll-beha
 button:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .profile-group{grid-column:1/-1!important;border:1px solid var(--line);border-radius:10px;padding:12px;margin:6px 0}.profile-group h3{margin:0 0 8px;font-size:15px}.profile-grid,.mail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}.profile-grid .detail-field{min-width:0}.profile-grid button{margin-top:8px}#mail-dialog{width:min(720px,94vw);max-height:90vh;overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:15px;padding:20px}#mail-dialog label{display:block;margin:10px 0}#mail-dialog input:not([type=checkbox]),#mail-dialog textarea,#mail-dialog select{display:block;width:100%;margin-top:4px}#mail-dialog::backdrop{background:#0009}#mail-dialog details{margin:12px 0}#mail-dialog .check{display:flex;align-items:flex-start;gap:8px}@media(max-width:600px){.profile-grid,.mail-grid{grid-template-columns:1fr}}
+
+/* Desktop polish: stable dialog controls, predictable keyboard focus and dense directory rows. */
+#detail .dialog-head,#mail-dialog>.panel-head{position:sticky;top:0;z-index:2;background:var(--panel);padding-top:8px}
+#detail .dialog-head h2,#mail-company{overflow-wrap:anywhere;word-break:normal}
+#detail [data-profile-tab]{min-height:36px;white-space:normal;text-align:center}
+#detail [data-profile-tab][aria-pressed=true]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.profile-grid .detail-field{padding:9px 0;overflow-wrap:anywhere}
+.profile-grid .detail-field:last-child{border-bottom:0}
+#company-rows[aria-busy=true]{opacity:.66}
+#company-rows tr:focus-within,#preview-rows tr:focus-within{background:var(--panel2)}
+textarea{font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical;min-width:0}
+#mail-dialog .actions>button{white-space:normal}
+#mail-dialog #mail-result,#mail-config-status{overflow-wrap:anywhere;color:var(--muted)}
+@media(max-height:500px){#detail .dialog-head,#mail-dialog>.panel-head{position:static}}
+@media(prefers-reduced-motion:reduce){#company-rows{transition:none}}

@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Polish loading, focus and profile dialogs; repair obsolete visual-test navigation.
+- Build standalone Windows and Linux update clients with pinned Ed25519 trust anchor, bounded HTTPS downloads, signed manifests and explicit installer confirmation.
+
 - Use Crawlvora branding throughout the visible desktop interface, remove the provenance tab and raw provider links while retaining underlying provenance and alternate values in history.
 - Add isolated signed update staging and authenticated worker load measurements.
 

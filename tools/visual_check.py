@@ -58,7 +58,7 @@ with sync_playwright() as p:
     page.evaluate('(id)=>detail(id)',companies['rows'][0]['id']); page.wait_for_timeout(120); assert page.locator('#detail').is_visible()
     box=page.locator('#detail').bounding_box(); assert box['width']<=width+1 and box['height']<=height+1,(lang,theme,width,height,box)
     if width in (1440,390): page.screenshot(path=str(out/f'{prefix}detail-{theme}-{width}-fixture.png'))
-    page.locator('[data-profile-tab="history"]').click(); assert page.locator('.history-block').is_visible() and not page.locator('.profile-property').first.is_visible(); page.locator('[data-profile-tab="sources"]').click(); assert page.locator('.profile-sources').is_visible() and not page.locator('.history-block').is_visible(); page.locator('#close-detail').click(); assert not page.locator('#detail').is_visible(); results.append((lang,theme,width,'detail',box['width']))
+    page.locator('[data-profile-tab="history"]').click(); assert page.locator('.history-block').is_visible() and not page.locator('.profile-property').first.is_visible(); assert page.locator('[data-profile-tab="sources"]').count()==0; page.locator('[data-profile-tab="registry"]').click(); assert page.locator('.profile-registry').is_visible() and not page.locator('.history-block').is_visible(); page.locator('#close-detail').click(); assert not page.locator('#detail').is_visible(); results.append((lang,theme,width,'detail',box['width']))
   page.close()
  b.close()
 print('errors',errors,'layout',results)

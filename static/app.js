@@ -19,8 +19,10 @@ const fail = (e) => toast(e instanceof Error ? e.message : translate('Pogreška 
 function post(path, data) { return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token }, body: JSON.stringify(data) }); }
 function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value, industry: $('industry-filter').value }); }
 function download(filtered = false) { location.href = '/api/export' + (filtered ? '?' + filters() : ''); }
-function go(view) { if (view !== 'directory')
-    directoryRequest?.abort(); current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
+function go(view) { if (view !== 'directory') {
+    directoryRequest?.abort();
+    $('company-rows').removeAttribute('aria-busy');
+} current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
     e.setAttribute('aria-current', 'page');
 else
     e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), registry: 'Crawlvora', data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
@@ -103,15 +105,19 @@ async function industries() {
     select.value = old;
 }
 let directoryRequest;
-async function directory() { directoryRequest?.abort(); const controller = new AbortController(); directoryRequest = controller; const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); let d; try {
+async function directory() { directoryRequest?.abort(); const controller = new AbortController(); directoryRequest = controller; const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); $('company-rows').setAttribute('aria-busy', 'true'); $('result-count').textContent = 'Učitavanje…'; $('prev').disabled = true; $('next').disabled = true; let d; try {
     d = await api('/api/companies?' + p, { signal: controller.signal });
 }
 catch (e) {
     if (controller.signal.aborted)
         return;
+    if (seq === serial) {
+        $('result-count').textContent = 'Pretraga nije uspjela. Pokušajte ponovno.';
+        $('company-rows').removeAttribute('aria-busy');
+    }
     throw e;
 } if (seq !== serial)
-    return; total = d.total; const pages = Math.max(1, Math.ceil(total / 25)); if (page > pages) {
+    return; $('company-rows').removeAttribute('aria-busy'); total = d.total; const pages = Math.max(1, Math.ceil(total / 25)); if (page > pages) {
     page = pages;
     return directory();
 } rows('company-rows', d.rows); $('result-count').textContent = n(total) + translate(' rezultata'); $('page-label').textContent = translate('Stranica ') + n(page) + translate(' od ') + n(pages); $('prev').disabled = page <= 1; $('next').disabled = page >= pages; }
@@ -169,9 +175,12 @@ async function detail(id) {
     body.append(hist);
     addRegistryProfile(id, body);
     setProfileTab('details');
-    $('detail').showModal();
+    if (!$('detail').open)
+        $('detail').showModal();
     try {
         const changes = await api('/api/history/' + id);
+        if (request !== detailSequence)
+            return;
         if (!changes.length)
             hist.append(make('p', translate('Nema zabilježenih promjena od ove verzije.'), 'muted'));
         for (const r of changes) {
@@ -192,7 +201,7 @@ document.querySelectorAll('[data-go]').forEach(e => e.addEventListener('click', 
     go(e.dataset.go); }));
 $('all-export').onclick = () => download();
 $('filtered-export').onclick = () => download(true);
-$('close-detail').onclick = () => $('detail').close();
+$('close-detail').onclick = () => { detailSequence++; $('detail').close(); };
 $('prev').onclick = () => { page--; directory().catch(fail); };
 $('next').onclick = () => { page++; directory().catch(fail); };
 let debounce;

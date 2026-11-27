@@ -170,6 +170,18 @@ jobs:
           sudo apt-get install -y ./release-assets/Crawlvora-Linux-amd64.deb
           WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /usr/bin/crawlvora --native-smoke
           sudo apt-get remove -y crawlvora
+      - name: Build standalone signed-update client
+        shell: bash
+        run: |
+          python -m PyInstaller --paths src --noconfirm --clean --onefile --console --name CrawlvoraUpdate src/update_client.py
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp dist/CrawlvoraUpdate.exe release-assets/Update.exe
+            release-assets/Update.exe --version
+          else
+            cp dist/CrawlvoraUpdate release-assets/crawlvora-update
+            chmod 755 release-assets/crawlvora-update
+            release-assets/crawlvora-update --version
+          fi
       - name: Enforce package size budgets
         shell: bash
         env:
