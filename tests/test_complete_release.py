@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from tools.complete_release import REQUIRED, COMPACT_REQUIRED, COMPACT_PACKAGES, verify
+from tools.complete_release import REQUIRED, COMPACT_REQUIRED, COMPACT_PACKAGES, verify, verify_remote
 from tools.sign_release_updates import sign
 from update_verification import TARGETS
 
@@ -71,3 +71,17 @@ class CompleteReleaseTests(unittest.TestCase):
             path.write_bytes(raw)
         (self.root/"REGISTRY-HR-MANIFEST.json").write_text("{}")
         with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public,mode="online")
+
+    def test_remote_uploads_must_match_all_eleven_local_files(self):
+        for path in self.root.iterdir():
+            if path.name not in COMPACT_REQUIRED:path.unlink()
+        rows=[{"name":p.name,"state":"uploaded","size":p.stat().st_size,
+               "digest":"sha256:"+hashlib.sha256(p.read_bytes()).hexdigest()} for p in self.root.iterdir()]
+        self.assertEqual(verify_remote(self.root,[rows[:5],rows[5:]]),11)
+        for i in range(len(rows)):
+            with self.assertRaises(ValueError):verify_remote(self.root,[rows[:i]+rows[i+1:]])
+        with self.assertRaises(ValueError):verify_remote(self.root,[rows,[rows[0]]])
+        for key,value in (("state","starter"),("digest","sha256:"+"0"*64),("size",0),("name","unexpected.exe")):
+            changed=[dict(row) for row in rows]
+            changed[0][key]=value
+            with self.assertRaises(ValueError):verify_remote(self.root,[changed])
