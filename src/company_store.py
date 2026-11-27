@@ -22,7 +22,9 @@ class Store:
             for col in ('oib','email','industry','entity_kind'):
                 if col not in existing: c.execute(f"ALTER TABLE companies ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
             c.execute("CREATE INDEX IF NOT EXISTS idx_entity_kind ON companies(entity_kind)")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_industry ON companies(industry)")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_industry_title ON companies(industry,title COLLATE NOCASE,id)")
+            c.execute("DROP INDEX IF EXISTS idx_industry")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_email_present_title ON companies(title COLLATE NOCASE,id) WHERE email<>''")
             c.execute("CREATE INDEX IF NOT EXISTS idx_oib ON companies(oib)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_mbs ON companies(mbs)")
             c.execute("CREATE TABLE IF NOT EXISTS origins (company_id INTEGER NOT NULL, provider TEXT NOT NULL, url TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(company_id,provider,url), FOREIGN KEY(company_id) REFERENCES companies(id))")

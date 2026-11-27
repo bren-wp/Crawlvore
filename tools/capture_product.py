@@ -1,4 +1,4 @@
-"""Capture the running English UI against a disposable synthetic workspace."""
+"""Capture the running Croatian UI against a disposable synthetic workspace."""
 import argparse
 import os
 from pathlib import Path
@@ -26,7 +26,7 @@ def capture(output):
             for index, name in enumerate(("Atlas Demo", "Birch Demo", "Cedar Demo",
                                           "Delta Demo", "Elm Demo", "Fjord Demo")):
                 store.upsert(conn, {"title": name, "city": ("Zagreb", "Rijeka", "Split")[index % 3],
-                                    "website": "https://example.invalid", "entity_kind": "company"})
+                                    "website": "https://example.invalid", "entity_kind": "company", "email": "kontakt@example.invalid" if index == 0 else ""})
             conn.execute("INSERT INTO meta(key,value) VALUES ('seeded','1')")
             conn.execute("INSERT INTO meta(key,value) VALUES ('ui_language','en')")
         env = {k: v for k, v in os.environ.items()
@@ -66,6 +66,12 @@ def capture(output):
                     page.locator("#company-rows .textbtn").first.click()
                     expect(page.locator("#detail")).to_be_visible()
                     shot("profile-dark")
+                    page.locator('#detail').get_by_role('button',name='Sastavi e-poštu').click()
+                    expect(page.locator('#mail-dialog')).to_be_visible()
+                    page.locator('#mail-template').select_option('security')
+                    expect(page.locator('#mail-subject')).to_have_value('Sigurnosno upozorenje – provjerite sumnjive poruke')
+                    shot("mail-dark")
+                    page.locator('#mail-close').click()
                     page.locator("#close-detail").click()
                     browser.close()
                 worker.stdin.close()

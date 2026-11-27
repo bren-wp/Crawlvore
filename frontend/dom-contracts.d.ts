@@ -1,5 +1,23 @@
 // DOM bindings shared by the classic-script frontend. No emitted runtime code.
 interface InterfaceElements {
+  "mail-dialog":HTMLDialogElement;
+  "mail-company":HTMLElement;
+  "mail-host":HTMLInputElement;
+  "mail-port":HTMLSelectElement;
+  "mail-user":HTMLInputElement;
+  "mail-sender":HTMLInputElement;
+  "mail-password":HTMLInputElement;
+  "mail-config-status":HTMLElement;
+  "mail-recipient":HTMLInputElement;
+  "mail-template":HTMLSelectElement;
+  "mail-subject":HTMLInputElement;
+  "mail-body":HTMLTextAreaElement;
+  "mail-basis":HTMLSelectElement;
+  "mail-confirm":HTMLInputElement;
+  "mail-send":HTMLButtonElement;
+  "mail-result":HTMLElement;
+  "mail-history":HTMLElement;
+
   "industry-filter":HTMLSelectElement;
   "entity-kind":HTMLSelectElement;
   "export-selected":HTMLButtonElement;

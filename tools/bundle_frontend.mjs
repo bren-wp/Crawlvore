@@ -5,7 +5,7 @@ import { join } from 'node:path';
 const source = '.frontend-build';
 const order = ['app', 'registry-controller', 'analytics-settings',
   'recovery-controller', 'protected-backups-controller',
-  'registry-profile'];
+  'registry-profile', 'mail-controller'];
 const expected = [...order, 'locale'].map(name => name + '.js').sort();
 const actual = readdirSync(source).sort();
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {

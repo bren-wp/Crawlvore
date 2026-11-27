@@ -19,7 +19,8 @@ const fail = (e) => toast(e instanceof Error ? e.message : translate('Pogreška 
 function post(path, data) { return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token }, body: JSON.stringify(data) }); }
 function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value, industry: $('industry-filter').value }); }
 function download(filtered = false) { location.href = '/api/export' + (filtered ? '?' + filters() : ''); }
-function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
+function go(view) { if (view !== 'directory')
+    directoryRequest?.abort(); current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
     e.setAttribute('aria-current', 'page');
 else
     e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), registry: translate('Crawlvora Sync'), data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
@@ -101,57 +102,106 @@ async function industries() {
         select.add(new Option(value, value));
     select.value = old;
 }
-async function directory() { const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); const d = await api('/api/companies?' + p); if (seq !== serial)
+let directoryRequest;
+async function directory() { directoryRequest?.abort(); const controller = new AbortController(); directoryRequest = controller; const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); let d; try {
+    d = await api('/api/companies?' + p, { signal: controller.signal });
+}
+catch (e) {
+    if (controller.signal.aborted)
+        return;
+    throw e;
+} if (seq !== serial)
     return; total = d.total; const pages = Math.max(1, Math.ceil(total / 25)); if (page > pages) {
     page = pages;
     return directory();
 } rows('company-rows', d.rows); $('result-count').textContent = n(total) + translate(' rezultata'); $('page-label').textContent = translate('Stranica ') + n(page) + translate(' od ') + n(pages); $('prev').disabled = page <= 1; $('next').disabled = page >= pages; }
 const detailFields = { entity_kind: translate('Vrsta subjekta'), oib: 'OIB', email: translate('Poslovni e-mail'), industry: translate('Djelatnost'), address: translate('Adresa'), postal: translate('Poštanski broj'), city: translate('Grad'), country: translate('Država'), phone: translate('Telefon'), fax: translate('Telefon / faks'), website: translate('Web stranica'), social: translate('Društvene mreže'), person: translate('Kontakt osoba'), year: translate('Godina osnivanja'), employees: translate('Broj zaposlenih'), account: translate('Broj računa'), mbs: 'MBS', rating: translate('Ocjena'), description: translate('Opis'), products: translate('Proizvodi i usluge') };
-async function detail(id) { const r = await api('/api/company/' + id); $('detail-title').textContent = r.title; $('detail-sub').textContent = [r.city, r.country].filter(Boolean).join(' · '); const body = $('detail-body'); body.replaceChildren(); for (const [key, label] of Object.entries(detailFields)) {
-    const el = make('div', undefined, 'detail-field profile-property');
-    el.append(make('small', label, 'muted'));
-    const u = ['website', 'social', 'logo', 'source'].includes(key) && safeLink(r[key]);
-    if (u) {
-        const a = make('a', u);
-        a.href = u;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        el.append(a);
+let detailSequence = 0;
+async function detail(id) {
+    const request = ++detailSequence;
+    const r = await api('/api/company/' + id);
+    if (request !== detailSequence)
+        return;
+    $('detail-title').textContent = r.title;
+    $('detail-sub').textContent = [r.city, r.country].filter(Boolean).join(' · ');
+    const body = $('detail-body');
+    body.replaceChildren();
+    const groups = { 'Identifikacija i djelatnost': ['oib', 'mbs', 'entity_kind', 'industry', 'year'], 'Kontakt i sjedište': ['email', 'phone', 'fax', 'website', 'social', 'address', 'postal', 'city', 'country', 'person'], 'Poslovni podaci': ['employees', 'account', 'rating', 'description', 'products'] };
+    for (const [heading, keys] of Object.entries(groups)) {
+        const group = make('section', undefined, 'profile-property profile-group');
+        group.append(make('h3', heading));
+        const fields = make('div', undefined, 'profile-grid');
+        for (const key of keys) {
+            const el = make('div', undefined, 'detail-field');
+            el.append(make('small', detailFields[key], 'muted'));
+            const u = ['website', 'social'].includes(key) && safeLink(r[key]);
+            if (u) {
+                const a = make('a', u);
+                a.href = u;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                el.append(a);
+            }
+            else
+                el.append(make('div', r[key] || '—'));
+            if (key === 'email' && typeof r.email === 'string' && r.email.trim()) {
+                const button = make('button', 'Sastavi e-poštu', 'btn secondary small');
+                button.onclick = () => openMail(r).catch(fail);
+                el.append(button);
+            }
+            fields.append(el);
+        }
+        group.append(fields);
+        body.append(group);
     }
-    else
-        el.append(make('div', r[key] || '—'));
-    body.append(el);
-} const src = make('div', undefined, 'detail-field profile-sources'); src.append(make('h3', translate('Podrijetlo podataka'))); if (!(r.sources || []).length)
-    src.append(make('p', translate('Nema povezanih izvora.'), 'muted')); for (const x of r.sources || []) {
-    src.append(make('div', (providerNames[x.provider] || x.provider) + ' · ' + x.updated));
-    const u = safeLink(x.url);
-    if (u) {
-        const a = make('a', u);
-        a.href = u;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        src.append(a);
+    const src = make('div', undefined, 'detail-field profile-sources');
+    src.append(make('h3', translate('Podrijetlo podataka')));
+    if (!(r.sources || []).length)
+        src.append(make('p', translate('Nema povezanih izvora.'), 'muted'));
+    for (const x of r.sources || []) {
+        src.append(make('div', (providerNames[x.provider] || x.provider) + ' · ' + x.updated));
+        const u = safeLink(x.url);
+        if (u) {
+            const a = make('a', u);
+            a.href = u;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            src.append(a);
+        }
     }
-} const alt = make('div', undefined, 'alternate-values'); alt.append(make('h3', translate('Sačuvane alternativne vrijednosti'))); if (!(r.alternate_values || []).length)
-    alt.append(make('p', translate('Nema alternativnih vrijednosti.'), 'muted')); for (const v of r.alternate_values || []) {
-    const item = make('div', undefined, 'history-event');
-    item.append(make('strong', detailFields[v.field] || v.field), make('p', v.value), make('small', (providerNames[v.provider] || v.provider) + ' · ' + v.observed_at + ' UTC', 'muted'));
-    alt.append(item);
-} src.append(alt); body.append(src); const hist = make('div', undefined, 'detail-field history-block'); hist.append(make('h3', translate('Povijest promjena'))); body.append(hist); addRegistryProfile(id, body); setProfileTab('details'); $('detail').showModal(); try {
-    const changes = await api('/api/history/' + id);
-    if (!changes.length)
-        hist.append(make('p', translate('Nema zabilježenih promjena od ove verzije.'), 'muted'));
-    for (const r of changes) {
-        const group = make('div', undefined, 'history-event');
-        group.append(make('strong', r.changed_at + ' UTC · ' + (providerNames[r.provider] || r.provider)));
-        for (const [k, v] of Object.entries(r.changes))
-            group.append(make('p', (detailFields[k] || k) + ': ' + (v.before || '—') + ' → ' + (v.after || '—')));
-        hist.append(group);
+    const alt = make('div', undefined, 'alternate-values');
+    alt.append(make('h3', translate('Sačuvane alternativne vrijednosti')));
+    if (!(r.alternate_values || []).length)
+        alt.append(make('p', translate('Nema alternativnih vrijednosti.'), 'muted'));
+    for (const v of r.alternate_values || []) {
+        const item = make('div', undefined, 'history-event');
+        item.append(make('strong', detailFields[v.field] || v.field), make('p', v.value), make('small', (providerNames[v.provider] || v.provider) + ' · ' + v.observed_at + ' UTC', 'muted'));
+        alt.append(item);
+    }
+    src.append(alt);
+    body.append(src);
+    const hist = make('div', undefined, 'detail-field history-block');
+    hist.append(make('h3', translate('Povijest promjena')));
+    body.append(hist);
+    addRegistryProfile(id, body);
+    setProfileTab('details');
+    $('detail').showModal();
+    try {
+        const changes = await api('/api/history/' + id);
+        if (!changes.length)
+            hist.append(make('p', translate('Nema zabilježenih promjena od ove verzije.'), 'muted'));
+        for (const r of changes) {
+            const group = make('div', undefined, 'history-event');
+            group.append(make('strong', r.changed_at + ' UTC · ' + (providerNames[r.provider] || r.provider)));
+            for (const [k, v] of Object.entries(r.changes))
+                group.append(make('p', (detailFields[k] || k) + ': ' + (v.before || '—') + ' → ' + (v.after || '—')));
+            hist.append(group);
+        }
+    }
+    catch (e) {
+        hist.append(make('p', translate('Povijest nije dostupna.'), 'muted'));
     }
 }
-catch (e) {
-    hist.append(make('p', translate('Povijest nije dostupna.'), 'muted'));
-} }
 document.querySelectorAll('[data-view]').forEach(e => e.addEventListener('click', () => { if (e.dataset.view)
     go(e.dataset.view); }));
 document.querySelectorAll('[data-go]').forEach(e => e.addEventListener('click', () => { if (e.dataset.go)
@@ -770,3 +820,143 @@ function addRegistryProfile(id, body) {
     prev.onclick = () => { offset = Math.max(0, offset - 25); void load(); };
     void load();
 }
+'use strict';
+let mailCompany = 0, mailBusy = false, mailConfigured = false;
+const mailStates = { pending: 'Ishod još nije potvrđen', accepted: 'SMTP je prihvatio poruku', unknown: 'Ishod nepoznat — provjerite prije ponovnog slanja', rejected: 'Odbijeno' };
+function mailControls() { $('mail-send').disabled = mailBusy || !mailConfigured || !$('mail-confirm').checked || !$('mail-basis').value || !$('mail-subject').value.trim() || !$('mail-body').value.trim(); }
+async function mailSettings() {
+    const s = await api('/api/mail/settings');
+    mailConfigured = s.configured;
+    $('mail-config-status').textContent = s.configured ? 'SMTP pristup spremljen.' : s.vault_available ? 'SMTP nije konfiguriran.' : 'Sigurna pohrana nije dostupna.';
+    $('mail-host').value = s.host || '';
+    $('mail-port').value = String(s.port || 587);
+    $('mail-user').value = s.username || '';
+    $('mail-sender').value = s.sender || '';
+    mailControls();
+}
+async function mailHistory() {
+    const company = mailCompany, entries = await api('/api/mail/history?company_id=' + company);
+    if (company !== mailCompany)
+        return;
+    const target = $('mail-history');
+    target.replaceChildren();
+    if (!entries.length)
+        target.append(make('p', 'Nema evidentiranih poruka.', 'muted'));
+    for (const entry of entries) {
+        const item = make('div', undefined, 'history-event');
+        item.append(make('strong', entry.subject), make('p', entry.recipient), make('small', new Date(entry.created * 1000).toLocaleString('hr-HR') + ' · ' + (mailStates[entry.state] || entry.state)));
+        target.append(item);
+    }
+}
+async function openMail(company) {
+    if (mailBusy)
+        return;
+    if (typeof company.email !== 'string' || !company.email.trim())
+        throw Error('Subjekt nema adresu e-pošte.');
+    mailCompany = company.id;
+    $('mail-company').textContent = company.title;
+    $('mail-recipient').value = company.email.trim();
+    $('mail-template').value = 'custom';
+    $('mail-subject').value = '';
+    $('mail-body').value = '';
+    $('mail-basis').value = '';
+    $('mail-confirm').checked = false;
+    $('mail-password').value = '';
+    $('mail-result').textContent = '';
+    mailConfigured = false;
+    mailControls();
+    $('mail-dialog').showModal();
+    await Promise.all([mailSettings(), mailHistory()]);
+}
+$('mail-close').onclick = () => { if (!mailBusy)
+    $('mail-dialog').close(); };
+$('mail-dialog').addEventListener('cancel', e => { if (mailBusy)
+    e.preventDefault(); });
+$('mail-dialog').addEventListener('close', () => { $('mail-password').value = ''; $('mail-subject').value = ''; $('mail-body').value = ''; $('mail-confirm').checked = false; });
+$('mail-save').onclick = async () => {
+    if (mailBusy)
+        return;
+    try {
+        if (!confirm('Spremiti pristupne podatke u sigurnu pohranu operacijskog sustava?'))
+            return;
+        mailBusy = true;
+        mailControls();
+        await post('/api/mail/configure', { host: $('mail-host').value.trim(), port: Number($('mail-port').value), username: $('mail-user').value, password: $('mail-password').value, sender: $('mail-sender').value.trim(), confirmed: true });
+        await mailSettings();
+    }
+    catch (e) {
+        $('mail-result').textContent = e instanceof Error ? e.message : 'Postavke nisu spremljene.';
+    }
+    finally {
+        $('mail-password').value = '';
+        mailBusy = false;
+        mailControls();
+    }
+};
+$('mail-forget').onclick = async () => { if (mailBusy || !confirm('Ukloniti SMTP pristup iz sigurne pohrane?'))
+    return; try {
+    mailBusy = true;
+    mailControls();
+    await post('/api/mail/forget', {});
+    await mailSettings();
+}
+catch (e) {
+    $('mail-result').textContent = e instanceof Error ? e.message : 'Pristup nije uklonjen.';
+}
+finally {
+    mailBusy = false;
+    mailControls();
+} };
+$('mail-template').onchange = async () => { if (mailBusy)
+    return; try {
+    const key = $('mail-template').value;
+    const templates = await api('/api/mail/templates');
+    if ($('mail-template').value === key) {
+        $('mail-subject').value = templates[key].subject;
+        $('mail-body').value = templates[key].body;
+        mailControls();
+    }
+}
+catch (e) {
+    fail(e);
+} };
+for (const id of ['mail-subject', 'mail-body', 'mail-basis', 'mail-confirm'])
+    $(id).addEventListener('input', mailControls);
+$('mail-block').onclick = async () => { if (mailBusy || !confirm('Zabraniti buduće slanje na ovu adresu?'))
+    return; try {
+    mailBusy = true;
+    mailControls();
+    await post('/api/mail/block', { recipient: $('mail-recipient').value, confirmed: true });
+    $('mail-result').textContent = 'Adresa je dodana na popis zabrane slanja.';
+    $('mail-confirm').checked = false;
+}
+catch (e) {
+    fail(e);
+}
+finally {
+    mailBusy = false;
+    mailControls();
+} };
+$('mail-send').onclick = async () => {
+    if (mailBusy || $('mail-send').disabled)
+        return;
+    const recipient = $('mail-recipient').value, subject = $('mail-subject').value, body = $('mail-body').value, basis = $('mail-basis').value;
+    if (!confirm('Poslati jednu poruku na ' + recipient + '?\n\nPredmet: ' + subject))
+        return;
+    mailBusy = true;
+    mailControls();
+    $('mail-result').textContent = 'Slanje je u tijeku…';
+    try {
+        const r = await post('/api/mail/send', { company_id: mailCompany, recipient, subject, body, basis, confirmed: true, request_id: crypto.randomUUID() });
+        $('mail-result').textContent = mailStates[r.state] || 'Ishod nije potvrđen.';
+        await mailHistory();
+    }
+    catch (e) {
+        $('mail-result').textContent = (e instanceof Error ? e.message : 'Ishod nije potvrđen.') + ' Provjerite evidenciju prije ponavljanja.';
+    }
+    finally {
+        $('mail-confirm').checked = false;
+        mailBusy = false;
+        mailControls();
+    }
+};

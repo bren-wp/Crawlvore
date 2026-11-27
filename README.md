@@ -30,6 +30,7 @@ Explore the Croatian Court Registry, discover company information and turn local
 | 🗓️ **Tasks & Schedule** | Manage synchronization tasks and scheduled updates while the application is running. |
 | 📥 **Import & Export** | Import CSV or JSON; export directory records to CSV, JSON or Excel and registry categories to additional formats. |
 | 🛡️ **Data protection** | Keep your working database local, create verified backups and recover into a separate workspace. |
+| ✉️ **Crawlvora Mail** | Compose individual correspondence and security notices from a company profile, using your own TLS SMTP account. [Mail guide](docs/MAIL.md). |
 
 ## Explore the workspace
 
@@ -43,6 +44,8 @@ Actual desktop application interface, captured from a disposable synthetic works
 | ![Business Directory](docs/screenshots/directory-dark.jpg) | ![Company Profile](docs/screenshots/profile-dark.jpg) |
 
 ![Crawlvora Sync](docs/screenshots/registry-dark.jpg)
+
+![Crawlvora Mail](docs/screenshots/mail-dark.jpg)
 
 | Tasks & Schedule | Import & Export |
 |---|---|

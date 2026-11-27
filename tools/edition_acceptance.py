@@ -35,18 +35,21 @@ def record(root,edition,source,hr):
         json.dump(receipt,out,sort_keys=True,indent=2);out.flush();os.fsync(out.fileno())
     return receipt
 
-def verify(root,source,manifest):
+def verify_edition(root,source,manifest,edition):
     root=Path(root);source=sha(source,40)
-    snapshots={country:sha(manifest[country]['database_sha256'],64) for country in ('HR',)}
-    for edition,countries in EDITIONS.items():
-        path=root/('acceptance-'+edition+'.json')
-        if path.is_symlink() or not path.is_file() or path.stat().st_size>16384:
-            raise ValueError('Missing or invalid edition acceptance: '+edition)
-        actual=json.loads(path.read_text(encoding='utf-8'))
-        expected={'edition':edition,'source_commit':source,
-                  'snapshots':{country:snapshots[country] for country in countries},
-                  'assets':{name:file_info(root/name) for name in names(edition)}}
-        if actual!=expected:raise ValueError('Edition acceptance mismatch: '+edition)
+    countries=EDITIONS[edition]
+    path=root/('acceptance-'+edition+'.json')
+    if path.is_symlink() or not path.is_file() or path.stat().st_size>16384:
+        raise ValueError('Missing or invalid edition acceptance: '+edition)
+    actual=json.loads(path.read_text(encoding='utf-8'))
+    expected={'edition':edition,'source_commit':source,
+              'snapshots':{country:sha(manifest[country]['database_sha256'],64) for country in countries},
+              'assets':{name:file_info(root/name) for name in names(edition)}}
+    if actual!=expected:raise ValueError('Edition acceptance mismatch: '+edition)
+
+def verify(root,source,manifest):
+    for edition in EDITIONS:
+        verify_edition(root,source,manifest,edition)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)

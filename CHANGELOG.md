@@ -2,6 +2,13 @@
 
 ## 8.1.7
 
+- Add index-backed category ordering and sparse e-mail contact lookup.
+- Introduce signed update manifest and bounded package verification with edition and rollback checks; execution is not yet enabled.
+
+- Add single-recipient TLS SMTP correspondence with OS vault, explicit confirmation, security notice template, suppression list, and persistent delivery status.
+- Group company profiles and abort stale client-side directory requests.
+- Separate database-free publication from the restricted full catalog release.
+
 - Project official primary NKD activity codes with revision labels and add a directory/export activity filter.
 
 - Separate download and directory-projection progress, commit completion atomically, and refresh the business directory immediately after successful synchronization.

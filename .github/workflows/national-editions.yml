@@ -12,7 +12,22 @@ concurrency:
   group: croatian-editions-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    outputs:
+      private: ${{ steps.visibility.outputs.private }}
+    steps:
+      - id: visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          private="$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)"
+          case "$private" in true|false) ;; *) exit 1;; esac
+          echo "private=$private" >> "$GITHUB_OUTPUT"
   hr:
+    needs: scope
+    if: needs.scope.outputs.private == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -111,3 +126,45 @@ jobs:
           gh release view "$tag" --json assets > remote.json
           python -c 'import json,hashlib,pathlib; a=json.load(open("remote.json"))["assets"]; p=pathlib.Path("release"); assert {x["name"] for x in a}=={f.name for f in p.iterdir()}; assert all(x["size"]==(p/x["name"]).stat().st_size and x["digest"]=="sha256:"+hashlib.file_digest((p/x["name"]).open("rb"),"sha256").hexdigest() for x in a)'
           gh release edit "$tag" --draft=false --prerelease --latest=false
+
+  publish_online:
+    needs: [online, quality, vault]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: Crawlvora-native-*-HR-Online
+          path: packages
+      - name: Verify and assemble four database-free packages
+        run: |
+          set -euo pipefail
+          mkdir release
+          windows=packages/Crawlvora-native-Windows-HR-Online
+          linux=packages/Crawlvora-native-Linux-HR-Online
+          python -c 'from tools.edition_acceptance import verify_edition; import os,sys; verify_edition(sys.argv[1],os.environ["GITHUB_SHA"],{},"Online")' "$windows"
+          cp "$windows/Setup-Online.exe" release/Setup-HR-Online.exe
+          cp "$windows/Portable-Online.exe" release/Portable-HR-Online.exe
+          cp "$linux/Crawlvora-Linux-amd64.deb" release/Crawlvora-Linux-HR-Online-amd64.deb
+          cp "$linux/Crawlvora-Linux-x86_64.tar.gz" release/Crawlvora-Linux-HR-Online-x86_64.tar.gz
+          cd release
+          test "$(find . -type f | wc -l)" = 4
+          for f in *; do test -s "$f"; test "$(stat -c %s "$f")" -lt 2147483648; done
+          sha256sum * > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+      - name: Publish only database-free packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v$(tr -d '\r\n' < VERSION)-online"
+          gh release create "$tag" --draft --prerelease --latest=false --target "$GITHUB_SHA" --title "Crawlvora $tag" --notes 'Croatian Windows and Linux edition without a bundled database. Existing workspaces are preserved.' release/*
+          # Drafts are not necessarily returned by tag lookups in all API clients.
+          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name==\"$tag\" and .draft) | .id")"
+          test -n "$id"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate --slurp > remote.json
+          python -c 'import json,hashlib,pathlib; a=[x for page in json.load(open("remote.json")) for x in page]; p=pathlib.Path("release"); assert {x["name"] for x in a}=={f.name for f in p.iterdir()}; assert all(x["size"]==(p/x["name"]).stat().st_size and x["digest"]=="sha256:"+hashlib.file_digest((p/x["name"]).open("rb"),"sha256").hexdigest() for x in a)'
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -F prerelease=false -f make_latest=true --jq '.html_url'

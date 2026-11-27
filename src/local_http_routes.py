@@ -15,12 +15,14 @@ from snapshot_diff import compare
 from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
 from cryptography.exceptions import InvalidTag
+from crawlvora_mail import MailService, TEMPLATES
 
 
 def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                  import_lock, integrity, protected, queue, recovery,
                  registry, registry_access, search_integrity, selection, store,
                  transfers, ui_ready, ui_ready_lock):
+    mail=MailService(store,database.parent) if store is not None else None
     class Handler(LocalResponseHandler):
         def authorized(self):
             return allowed_host(single_header(self.headers,'Host'),self.server.server_port)
@@ -46,6 +48,9 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 if p.path in ('/app.js','/locale.js','/style.css','/logo.svg'):
                     return self.send_data((ROOT/'static'/p.path[1:]).read_bytes(),'text/javascript; charset=utf-8' if p.path.endswith('js') else ('image/svg+xml' if p.path.endswith('svg') else 'text/css; charset=utf-8'))
                 if p.path=='/api/registry/diff': return self.send_data(compare(registry,get('before'),get('after')))
+                if p.path=='/api/mail/settings': return self.send_data(mail.settings())
+                if p.path=='/api/mail/templates': return self.send_data(TEMPLATES)
+                if p.path=='/api/mail/history': return self.send_data(mail.history(int(get('company_id','0'))))
                 if p.path=='/api/jobs': return self.send_data(queue.summary())
                 if p.path.startswith('/api/history/'): return self.send_data(store.history(int(p.path.rsplit('/',1)[1])))
                 if p.path in ('/api/registry/export-xlsx','/api/registry/export-xml','/api/registry/export-sql'):
@@ -158,12 +163,21 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                             return self.send_data(import_file(store,staged,'json' if self.path=='/api/import-json' else 'csv'))
                     finally:
                         import_lock.release()
+                if self.path.startswith('/api/mail/') and n>65536:
+                    self.close_connection=True
+                    return self.send_data({'error':'Prevelik zahtjev e-pošte.'},status=413)
                 if n<0 or n>64*1024*1024: return self.send_data({'error':'Datoteka je prevelika (64 MB).'},status=413)
                 self.connection.settimeout(120)
                 raw=self.rfile.read(n)
                 if len(raw)!=n: raise ValueError('Incomplete request body.')
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
+                if self.path.startswith('/api/mail/'):
+                    if n>65536: raise ValueError('Prevelik zahtjev e-pošte.')
+                    if self.path=='/api/mail/configure': return self.send_data(mail.configure(data))
+                    if self.path=='/api/mail/forget': return self.send_data(mail.forget())
+                    if self.path=='/api/mail/block': return self.send_data(mail.block(data))
+                    if self.path=='/api/mail/send': return self.send_data(mail.send(data))
                 if self.path=='/api/recovery/encrypt':
                     if not isinstance(data,dict): raise ValueError('Invalid encryption request.')
                     password=data.get('password')

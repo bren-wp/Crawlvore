@@ -23,7 +23,7 @@ def run(count):
         with store.db() as c:
             c.execute('BEGIN IMMEDIATE')
             for i in range(count):
-                store.upsert(c,{'title':f'Synthetic company {i:07}','city':f'City {i%100:03}','phone':str(i),'mbs':str(i+1)},provider='registry')
+                store.upsert(c,{'title':f'Synthetic company {i:07}','city':f'City {i%100:03}','phone':str(i),'mbs':str(i+1),'industry':f'NKD {i%250:03}','email':f'contact{i}@example.invalid' if i%50==0 else ''},provider='registry')
                 if i%500==0:
                     company_id=c.execute('SELECT id FROM companies WHERE mbs=?',(str(i+1).zfill(9),)).fetchone()[0]
                     c.execute("INSERT INTO origins(company_id,provider,url) VALUES(?, 'csv', '')",(company_id,))
@@ -54,6 +54,13 @@ def run(count):
         assert store.query(provider='csv')['total']==expected
         assert store.query(provider='registry',city=city)['total']==(count+98)//100
         result['rare_provider_page']=measure(lambda:store.query(provider='csv'))
+        result['industry_page']=measure(lambda:store.query(industry='NKD 001'))
+        result['email_page']=measure(lambda:store.query(contact='email'))
+        with store.db() as c:
+            result['industry_plan']=[r[3] for r in c.execute("EXPLAIN QUERY PLAN SELECT id,title FROM companies WHERE industry=? ORDER BY title COLLATE NOCASE,id LIMIT 25",('NKD 001',))]
+            result['email_plan']=[r[3] for r in c.execute("EXPLAIN QUERY PLAN SELECT id,title FROM companies WHERE email<>'' ORDER BY title COLLATE NOCASE,id LIMIT 25")]
+        assert store.query(contact='email')['total']==(count+49)//50
+
         # Exercise the actual disk-backed production export rather than only the legacy in-memory API.
         output=root/'filtered.json'
         tracemalloc.start()

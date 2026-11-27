@@ -19,7 +19,7 @@ def run():
         store=Store(data/'companies.sqlite3')
         with store.db() as db:
             for i in range(60):
-                store.upsert(db,{'title':f'Demo company {i:03d}','mbs':f'{i+1:09d}','city':'Zagreb' if i%2 else 'Rijeka','phone':'012345' if i%3==0 else '', 'website':'https://example.invalid' if i%4==0 else ''},provider='csv')
+                store.upsert(db,{'title':f'Demo company {i:03d}','mbs':f'{i+1:09d}','city':'Zagreb' if i%2 else 'Rijeka','phone':'012345' if i%3==0 else '', 'email':'contact@example.invalid' if i==0 else '', 'website':'https://example.invalid' if i%4==0 else ''},provider='csv')
             db.execute("INSERT INTO meta(key,value) VALUES ('ui_language','en')")
 
         env={k:v for k,v in os.environ.items() if not k.startswith(('SUDREG_','CRAWLVORA_REGISTRY_'))}
@@ -72,6 +72,17 @@ def run():
                 expect(page.locator('.history-block')).to_be_visible()
                 page.locator('[data-profile-tab="details"]').click()
                 expect(page.locator('.profile-property').first).to_be_visible()
+                expect(page.locator('.profile-group')).to_have_count(3)
+                page.locator('#detail').get_by_role('button',name='Sastavi e-poštu').click()
+                expect(page.locator('#mail-dialog')).to_be_visible()
+                expect(page.locator('#mail-recipient')).to_have_value('contact@example.invalid')
+                expect(page.locator('#mail-send')).to_be_disabled()
+                page.locator('#mail-template').select_option('security')
+                expect(page.locator('#mail-subject')).to_have_value('Sigurnosno upozorenje – provjerite sumnjive poruke')
+                expect(page.locator('#mail-body')).not_to_have_value('')
+                expect(page.locator('#mail-send')).to_be_disabled()
+                page.locator('#mail-close').click()
+                expect(page.locator('#mail-dialog')).not_to_be_visible()
                 page.locator('#close-detail').click()
                 expect(page.locator('#detail')).not_to_be_visible()
                 page.locator('[data-view="registry"]').click()
