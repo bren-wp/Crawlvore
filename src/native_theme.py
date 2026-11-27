@@ -91,6 +91,58 @@ def install(root):
     style.map("TNotebook.Tab",background=[("selected",ACTIVE)],foreground=[("selected",ACCENT)])
     style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT,thickness=8)
 
+    install_control_states(root,style)
+
+def install_control_states(root,style):
+    """Keep live clam controls and use the product palette in every state."""
+    style.configure(".",focuscolor=ACCENT,focusthickness=2,focussolid=True)
+    for name,fill,fg,hover,pressed in (
+        ("TButton",PANEL2,TEXT,"#21394b",ACTIVE),
+        ("Small.TButton",PANEL2,TEXT,"#21394b",ACTIVE),
+        ("Accent.TButton",ACCENT,INK,"#51efc5","#26cda3"),
+        ("Nav.TButton",SIDE,TEXT,PANEL2,ACTIVE),
+        ("Active.Nav.TButton",ACTIVE,ACCENT,ACTIVE,ACTIVE),
+    ):
+        edge=ACCENT if name=="Accent.TButton" else LINE
+        borders=[("disabled",LINE),("focus",ACCENT),("active",ACCENT if name=="Accent.TButton" else LINE)]
+        style.configure(name,background=fill,foreground=fg,bordercolor=edge,
+                        lightcolor=fill,darkcolor=fill,focuscolor=ACCENT if fg!=INK else INK)
+        colors=[("disabled",PANEL),("pressed",pressed),("active",hover)]
+        style.map(name,background=colors,lightcolor=colors,darkcolor=colors,
+                  foreground=[("disabled",MUTED)],bordercolor=borders)
+    for name in ("TEntry","TCombobox","TSpinbox"):
+        style.configure(name,fieldbackground=BG,foreground=TEXT,insertcolor=ACCENT,
+                        selectbackground=ACTIVE,selectforeground=TEXT,arrowcolor=MUTED,
+                        bordercolor=LINE,lightcolor=LINE)
+        style.map(name,fieldbackground=[("disabled",PANEL),("readonly",BG)],
+                  foreground=[("disabled",MUTED),("readonly",TEXT)],
+                  bordercolor=[("disabled",LINE),("focus",ACCENT)],
+                  lightcolor=[("disabled",LINE),("focus",ACCENT)],
+                  background=[("disabled",PANEL),("pressed",ACTIVE),("active",PANEL2),("readonly",PANEL2)],
+                  arrowcolor=[("disabled",MUTED),("active",ACCENT)])
+    for name in ("TCheckbutton","Panel.TCheckbutton","TRadiobutton"):
+        fill=PANEL if name.startswith("Panel.") else BG
+        style.configure(name,background=fill,foreground=TEXT,indicatorbackground=BG,
+                        indicatorforeground=ACCENT,upperbordercolor=LINE,lowerbordercolor=LINE)
+        style.map(name,background=[("active",fill)],foreground=[("disabled",MUTED)],
+                  indicatorbackground=[("disabled",PANEL),("pressed",ACTIVE),("selected",ACTIVE)],
+                  indicatorforeground=[("disabled",MUTED),("selected",ACCENT)],
+                  upperbordercolor=[("focus",ACCENT)],lowerbordercolor=[("focus",ACCENT)])
+    style.map("Treeview",background=[("disabled",PANEL),("selected",ACTIVE)],
+              foreground=[("disabled",MUTED),("selected",TEXT)],
+              bordercolor=[("focus",ACCENT)],lightcolor=[("focus",ACCENT)])
+    style.map("Treeview.Heading",background=[("pressed",ACTIVE),("active",PANEL2)],
+              foreground=[("active",TEXT)],lightcolor=[("active",PANEL2)],darkcolor=[("active",PANEL2)])
+    style.map("TNotebook.Tab",background=[("disabled",PANEL),("selected",ACTIVE),("active",PANEL2)],
+              foreground=[("disabled",MUTED),("selected",ACCENT)],
+              lightcolor=[("selected",ACTIVE),("!selected",PANEL2)],
+              darkcolor=[("selected",ACTIVE),("!selected",PANEL2)])
+    # Tk creates the dropdown as a separate listbox, outside ttk styling.
+    for option,value in (("background",BG),("foreground",TEXT),("selectBackground",ACTIVE),
+                         ("selectForeground",TEXT),("highlightColor",ACCENT),("font","{Segoe UI} -13")):
+        root.option_add("*TCombobox*Listbox."+option,value)
+
+
 def panel(parent,title=None,padding=15):
     box=ttk.Frame(parent,style="Panel.TFrame",padding=padding)
     if title:ttk.Label(box,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
