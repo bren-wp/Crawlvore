@@ -1,0 +1,86 @@
+[
+  {
+    "view": "overview",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  },
+  {
+    "view": "directory",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  },
+  {
+    "view": "jobs",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  },
+  {
+    "view": "data",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  },
+  {
+    "view": "analytics",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  },
+  {
+    "view": "registry",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  },
+  {
+    "view": "settings",
+    "capture": [
+      1436,
+      744
+    ],
+    "reference": [
+      1440,
+      900
+    ],
+    "changed_pixels_percent": null
+  }
+]

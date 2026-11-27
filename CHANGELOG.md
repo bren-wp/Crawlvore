@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Use final reference palette and compact desktop layout; move synchronization above Settings, add native navigation icons and a resizable non-maximized window with adaptive card grids and overflow access.
+- Capture actual native windows separately from reference screenshots and check seven pages at compact window sizes.
+
 - Add native settings, tasks, import/export and analytics candidate views with bounded authenticated streaming transfers.
 
 - Rebrand the visible application to Tvrtke, add official product and developer information, remove workspace badges, retain compatibility identifiers and existing data paths.

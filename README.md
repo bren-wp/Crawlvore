@@ -37,7 +37,7 @@ Istražite poslovne subjekte, pronađite relevantne informacije i organizirajte 
 ## Explore the workspace
 
 <!-- PRODUCT_SCREENSHOTS_START -->
-Actual desktop application interface, captured from a disposable synthetic workspace.
+Stvarne snimke postojećeg izdanja s demonstracijskim podacima. Nativni prikaz u razvoju prikazan je odvojeno ispod.
 
 ![Tvrtke Overview](docs/screenshots/overview-dark.jpg)
 
@@ -58,6 +58,25 @@ Actual desktop application interface, captured from a disposable synthetic works
 | ![Analytics](docs/screenshots/analytics-dark.jpg) | ![Settings](docs/screenshots/settings-dark.jpg) |
 
 <!-- PRODUCT_SCREENSHOTS_END -->
+
+### Tvrtke – nativno sučelje u razvoju
+
+Stvarne snimke prozora nativne aplikacije bez WebViewa, s demonstracijskim podacima. Ovaj prikaz još nije konačno stabilno izdanje.
+
+![Pregled imenika](docs/screenshots-native/overview.png)
+
+| Poslovni imenik | Uvoz i izvoz |
+|---|---|
+| ![Poslovni imenik](docs/screenshots-native/directory.png) | ![Uvoz i izvoz](docs/screenshots-native/data.png) |
+
+| Zadaci i raspored | Analitika i izvještaji |
+|---|---|
+| ![Zadaci](docs/screenshots-native/jobs.png) | ![Analitika](docs/screenshots-native/analytics.png) |
+
+| Tvrtke – sinkronizacija | Postavke |
+|---|---|
+| ![Sinkronizacija](docs/screenshots-native/registry.png) | ![Postavke](docs/screenshots-native/settings.png) |
+
 
 Hrvatsko sučelje s jedinstvenom tamnom temom.
 

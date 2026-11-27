@@ -10,7 +10,7 @@ STATES={"queued":"Na čekanju","retry_wait":"Čeka ponavljanje","running":"Aktiv
 
 class SecondaryPages:
     def section_header(self,view,kicker,title,description):
-        ttk.Label(view,text=kicker,foreground="#52d6b0").pack(anchor="w")
+        ttk.Label(view,text=kicker,style="Kicker.TLabel").pack(anchor="w")
         ttk.Label(view,text=title,style="Title.TLabel").pack(anchor="w",pady=(4,4))
         ttk.Label(view,text=description,style="Muted.TLabel").pack(anchor="w",pady=(0,16))
     def two_columns(self,view):
@@ -41,6 +41,7 @@ class SecondaryPages:
         self.job_metrics=tk.StringVar(value="—")
         ttk.Label(right,textvariable=self.job_metrics,justify="left").pack(anchor="w",pady=8)
         ttk.Label(right,text="Serijsko izvršavanje bez paralelnih zahtjeva.",wraplength=320,style="Muted.TLabel").pack(anchor="w")
+        self.register_grid(grid,2)
         history=ttk.LabelFrame(view,text="Povijest zadataka",padding=14);history.pack(fill="both",expand=True,pady=(8,0))
         self.job_table=ttk.Treeview(history,columns=("id","state","created","finished","attempts"),show="headings",height=6)
         for key,label,width in (("id","Br.",48),("state","Status",130),("created","Dodano (UTC)",150),("finished","Završeno (UTC)",150),("attempts","Pokušaji",65)):
@@ -84,6 +85,7 @@ class SecondaryPages:
         grid=self.two_columns(view)
         left=self.panel(grid,"Uvoz podataka",0)
         right=self.panel(grid,"Izvoz podataka",1)
+        self.register_grid(grid,2)
         self.import_path=None
         self.import_label=tk.StringVar(value="Nije odabrana datoteka.")
         ttk.Label(left,text="CSV ili JSON datoteka, najviše 2 GiB.",wraplength=360).pack(anchor="w",pady=8)
@@ -150,6 +152,7 @@ class SecondaryPages:
             panel=ttk.LabelFrame(top,text=label,padding=12);panel.grid(row=0,column=col,sticky="nsew",padx=(0,6))
             var=tk.StringVar(value="—");self.analytics_values[key]=var
             ttk.Label(panel,textvariable=var,font=("Segoe UI",22,"bold")).pack(anchor="w")
+        self.register_grid(top,4)
         grid=self.two_columns(view)
         left=self.panel(grid,"Najzastupljeniji gradovi",0)
         right=self.panel(grid,"Dostupnost podataka",1)
@@ -162,6 +165,7 @@ class SecondaryPages:
         exports=self.panel(grid,"Izvoz podataka",1,1)
         for label,route in (("CSV","/api/export"),("JSON","/api/export-json"),("Excel","/api/export-xlsx")):
             ttk.Button(exports,text="Izvoz "+label,command=lambda label=label,route=route:self.export_file(route,FORMATS[label],{})).pack(anchor="w",pady=4)
+        self.register_grid(grid,2)
     def refresh_analytics(self):
         if not self.client:return
         def done(result):
@@ -182,6 +186,7 @@ class SecondaryPages:
             panel=ttk.LabelFrame(metrics,text=label,padding=12);panel.grid(row=0,column=col,sticky="nsew",padx=(0,6))
             var=tk.StringVar(value="—");self.registry_values[key]=var
             ttk.Label(panel,textvariable=var,font=("Segoe UI",22,"bold")).pack(anchor="w")
+        self.register_grid(metrics,4)
         grid=ttk.Frame(view);grid.pack(fill="x")
         grid.columnconfigure(0,weight=1);grid.columnconfigure(1,weight=1)
         actions=self.panel(grid,"Osvježavanje poslovnih podataka",0)
@@ -201,6 +206,7 @@ class SecondaryPages:
         self.registry_progress=tk.StringVar(value="Nema aktivne sinkronizacije")
         ttk.Label(operation,textvariable=self.registry_progress,wraplength=300).pack(anchor="w",pady=8)
         self.registry_bar=ttk.Progressbar(operation,maximum=100);self.registry_bar.pack(fill="x",pady=8)
+        self.register_grid(grid,2)
         category_panel=ttk.LabelFrame(view,text="Preuzete kategorije",padding=12);category_panel.pack(fill="both",expand=True)
         self.registry_table=ttk.Treeview(category_panel,columns=("snapshot","category","rows","status"),show="headings",height=6)
         for key,label,width in (("snapshot","Snimka",90),("category","Kategorija",250),("rows","Redaka",130),("status","Status",100)):
@@ -249,7 +255,7 @@ class SecondaryPages:
         search=tk.StringVar();page=1
         toolbar=ttk.Frame(dialog,padding=8);toolbar.pack(fill="x")
         ttk.Entry(toolbar,textvariable=search).pack(side="left",fill="x",expand=True)
-        body=tk.Text(dialog,wrap="word",background="#111b2a",foreground="#edf2f9",relief="flat");body.pack(fill="both",expand=True,padx=8)
+        body=tk.Text(dialog,wrap="word",background="#101f2d",foreground="#edf4fa",relief="flat");body.pack(fill="both",expand=True,padx=8)
         def load():
             params={"snapshot":row["snapshot"],"category":row["category"],"page":page,"q":search.get()}
             def done(data):
