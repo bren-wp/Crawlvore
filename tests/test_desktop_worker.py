@@ -13,6 +13,35 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 class DesktopWorkerTests(unittest.TestCase):
+    def test_source_mode_requires_authentication_and_does_not_log_session(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with tempfile.TemporaryDirectory() as directory:
+            with tempfile.TemporaryFile(mode='w+b') as log:
+                p=subprocess.Popen([sys.executable,str(ROOT/'src/tvrtk_scraper.py'),'--no-browser','--port','0','--data-dir',directory],stdout=subprocess.PIPE,stderr=log,text=True,encoding='utf-8',env=dict(__import__('os').environ,PYTHONIOENCODING='utf-8'))
+                try:
+                    with ThreadPoolExecutor(max_workers=1) as pool:
+                        def session_line():
+                            for line in p.stdout:
+                                if '/session/' in line:return line.strip()
+                        future=pool.submit(session_line)
+                        try: url=future.result(timeout=30)
+                        except TimeoutError:p.kill();raise
+                    self.assertRegex(url,r'^http://127\.0\.0\.1:[0-9]+/session/[a-f0-9]{64}$')
+                    base,token=url.split('/session/')
+                    with self.assertRaises(urllib.error.HTTPError) as denied:urllib.request.urlopen(base+'/api/stats',timeout=5)
+                    self.assertEqual(denied.exception.code,403)
+                    denied.exception.close()
+                    opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+                    with opener.open(url,timeout=5) as response:self.assertIn(b'Crawlvora',response.read())
+                    with self.assertRaises(urllib.error.HTTPError) as denied:opener.open(base+'/api/stats?'+('&'.join('x'+str(i)+'=1' for i in range(65))),timeout=5)
+                    self.assertEqual(denied.exception.code,400)
+                    denied.exception.close()
+                    log.seek(0)
+                    self.assertNotIn(token.encode(),log.read())
+                finally:
+                    if p.poll() is None:p.terminate();p.wait(timeout=10)
+                    p.stdout.close()
+
     def test_worker_requires_session_and_exits_on_parent_eof(self):
         with tempfile.TemporaryDirectory() as directory:
             p=subprocess.Popen([sys.executable,str(ROOT/'src/tvrtk_scraper.py'),'--worker','--port','0','--data-dir',directory],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)

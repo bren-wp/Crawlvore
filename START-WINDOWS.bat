@@ -10,6 +10,6 @@ if errorlevel 1 goto error
 if errorlevel 1 goto error
 exit /b 0
 :error
-echo Pokretanje nije uspjelo. Provjerite instalaciju Python 3.10+ i mrezu.
+echo Pokretanje nije uspjelo. Provjerite instalaciju Python 3.12+ i mrezu.
 pause
 exit /b 1

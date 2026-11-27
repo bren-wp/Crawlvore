@@ -62,10 +62,10 @@ dialog{width:min(700px,calc(100% - 24px));padding:20px;border-color:color-mix(in
 .profile-tabs{display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:10px 0}
 .profile-tabs [aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 #detail-body .profile-property{grid-column:auto}
-#detail-body .profile-sources,#detail-body .history-block{grid-column:1/-1;padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);margin-top:10px}
-#detail-body .profile-sources h3,#detail-body .history-block h3{font-size:15px;margin:0 0 8px}
-#detail[data-profile-tab="history"] .profile-property,#detail[data-profile-tab="history"] .profile-sources,#detail[data-profile-tab="sources"] .profile-property,#detail[data-profile-tab="sources"] .history-block{display:none}
-#detail[data-profile-tab="sources"] .profile-sources,#detail[data-profile-tab="history"] .history-block{margin-bottom:8px}
+#detail-body .history-block{grid-column:1/-1;padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);margin-top:10px}
+#detail-body .history-block h3{font-size:15px;margin:0 0 8px}
+#detail[data-profile-tab="history"] .profile-property{display:none}
+#detail[data-profile-tab="history"] .history-block{margin-bottom:8px}
 @media(min-width:1101px){#overview .overview-grid .chart .track{height:7px}#overview .preview{margin-bottom:0}#overview .overview-grid{margin-bottom:12px}#overview .preview .table-wrap{max-height:300px}#overview .preview th{padding-top:7px;padding-bottom:7px}#overview .preview td:first-child{padding-left:17px}#overview .metrics .metric{min-height:89px}}
 @media(max-width:600px){#detail-body .profile-property{grid-column:1/-1}.profile-tabs .btn{font-size:11px;padding:7px 9px}}
 
@@ -130,7 +130,7 @@ dialog{max-width:calc(100% - 24px);max-height:calc(100vh - 24px);overscroll-beha
 
 .export-fields{min-width:0;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.export-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:2px 8px}.export-field-grid .check{margin:0;min-width:0;font-size:12px}.export-fields .actions{margin-top:6px;flex-wrap:wrap}
 
-#detail:not([data-profile-tab="registry"]) .profile-registry,#detail[data-profile-tab="registry"] .profile-property,#detail[data-profile-tab="registry"] .profile-sources,#detail[data-profile-tab="registry"] .history-block{display:none}.profile-registry{grid-column:1/-1}.profile-registry details{border-bottom:1px solid var(--line);padding:8px;overflow-wrap:anywhere}.profile-registry summary{cursor:pointer;font-weight:600}.profile-registry p{white-space:pre-wrap;overflow-wrap:anywhere}
+#detail:not([data-profile-tab="registry"]) .profile-registry,#detail[data-profile-tab="registry"] .profile-property,#detail[data-profile-tab="registry"] .history-block{display:none}.profile-registry{grid-column:1/-1}.profile-registry details{border-bottom:1px solid var(--line);padding:8px;overflow-wrap:anywhere}.profile-registry summary{cursor:pointer;font-weight:600}.profile-registry p{white-space:pre-wrap;overflow-wrap:anywhere}
 
 /* Keep complete contact values inside their own cells at every window size. */
 #overview td:nth-child(3),#directory td:nth-child(3){

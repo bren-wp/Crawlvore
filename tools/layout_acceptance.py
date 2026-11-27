@@ -95,7 +95,7 @@ def capture(output):
                                 box=page.locator("#detail").bounding_box()
                                 assert box["width"]<=width+1 and box["height"]<=height+1
                                 expect(page.locator("#detail")).to_have_attribute("aria-labelledby","detail-title")
-                                for tab in ("history","sources","registry","details"):
+                                for tab in ("history","registry","details"):
                                     page.locator('button[data-profile-tab="'+tab+'"]').click()
                                     expect(page.locator('button[data-profile-tab="'+tab+'"]')).to_have_attribute("aria-pressed","true")
                                 page.keyboard.press("Escape")

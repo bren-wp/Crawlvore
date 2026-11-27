@@ -27,7 +27,8 @@ pub(crate) fn extract() -> io::Result<(PathBuf, tempfile::TempDir)> {
         file.write_all(&buffer[..count])?;
         remaining -= count as u64;
     }
-    if format!("{:x}", digest.finalize()) != env!("CRAWLVORA_WORKER_SHA256") {
+    let actual = digest.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
+    if actual != env!("CRAWLVORA_WORKER_SHA256") {
         return Err(invalid("Portable payload integrity check failed"));
     }
     file.sync_all()?;

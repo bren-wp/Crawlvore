@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt pip-audit bandit vulture pillow packaging
+      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt -r requirements-audit.txt
       - run: python -m pip check
       - run: python -m unittest discover -s tests -v
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
@@ -33,17 +33,17 @@ jobs:
       - run: npm run build:frontend
       - run: node --check static/app.js && node --check static/locale.js
       - run: python -m pip_audit --strict
-      - run: python -m bandit -r . -x ./tests,./tools -ll
+      - run: python -m bandit -r src tools -ll
       - name: Source and normalized clone audit
         run: |
           set -euo pipefail
           python tools/source_audit.py --strict-deps | tee source-audit.json
           python tools/clone_review.py | tee clone-review.json
-      - run: python -m vulture . --exclude tests,tools --min-confidence 90
+      - run: python -m vulture src tools --min-confidence 90
       - name: Extended static audit evidence (review candidates)
         run: |
-          python -m bandit -r . -x ./tests -f json -o bandit-extended.json --exit-zero
-          python -m vulture . --exclude tests --min-confidence 60 > dead-code-candidates.txt || test "$?" -eq 3
+          python -m bandit -r src tools -f json -o bandit-extended.json --exit-zero
+          python -m vulture src tools --min-confidence 60 > dead-code-candidates.txt || test "$?" -eq 3
       - run: python -m playwright install --with-deps chromium
       - run: python tools/ui_e2e.py
       - run: python tools/layout_acceptance.py layout-evidence
@@ -55,11 +55,12 @@ jobs:
           python tools/import_design_references.py --verify
           python tools/pixel_diff.py --strict
       - run: python tools/performance_check.py --records 100000 > performance.json
+      - run: python tools/worker_endurance.py --seconds 60 --records 25000 > worker-endurance.json
       - name: Record audit evidence in job summary
         if: always()
         shell: bash
         run: |
-          for report in source-audit.json clone-review.json pixel-diff.json performance.json layout-evidence/layout-report.json; do
+          for report in bandit-extended.json dead-code-candidates.txt source-audit.json clone-review.json pixel-diff.json performance.json worker-endurance.json layout-evidence/layout-report.json; do
             if [ -s "$report" ]; then
               { printf '\n### %s\n\n```json\n' "$report"; head -c 160000 "$report"; printf '\n```\n'; } >> "$GITHUB_STEP_SUMMARY"
             fi
@@ -77,6 +78,7 @@ jobs:
             clone-review.json
             pixel-diff.json
             performance.json
+            worker-endurance.json
             layout-evidence/layout-report.json
             branding/*fixture.png
   rust-dependencies:

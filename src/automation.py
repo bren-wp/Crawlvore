@@ -17,7 +17,7 @@ class Queue:
             c.execute("UPDATE jobs SET state='interrupted',finished=CURRENT_TIMESTAMP WHERE state='running'")
             c.execute("UPDATE jobs SET state='cancelled',finished=CURRENT_TIMESTAMP WHERE kind<>'registry' AND state IN ('queued','retry_wait')")
     def enqueue(self,kind,config):
-        if kind!='registry' or not isinstance(config,dict) or config.get('permission') is not True: raise ValueError('Only authorized Court Registry jobs are supported.')
+        if kind!='registry' or not isinstance(config,dict) or config.get('permission') is not True: raise ValueError('Dopušteni su samo ovlašteni zadaci osvježavanja poslovnih podataka.')
         limit=int(config.get('limit',500))
         if not 1<=limit<=1000: raise ValueError('Invalid registry page size.')
         config={'permission':True,'limit':limit}

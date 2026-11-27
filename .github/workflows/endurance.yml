@@ -1,8 +1,8 @@
 name: Four-hour endurance
 on:
   push:
-    branches: [data-safety-release, product-readme-and-web-packaging]
-    paths: ['.github/workflows/endurance.yml', 'tools/endurance.py']
+    branches: [main, refactor/hr-only-desktop]
+    paths: ['.github/workflows/endurance.yml', 'tools/endurance.py', 'tools/worker_endurance.py']
   workflow_dispatch:
   workflow_call:
 env:
@@ -18,11 +18,14 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt
+      - run: python -m pip install -r requirements.txt -r requirements-audit.txt
       - run: python tools/endurance.py --seconds 14400 > endurance.json
+      - run: python tools/worker_endurance.py --seconds 600 --records 25000 > worker-endurance.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           retention-days: 1
           name: endurance-report
-          path: endurance.json
+          path: |
+            endurance.json
+            worker-endurance.json

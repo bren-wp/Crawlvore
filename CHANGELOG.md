@@ -2,6 +2,16 @@
 
 ## 8.1.7
 
+- Use Crawlvora branding throughout the visible desktop interface, remove the provenance tab and raw provider links while retaining underlying provenance and alternate values in history.
+- Add isolated signed update staging and authenticated worker load measurements.
+
+- Retire unreachable historical web scraping, configurable connector, browser renderer and studio engines; keep legacy imported data, provenance labels and active regression coverage.
+- Separate runtime dependencies from browser and audit tooling.
+
+- Require authenticated sessions in source and packaged mode; stop logging session URLs in HTTP access logs and bound worker concurrency and idle socket timeouts.
+- Remove obsolete PyWebView fallback and use a dependency-free-of-browser worker self-test.
+- Update SHA-2 and build dependencies; retain stable Tauri 2 pending full native migration.
+
 - Add measured package-size reports and CI budgets for both Croatian editions.
 
 - Compress the complete offline SQLite seed with XZ/LZMA2, verify the exact decoded bytes with a bounded decoder, retain legacy GZIP support, and avoid recompressing native CI artifacts.

@@ -4,6 +4,11 @@ from http.server import BaseHTTPRequestHandler
 
 
 class LocalResponseHandler(BaseHTTPRequestHandler):
+    def log_message(self, _format, *args):
+        # The initial session URL contains a secret. Do not log request targets
+        # or headers, including rejected requests and HTTP parse errors.
+        return
+
     def send_data(self,data,kind='application/json; charset=utf-8',status=200,extra=None):
         if not isinstance(data,bytes): data=json.dumps(data,ensure_ascii=False).encode()
         self.send_response(status); self.send_header('Content-Type',kind); self.send_header('Content-Length',str(len(data)))

@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, parse_qs, unquote
 from local_http_response import LocalResponseHandler
 from local_http_security import token_matches, allowed_host, session_cookie_name, valid_session_cookie, content_length, InvalidFraming, single_header, allowed_origin
-from sources import NAMES
+from company_fields import NAMES
 from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import start_registry
 from snapshot_diff import compare
@@ -29,19 +29,19 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
         def cookie_name(self):
             return session_cookie_name(self.server.server_port)
         def session_authorized(self):
-            return not args.worker or valid_session_cookie(single_header(self.headers,'Cookie') or '',self.cookie_name(),TOKEN)
+            return valid_session_cookie(single_header(self.headers,'Cookie') or '',self.cookie_name(),TOKEN)
         def do_GET(self):
             if not self.authorized(): return self.send_data({'error':'Nedopušten host.'},status=403)
             try: p=urlsplit(self.path)
             except ValueError: return self.send_data({'error':'Invalid request target.'},status=400)
-            if args.worker and p.path.startswith('/session/'):
+            if p.path.startswith('/session/'):
                 if not token_matches(p.path,'/session/'+TOKEN):
                     return self.send_data({'error':'Access denied.'},status=403)
                 return self.send_data(b'',status=303,extra={'Location':'/','Set-Cookie':self.cookie_name()+'='+TOKEN+'; Path=/; HttpOnly; SameSite=Strict'})
             if not self.session_authorized(): return self.send_data({'error':'Access denied.'},status=403)
-            params=parse_qs(p.query); get=lambda k,d='':params.get(k,[d])[0]
-            filters={k:get(k) for k in ('q','city','contact','provider','entity_kind','industry')}
             try:
+                params=parse_qs(p.query,max_num_fields=64); get=lambda k,d='':params.get(k,[d])[0]
+                filters={k:get(k) for k in ('q','city','contact','provider','entity_kind','industry')}
                 if p.path=='/':
                     lang='hr'; theme='dark'
                     return self.send_data((ROOT/'static/index.html').read_text(encoding='utf-8').replace('__TOKEN__',TOKEN).replace('__LANGUAGE__',lang).replace('data-theme="dark"','data-theme="'+theme+'"',1).encode(),'text/html; charset=utf-8')
@@ -173,7 +173,6 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
                 if self.path.startswith('/api/mail/'):
-                    if n>65536: raise ValueError('Prevelik zahtjev e-pošte.')
                     if self.path=='/api/mail/configure': return self.send_data(mail.configure(data))
                     if self.path=='/api/mail/forget': return self.send_data(mail.forget())
                     if self.path=='/api/mail/block': return self.send_data(mail.block(data))
@@ -264,5 +263,4 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database,
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)
             except (ValueError,TypeError,UnicodeError) as e: self.send_data({'error':str(e)},status=400)
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Operacija nije uspjela.'},status=500)
-        def log_message(self,*args): pass
     return Handler

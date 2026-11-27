@@ -53,7 +53,7 @@ def run():
                 fn=ast.unparse(node.func)
                 if fn in ('eval','exec','pickle.loads','os.system') or any(k.arg=='shell' and isinstance(k.value,ast.Constant) and k.value.value is True for k in node.keywords) or any(k.arg=='verify' and isinstance(k.value,ast.Constant) and k.value.value is False for k in node.keywords): review.append({'file':path.name,'line':node.lineno,'call':fn})
     deps,issues=dependencies()
-    return {'functions_scanned':funcs,'unused_import_candidates':unused,'normalized_ast_clone_candidates':[v for v in clones.values() if len(v)>1],'high_risk_call_patterns':review,'installed_dependency_closure':deps,'dependency_resolution_issues':issues,'dependency_scope':'runtime and active native PyInstaller build; legacy PyWebView build excluded','scope':'src runtime Python modules and launcher; lexical imports and normalized whole-function AST only; no CVE lookup or semantic equivalence proof'}
+    return {'functions_scanned':funcs,'unused_import_candidates':unused,'normalized_ast_clone_candidates':[v for v in clones.values() if len(v)>1],'high_risk_call_patterns':review,'installed_dependency_closure':deps,'dependency_resolution_issues':issues,'dependency_scope':'runtime and active native PyInstaller build; browser and audit tooling excluded','scope':'src runtime Python modules and launcher; lexical imports and normalized whole-function AST only; no CVE lookup or semantic equivalence proof'}
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--strict-deps',action='store_true')

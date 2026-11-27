@@ -24,7 +24,7 @@ class Client:
             self.bot.wait(self.delay-(time.monotonic()-self.bot.last_request)); self.bot.last_request=time.monotonic()
             try:
                 with self.session.request(method,url,timeout=(10,60),allow_redirects=False,stream=True,**kw) as r:
-                    if r.status_code in (429,403): raise PermissionError(f'Sudski registar: HTTP {r.status_code}. Prikupljanje zaustavljeno.')
+                    if r.status_code in (429,403): raise PermissionError(f'Crawlvora: HTTP {r.status_code}. Prikupljanje zaustavljeno.')
                     if r.status_code>=500:
                         if attempt<2: self.bot.wait(2**(attempt+1)); continue
                         raise TransientRegistryError('Privremena pogreška poslužitelja.')
@@ -34,10 +34,10 @@ class Client:
                         if size>10*1024*1024: raise ValueError('Odgovor veći od 10 MB; smanjite veličinu stranice.')
                         chunks.append(chunk)
                     try: body=json.loads(b''.join(chunks))
-                    except (ValueError,UnicodeError): raise ValueError(f'Sudski registar: neispravan JSON (HTTP {r.status_code}).') from None
+                    except (ValueError,UnicodeError): raise ValueError(f'Crawlvora: neispravan JSON (HTTP {r.status_code}).') from None
                     return r.status_code, r.headers, body
             except requests.RequestException:
-                if attempt==2: raise TransientRegistryError('Mrežna pogreška Sudskog registra.') from None
+                if attempt==2: raise TransientRegistryError('Mrežna pogreška poslovnih podataka.') from None
                 self.bot.wait(2**(attempt+1))
     def auth(self):
         code,_,body=self.request('POST',TOKEN_URL,auth=self.creds,data={'grant_type':'client_credentials'},headers={'Content-Type':'application/x-www-form-urlencoded'})
@@ -50,7 +50,7 @@ class Client:
             if code==401 and attempt==0: self.expiry=0; continue
             if code==200: return h,b
             if code==400 and isinstance(b,dict) and str(b.get('error_code'))=='505': return h,[]
-            raise ValueError(f'Sudski registar: {name} · HTTP {code}.')
+            raise ValueError(f'Crawlvora: {name} · HTTP {code}.')
         raise ValueError('Autentikacija nije uspjela.')
     def spec(self):
         code,_,body=self.request('GET',SPEC_URL,headers={'Accept':'application/openapi+json, application/json'})

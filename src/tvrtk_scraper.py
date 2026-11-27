@@ -5,7 +5,7 @@ import secrets
 import sys
 import time
 import webbrowser
-from http.server import ThreadingHTTPServer
+from local_server import LocalServer
 from pathlib import Path
 from core import Store, Collector
 from local_http_routes import make_handler
@@ -34,32 +34,22 @@ def main():
     ap.add_argument('--registry-sync',action='store_true')
     ap.add_argument('--registry-limit',type=int,default=500)
     ap.add_argument('--registry-full-refresh',action='store_true',help='Explicitly allow downloading a different full registry snapshot')
-    ap.add_argument('--desktop',action='store_true')
     ap.add_argument('--worker',action='store_true',help='Run the authenticated desktop worker on loopback')
     ap.add_argument('--self-test',type=Path,help='Write packaged runtime smoke test result and exit')
     ap.add_argument('--no-browser',action='store_true')
-    if getattr(sys,'frozen',False): os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH','0')
     args=ap.parse_args()
-    if args.worker and (args.desktop or args.registry_sync or args.self_test):
+    if args.worker and (args.registry_sync or args.self_test):
         ap.error('Worker mode cannot be combined with other modes.')
     if args.self_test:
         result={'ok':False}
         try:
-            from playwright.sync_api import sync_playwright
             from openpyxl import Workbook
-            if getattr(sys,'frozen',False): import webview
             with tempfile.TemporaryDirectory() as td:
                 test_store=Store(Path(td)/'smoke.db')
                 with test_store.db() as db: test_store.upsert(db,{'title':'Synthetic smoke record','mbs':'000000001'},provider='registry')
                 if test_store.stats()['total']!=1: raise RuntimeError('Database smoke failed')
             if not all((ROOT/'static'/f).is_file() for f in ('index.html','style.css','app.js','locale.js','logo.svg')): raise RuntimeError('Missing assets')
-            with sync_playwright() as pw:
-                browser=pw.chromium.launch(headless=True,executable_path=None if getattr(sys,'frozen',False) else os.getenv('CRAWLVORA_TEST_CHROMIUM'))
-                try:
-                    page=browser.new_page(); page.set_content('<h1>Crawlvora</h1>')
-                    if page.locator('h1').inner_text()!='Crawlvora': raise RuntimeError('Browser smoke test failed.')
-                finally: browser.close()
-            Workbook().close(); result={'ok':True,'records':1,'browser':True}
+            Workbook().close(); result={'ok':True,'records':1}
         except Exception as e: result={'ok':False,'error':type(e).__name__}
         args.self_test.write_text(json.dumps(result),encoding='utf-8'); return 0 if result['ok'] else 1
     root=args.data_dir
@@ -139,7 +129,7 @@ def run_workspace(args,selection,active):
         registry_access=registry_access, search_integrity=search_integrity,
         selection=selection, store=store, transfers=transfers, ui_ready=ui_ready,
         ui_ready_lock=ui_ready_lock)
-    server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler); url=f'http://127.0.0.1:{server.server_port}'
+    server=LocalServer(('127.0.0.1',args.port),Handler); url=f'http://127.0.0.1:{server.server_port}'
     if args.worker:
         # The parent receives this secret over a private stdout pipe. Never log it.
         print('CRAWLVORA_READY '+url+'/session/'+TOKEN,flush=True)
@@ -154,17 +144,11 @@ def run_workspace(args,selection,active):
             queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()
         return 0
     if sys.stdout is not None: print(f'Crawlvora: {url}\nPodaci: {args.data_dir}\nZa izlaz pritisnite Ctrl+C.')
-    if args.desktop or getattr(sys,'frozen',False):
-        import webview
-        webview.settings['ALLOW_DOWNLOADS']=True
-        threading.Thread(target=server.serve_forever,daemon=True).start()
-        try:
-            webview.create_window('Crawlvora',url,width=1440,height=900,min_size=(900,620))
-            webview.start(gui='edgechromium')
-        finally:
-            queue.close(); collector.stop(); server.shutdown(); server.server_close(); transfers.close(); protected.close()
-        return 0
-    if not args.no_browser: webbrowser.open(url)
+    if args.no_browser:
+        # The source CLI user explicitly asked for a manually opened session.
+        print(url+'/session/'+TOKEN,flush=True)
+    else:
+        webbrowser.open(url+'/session/'+TOKEN)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally: queue.close(); collector.stop(); server.server_close(); transfers.close(); protected.close()

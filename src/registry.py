@@ -341,7 +341,7 @@ class Registry:
             bot.update(projected=total)
 
 def start_registry(bot,registry,creds,limit=500,check=False,*,pinned_snapshot=None,allow_full_refresh=True):
-    if not all(creds): raise ValueError('Nedostaje privatna konfiguracija Sudskog registra.')
+    if not all(creds): raise ValueError('Nedostaje privatna konfiguracija poslovnih podataka.')
     if not 1<=limit<=1000: raise ValueError('Veličina stranice mora biti 1–1000.')
     with bot.lock:
         if bot.state['status'] in ('running','stopping'): raise ValueError('Prikupljanje je već aktivno.')
