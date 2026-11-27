@@ -61,6 +61,7 @@ class Desktop(SecondaryPages):
         sidebar.pack(side="left",fill="y")
         sidebar.pack_propagate(False)
         brand=tk.Frame(sidebar,bg=SIDE)
+        self.brand=brand
         brand.pack(fill="x",padx=20,pady=(28,25))
         logo=tk.Canvas(brand,width=42,height=42,bg=SIDE,highlightthickness=0)
         logo.pack(side="left",padx=(0,12))
@@ -72,8 +73,11 @@ class Desktop(SecondaryPages):
         self.sidebar=sidebar
         self.nav={}
         self.nav_icons={}
+        self.nav_labels=[]
         def nav_label(label):
-            tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",9,"bold")).pack(anchor="w",padx=20,pady=(14,5))
+            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",9,"bold"))
+            widget.pack(anchor="w",padx=20,pady=(14,5))
+            self.nav_labels.append(widget)
         def nav(key,label,command,parent=sidebar):
             self.nav_icons[key]=(nav_icon(root,key,TEXT),nav_icon(root,key,ACCENT))
             button=ttk.Button(parent,text=label,image=self.nav_icons[key][0],compound="left",style="Nav.TButton",command=command)
@@ -85,12 +89,9 @@ class Desktop(SecondaryPages):
         nav_label("UPRAVLJANJE")
         nav("jobs","Zadaci i raspored",lambda:self.show_view("jobs"))
         nav("data","Uvoz i izvoz",lambda:self.show_view("data"))
-        bottom=tk.Frame(sidebar,bg=SIDE)
-        bottom.pack(side="bottom",fill="x",pady=(0,12))
-        ttk.Separator(bottom).pack(fill="x",padx=15,pady=(0,8))
-        nav("analytics","Analitika i izvještaji",lambda:self.show_view("analytics"),bottom)
-        nav("registry","Tvrtke – sinkronizacija",lambda:self.show_view("registry"),bottom)
-        nav("settings","Postavke",lambda:self.show_view("settings"),bottom)
+        nav("analytics","Analitika i izvještaji",lambda:self.show_view("analytics"))
+        nav("registry","Tvrtke – sinkronizacija",lambda:self.show_view("registry"))
+        nav("settings","Postavke",lambda:self.show_view("settings"))
         main=ttk.Frame(shell)
         main.pack(side="left",fill="both",expand=True)
         self.header=ttk.Frame(main,padding=(28,10))
@@ -145,6 +146,14 @@ class Desktop(SecondaryPages):
             if int(self.sidebar.cget("width"))!=width:
                 self.sidebar.configure(width=width)
                 self.nav["registry"].configure(text="Tvrtke – sinkronizacija" if width>=205 else "Sinkronizacija")
+            short=event.height<580
+            if getattr(self,"short_navigation",None)!=short:
+                self.short_navigation=short
+                self.brand.pack_configure(pady=(10,8) if short else (28,25))
+                for label in self.nav_labels:label.pack_configure(pady=(5,2) if short else (14,5))
+                for button in self.nav.values():button.pack_configure(pady=0 if short else 2)
+                style=ttk.Style(self.root)
+                for name in ("Nav.TButton","Active.Nav.TButton"):style.configure(name,padding=(7,3) if short else (11,9))
             self.reflow_layout()
             self.resize_content()
 

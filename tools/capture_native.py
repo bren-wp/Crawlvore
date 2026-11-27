@@ -88,7 +88,9 @@ def run(output,reference):
                     while time.monotonic()<until:root.update();time.sleep(.02)
                     def reachable():
                         box=app.viewport.bbox(app.content_window)
-                        return not root.attributes("-fullscreen") and box and box[2]>=app.content.winfo_reqwidth() and box[3]>=app.content.winfo_reqheight()
+                        return (not root.attributes("-fullscreen") and box and box[2]>=app.content.winfo_reqwidth()
+                                and box[3]>=app.content.winfo_reqheight()
+                                and all(b.winfo_ismapped() and b.winfo_height()>15 and b.winfo_y()+b.winfo_height()<=app.sidebar.winfo_height() for b in app.nav.values()))
                     try:wait(root,reachable,timeout=3)
                     except RuntimeError as error:raise RuntimeError(f"Unreachable content: {key} {w}x{h}") from error
                 print(f"All seven views accessible via viewport at {w}x{h}",flush=True)
