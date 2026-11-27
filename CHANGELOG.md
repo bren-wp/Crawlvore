@@ -1,6 +1,6 @@
 # Changelog
 
-## 8.1.5 - pending production acceptance
+## 8.1.5 - Online
 
 - Resume checkpointed registry downloads and repair missing rows from original verified pages without overwriting existing records. Require explicit confirmation for a different full snapshot.
 - Check UK monthly catalog availability without downloading an archive again.
@@ -8,7 +8,7 @@
 - Reduce the native Rust dependency surface and add RustSec, WPCS and hosting acceptance evidence.
 - Optimize provider counts and full exports; validate million-row JSON, CSV and XLSX workloads in CI.
 - Expand bilingual web and WordPress profiles, separate reproducible fresh-install and upgrade ZIPs, and protect existing catalogs during upgrades.
-- Preserve the complete private national-data distribution gate. This version is prepared for acceptance, not yet published.
+- Preserve the complete private national-data distribution gate. Public Online application releases use a separate code-only publication path; bundled national-data editions retain their full acceptance gates.
 
 ## 8.1.4 — release candidate
 

@@ -104,7 +104,14 @@ jobs:
             test -s national-data/GB/united-kingdom.sqlite3.gz
             extra+=(--add-data "national-data:national-data")
           fi
-          python -m PyInstaller "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --add-data "tvrtk_output.csv:." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+          if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" != 1 ] && [ "${CRAWLVORA_NATIONAL_BUNDLE:-}" != 1 ]; then
+            mkdir -p native-edition
+            printf '%s\n' '{"edition":"Online"}' > native-edition/edition.json
+            extra+=(--add-data "native-edition/edition.json:.")
+          else
+            extra+=(--add-data "tvrtk_output.csv:.")
+          fi
+          python -m PyInstaller "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview tvrtk_scraper.py
           mkdir -p native-preview
           cp -R dist/CrawlvoraWorker native-preview/worker
           if [ "$RUNNER_OS" = Windows ]; then
@@ -149,8 +156,10 @@ jobs:
           if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
           if ('${{ inputs.registry_bundle }}' -eq 'true' -and '${{ inputs.national_bundle }}' -eq 'true') {
             foreach ($edition in @('Full','HR','GB','Online')) { ./windows/package-native.ps1 -Edition $edition }
-          } else {
+          } elseif ('${{ inputs.registry_bundle }}' -eq 'true' -or '${{ inputs.national_bundle }}' -eq 'true') {
             ./windows/package-native.ps1
+            ./windows/package-native.ps1 -Edition Online
+          } else {
             ./windows/package-native.ps1 -Edition Online
           }
       - name: Archive tested Linux package
