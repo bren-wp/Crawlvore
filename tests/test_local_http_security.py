@@ -2,7 +2,7 @@ import unittest
 from email.message import Message
 
 from local_http_security import (InvalidFraming, allowed_host, content_length,
-                                 session_cookie_name, token_matches, valid_session_cookie)
+                                 session_cookie_name, token_matches, valid_session_cookie, single_header, allowed_origin)
 
 
 class LocalHttpSecurityTests(unittest.TestCase):
@@ -40,3 +40,28 @@ class LocalHttpSecurityTests(unittest.TestCase):
         headers["Transfer-Encoding"] = "chunked"
         with self.assertRaises(InvalidFraming):
             content_length(headers)
+
+
+    def test_security_headers_must_be_unambiguous(self):
+        for name in ("Host", "Cookie", "X-Local-Token"):
+            headers = Message()
+            self.assertIsNone(single_header(headers, name))
+            headers[name] = "one"
+            self.assertEqual(single_header(headers, name), "one")
+            headers[name] = "two"
+            self.assertIsNone(single_header(headers, name))
+
+    def test_browser_origin_is_exact(self):
+        headers = Message()
+        self.assertTrue(allowed_origin(headers, 49152))
+        for value in ("http://127.0.0.1:49152", "http://localhost:49152"):
+            headers = Message()
+            headers["Origin"] = value
+            self.assertTrue(allowed_origin(headers, 49152))
+            headers["Origin"] = value
+            self.assertFalse(allowed_origin(headers, 49152))
+        for value in ("null", "https://localhost:49152", "http://localhost:49153",
+                      "http://localhost.evil:49152"):
+            headers = Message()
+            headers["Origin"] = value
+            self.assertFalse(allowed_origin(headers, 49152))

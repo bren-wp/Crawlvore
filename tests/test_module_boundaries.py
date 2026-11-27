@@ -1,6 +1,7 @@
 """Regression checks for the compatibility facades and workspace-scoped routes."""
 import unittest
 from types import SimpleNamespace
+from email.message import Message
 
 import core
 import company_fields
@@ -34,8 +35,9 @@ class ModuleBoundaryTests(unittest.TestCase):
             self.assertTrue(issubclass(cls, LocalResponseHandler))
             instance = object.__new__(cls)
             instance.server = SimpleNamespace(server_port=49152)
-            instance.headers = {"Host": "127.0.0.1:49152",
-                                "Cookie": "crawlvora_session_49152=" + token}
+            instance.headers = Message()
+            instance.headers["Host"] = "127.0.0.1:49152"
+            instance.headers["Cookie"] = "crawlvora_session_49152=" + token
             return instance
 
         a = handler("a" * 64)
@@ -43,7 +45,7 @@ class ModuleBoundaryTests(unittest.TestCase):
         self.assertTrue(a.authorized())
         self.assertTrue(a.session_authorized())
         self.assertTrue(b.session_authorized())
-        b.headers["Cookie"] = a.headers["Cookie"]
+        b.headers.replace_header("Cookie", a.headers["Cookie"])
         self.assertFalse(b.session_authorized())
-        a.headers["Host"] = "example.invalid:49152"
+        a.headers.replace_header("Host", "example.invalid:49152")
         self.assertFalse(a.authorized())

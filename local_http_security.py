@@ -34,3 +34,16 @@ def content_length(headers):
             or len(lengths[0]) > 12):
         raise InvalidFraming("Invalid request framing.")
     return int(lengths[0])
+
+
+def single_header(headers, name):
+    """Reject ambiguous repeated security headers rather than taking the first."""
+    values = headers.get_all(name, [])
+    return values[0] if len(values) == 1 else None
+
+
+def allowed_origin(headers, port):
+    """Native clients may omit Origin; browser origins must match loopback."""
+    origins = headers.get_all("Origin", [])
+    return not origins or (len(origins) == 1 and origins[0] in (
+        f"http://127.0.0.1:{port}", f"http://localhost:{port}"))

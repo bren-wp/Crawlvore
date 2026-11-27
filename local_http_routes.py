@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs, unquote
 from local_http_response import LocalResponseHandler
-from local_http_security import token_matches, allowed_host, session_cookie_name, valid_session_cookie, content_length, InvalidFraming
+from local_http_security import token_matches, allowed_host, session_cookie_name, valid_session_cookie, content_length, InvalidFraming, single_header, allowed_origin
 from sources import NAMES
 from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import start_registry
@@ -23,14 +23,15 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
                  transfers, ui_ready, ui_ready_lock):
     class Handler(LocalResponseHandler):
         def authorized(self):
-            return allowed_host(self.headers.get('Host'),self.server.server_port)
+            return allowed_host(single_header(self.headers,'Host'),self.server.server_port)
         def cookie_name(self):
             return session_cookie_name(self.server.server_port)
         def session_authorized(self):
-            return not args.worker or valid_session_cookie(self.headers.get('Cookie',''),self.cookie_name(),TOKEN)
+            return not args.worker or valid_session_cookie(single_header(self.headers,'Cookie') or '',self.cookie_name(),TOKEN)
         def do_GET(self):
             if not self.authorized(): return self.send_data({'error':'Nedopušten host.'},status=403)
-            p=urlsplit(self.path)
+            try: p=urlsplit(self.path)
+            except ValueError: return self.send_data({'error':'Invalid request target.'},status=400)
             if args.worker and p.path.startswith('/session/'):
                 if not token_matches(p.path,'/session/'+TOKEN):
                     return self.send_data({'error':'Access denied.'},status=403)
@@ -134,7 +135,7 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
             except (BrokenPipeError,ConnectionResetError): pass
             except Exception as e: print(type(e).__name__,file=sys.stderr); self.send_data({'error':'Interna pogreška.'},status=500)
         def do_POST(self):
-            if not self.authorized() or not self.session_authorized() or not token_matches(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
+            if not self.authorized() or not self.session_authorized() or not allowed_origin(self.headers,self.server.server_port) or not token_matches(single_header(self.headers,'X-Local-Token'),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
                 try:
                     n=content_length(self.headers)

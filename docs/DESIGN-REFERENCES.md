@@ -21,3 +21,7 @@ Run python tools/layout_acceptance.py layout-evidence after compiling the fronte
 ## Phase 4 ? increment 2
 
 The active navigation button exposes aria-current and the UK subview retains the directory highlight. Company dialogs have accessible names; the UK profile uses a responsive property grid with wrapped long names instead of a table scrolling container. The live layout matrix now adds effective viewports and Chromium device scale factors for 125%, 150%, 175% and 200%, with both themes and languages, synthetic verified UK data, profile tabs and keyboard dismissal. These browser emulations are not OS-level DPI or native WebView acceptance. The layout report is retained in quality evidence, and strict production comparison must verify the original locked PNG hashes before comparing pixels.
+
+## Phase 4 handoff
+
+The responsive acceptance matrix passed 320 screen cases and 80 dialog cases on the preceding revision. Reference PNGs remain absent; exact visual acceptance and native DPI certification remain open. The pixel comparison now rejects changed reference bytes even outside strict production mode and cannot pass an empty comparison in strict mode. Do not waive this gate when moving to security work.
