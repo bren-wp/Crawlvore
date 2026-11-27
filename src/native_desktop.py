@@ -265,7 +265,10 @@ class Desktop(SecondaryPages):
         self.submit(lambda:(self.client.request("/api/cities"),self.client.request("/api/industries")),self.facets)
         if self.current_view=="overview":self.refresh_overview()
         elif self.current_view=="directory":self.refresh()
-        else:self.refresh_settings()
+        elif self.current_view=="settings":self.refresh_settings()
+        elif self.current_view=="jobs":self.refresh_jobs()
+        elif self.current_view=="registry":self.refresh_registry()
+        elif self.current_view=="analytics":self.refresh_analytics()
         self.poll_sync()
 
     def facets(self, result):
@@ -920,7 +923,11 @@ class Desktop(SecondaryPages):
                 if state=="completed":
                     self.page=1
                     if self.current_view=="overview":self.refresh_overview()
-                    else:self.refresh()
+                    elif self.current_view=="directory":self.refresh()
+                    elif self.current_view=="analytics":self.refresh_analytics()
+                    elif self.current_view=="jobs":self.refresh_jobs()
+                    elif self.current_view=="registry":self.refresh_registry()
+                    elif self.current_view=="settings":self.refresh_settings()
                     self.submit(lambda:(self.client.request("/api/cities"),self.client.request("/api/industries")),self.facets)
                 else:self.status.set("Sinkronizacija nije završena.")
         if not self.sync_polling:

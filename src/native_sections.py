@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from native_transfer import upload,download
+from native_progress import sync_progress
 from native_theme import Card, PANEL, TEXT, MUTED, ACCENT, PANEL2
 
 FORMATS={"CSV":"csv","JSON":"json","Excel":"xlsx"}
@@ -314,23 +315,30 @@ class SecondaryPages:
 
     def build_registry(self):
         view=self.views["registry"]
-        self.section_header(view,"TVRTKE","Tvrtke","Osvježavanje i pregled dostupnih skupina poslovnih podataka.")
-        metrics=ttk.Frame(view);metrics.pack(fill="x",pady=(0,12))
+        heading=ttk.Frame(view);heading.pack(fill="x")
+        copy=ttk.Frame(heading);copy.pack(side="left",fill="x",expand=True)
+        self.section_header(copy,"TVRTKE","Tvrtke","Skupna sinkronizacija javnih podataka i pregled dostupnih kategorija.")
+        self.registry_access_label=tk.StringVar(value="Provjera pristupa…")
+        ttk.Label(heading,textvariable=self.registry_access_label,style="Muted.TLabel").pack(side="right")
+        metrics=ttk.Frame(view);metrics.pack(fill="x",pady=(0,24))
         self.registry_values={}
         for col,(key,label) in enumerate((("runs","Snimke"),("complete","Dovršene snimke"),("categories","Kategorije"),("rows","Izvorni redci"))):
             metrics.columnconfigure(col,weight=1,uniform="metric")
             panel=Card(metrics,padding=15);panel.grid(row=0,column=col,sticky="nsew",padx=(0,12 if col<3 else 0))
             ttk.Label(panel,text=label,style="Panel.TLabel").pack(anchor="w",pady=(0,8))
             var=tk.StringVar(value="—");self.registry_values[key]=var
-            ttk.Label(panel,textvariable=var,font=("Segoe UI",22,"bold")).pack(anchor="w")
+            ttk.Label(panel,textvariable=var,style="Metric.TLabel").pack(anchor="w")
+            captions={"runs":"Spremljene snimke","complete":"Konzistentna preuzimanja","categories":"Dovršene u odabiru","rows":"Preuzeto po kategorijama"}
+            ttk.Label(panel,text=captions[key],style="PanelMuted.TLabel").pack(anchor="w",pady=(12,0))
         self.register_grid(metrics,4)
         grid=ttk.Frame(view);grid.pack(fill="x")
-        grid.columnconfigure(0,weight=1);grid.columnconfigure(1,weight=1)
+        grid.columnconfigure(0,weight=9);grid.columnconfigure(1,weight=8)
         actions=self.panel(grid,"Osvježavanje poslovnih podataka",0)
         operation=self.panel(grid,"Trenutačna operacija",1)
+        ttk.Label(actions,text="Automatsko osvježavanje poslovnih podataka",style="PanelMuted.TLabel").pack(anchor="w",pady=(0,10))
         ttk.Label(actions,text="Veličina stranice").pack(anchor="w")
         self.registry_limit=tk.StringVar(value="1000")
-        ttk.Spinbox(actions,from_=1,to=1000,textvariable=self.registry_limit,width=12).pack(anchor="w",pady=4)
+        ttk.Spinbox(actions,from_=1,to=1000,textvariable=self.registry_limit,width=12).pack(fill="x",pady=4)
         self.registry_permission=tk.BooleanVar()
         ttk.Checkbutton(actions,text="Imam ovlaštenje za osvježavanje",variable=self.registry_permission).pack(anchor="w")
         buttons=ttk.Frame(actions);buttons.pack(fill="x",pady=8)
@@ -338,41 +346,79 @@ class SecondaryPages:
         self.registry_start.pack(side="left")
         self.registry_stop=ttk.Button(buttons,text="Zaustavi",command=lambda:self.registry_operation("stop"))
         self.registry_stop.pack(side="left",padx=6)
-        self.registry_check=ttk.Button(actions,text="Provjeri vezu",command=lambda:self.registry_operation("check"))
-        self.registry_check.pack(anchor="w")
+        self.registry_check=ttk.Button(buttons,text="Provjeri vezu",command=lambda:self.registry_operation("check"))
+        self.registry_check.pack(side="left")
+        ttk.Label(actions,text="Prekinuto osvježavanje nastavlja se od posljednje spremljene točke.",style="Hint.TLabel",wraplength=310).pack(fill="x",pady=(4,0))
         self.registry_progress=tk.StringVar(value="Nema aktivne sinkronizacije")
         ttk.Label(operation,textvariable=self.registry_progress,wraplength=300).pack(anchor="w",pady=8)
         self.registry_bar=ttk.Progressbar(operation,maximum=100);self.registry_bar.pack(fill="x",pady=8)
+        self.registry_log=tk.Text(operation,height=3,wrap="word",background="#08131e",foreground=TEXT,relief="flat",padx=9,pady=8,font=("Segoe UI",-12),state="disabled")
+        self.registry_log.pack(fill="x")
+        self.registry_log_signature=None
         self.register_grid(grid,2)
-        category_panel=Card(view,"Preuzete kategorije",padding=15);category_panel.pack(fill="both",expand=True)
+        category_panel=Card(view,padding=15);category_panel.pack(fill="both",expand=True)
+        header=ttk.Frame(category_panel,style="PanelInner.TFrame");header.pack(fill="x",pady=(0,8))
+        copy=ttk.Frame(header,style="PanelInner.TFrame");copy.pack(side="left",fill="x",expand=True)
+        ttk.Label(copy,text="Preuzete kategorije",style="PanelTitle.TLabel").pack(anchor="w")
+        ttk.Label(copy,text="Dostupne skupine poslovnih podataka.",style="PanelMuted.TLabel").pack(anchor="w",pady=(5,0))
+        self.registry_filter=tk.StringVar(value="Sve snimke")
+        self.registry_filterbox=ttk.Combobox(header,textvariable=self.registry_filter,values=["Sve snimke"],state="readonly",width=13)
+        self.registry_filterbox.pack(side="right",padx=(6,0))
+        self.registry_filterbox.bind("<<ComboboxSelected>>",lambda _e:self.refresh_registry())
         self.registry_table=ttk.Treeview(category_panel,columns=("snapshot","category","rows","status"),show="headings",height=6)
         for key,label,width in (("snapshot","Snimka",90),("category","Kategorija",250),("rows","Redaka",130),("status","Status",100)):
-            self.registry_table.heading(key,text=label);self.registry_table.column(key,width=width)
+            self.registry_table.heading(key,text=label.upper(),anchor="w");self.registry_table.column(key,width=width)
         self.registry_table.pack(fill="both",expand=True)
         buttons=ttk.Frame(category_panel);buttons.pack(fill="x",pady=6)
         ttk.Button(buttons,text="Osvježi",command=self.refresh_registry).pack(side="right")
         ttk.Button(buttons,text="Otvori kategoriju",command=self.open_category).pack(side="right",padx=6)
         self.registry_table.bind("<Double-1>",lambda _e:self.open_category())
         self.registry_items={}
+        self.registry_pending=False
+        self.registry_signature=None
+        self.registry_percent=tk.StringVar(value="0 %")
+        ttk.Label(operation,textvariable=self.registry_percent,style="Metric.TLabel").pack(anchor="w",before=self.registry_bar)
 
     def refresh_registry(self):
-        if not self.client:return
+        if not self.client or self.registry_pending:return
+        self.registry_pending=True
         def done(result):
+            self.registry_pending=False
             data,status=result
             runs=data["runs"];categories=data["categories"]
             for key,value in (("runs",len(runs)),("complete",sum(bool(r["complete"]) for r in runs)),("categories",sum(bool(r["done"]) for r in categories)),("rows",sum(r["rows"] for r in categories))):
                 self.registry_values[key].set(f"{value:,}".replace(",","."))
-            self.registry_table.delete(*self.registry_table.get_children());self.registry_items.clear()
-            for index,row in enumerate(categories):
-                self.registry_items[str(index)]=row
-                self.registry_table.insert("","end",iid=str(index),values=(row["snapshot"],row["category"],f"{row['rows']} / {row['total'] if row['total'] is not None else '—'}","Preuzeto" if row["done"] else "U tijeku"))
+            options=["Sve snimke"]+[str(r["snapshot"]) for r in runs]
+            self.registry_filterbox.configure(values=options)
+            if self.registry_filter.get() not in options:self.registry_filter.set("Sve snimke")
+            filtered=[r for r in categories if self.registry_filter.get()=="Sve snimke" or str(r["snapshot"])==self.registry_filter.get()]
+            self.registry_access_label.set("Pristup omogućen" if data.get("configured") else "Pristup nije omogućen")
+            signature=tuple((r["snapshot"],r["category"],r["rows"],r["total"],r["done"]) for r in filtered)
+            if signature!=self.registry_signature:
+                self.registry_signature=signature
+                selected=self.registry_table.selection()
+                previous=self.registry_items.get(selected[0]) if selected else None
+                self.registry_table.delete(*self.registry_table.get_children());self.registry_items.clear()
+                for index,row in enumerate(filtered):
+                    key=str(index);self.registry_items[key]=row
+                    self.registry_table.insert("","end",iid=key,values=(row["snapshot"],row["category"],f"{row['rows']} / {row['total'] if row['total'] is not None else '—'}","Preuzeto" if row["done"] else "U tijeku"))
+                    if previous and (previous["snapshot"],previous["category"])==(row["snapshot"],row["category"]):self.registry_table.selection_set(key)
             active=status.get("status") in ("running","stopping")
             self.registry_start.configure(state="normal" if data.get("configured") and not active else "disabled")
             self.registry_check.configure(state="normal" if data.get("configured") and not active else "disabled")
             self.registry_stop.configure(state="normal" if active else "disabled")
-            self.registry_progress.set("Sinkronizacija je u tijeku…" if active else "Nema aktivne sinkronizacije")
-            self.registry_bar["value"]=100*status.get("projected",0)/max(1,status.get("projection_total",1)) if status.get("phase")=="projection" else 0
-        self.submit(lambda:(self.client.request("/api/registry"),self.client.request("/api/status")),done)
+            percent,label=sync_progress(status,categories)
+            self.registry_progress.set(label);self.registry_bar["value"]=percent
+            self.registry_percent.set(f"{int(percent)} %")
+            logs=tuple(str(x) for x in status.get("logs",[])[-10:]) or (label,)
+            if logs!=self.registry_log_signature:
+                self.registry_log_signature=logs
+                self.registry_log.configure(state="normal");self.registry_log.delete("1.0","end")
+                self.registry_log.insert("end","\n".join(logs));self.registry_log.see("end");self.registry_log.configure(state="disabled")
+        def failed(_exc):
+            self.registry_pending=False
+            self.registry_progress.set("Osvježavanje statusa nije uspjelo.")
+        self.submit(lambda:(self.client.request("/api/registry"),self.client.request("/api/status")),done,failed)
 
     def registry_operation(self,action):
         if not self.client:return
