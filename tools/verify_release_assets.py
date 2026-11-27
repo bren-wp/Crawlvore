@@ -13,6 +13,32 @@ MAX_SIZE=2*1024**3
 def digest(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
+def validate_snapshots(hr,gb):
+    # Older completed HR manifests omit the complete flag. Partial manifests
+    # always carry explicit progress; never accept those for distribution.
+    if not isinstance(hr,dict) or not isinstance(gb,dict):
+        raise ValueError('Invalid registry snapshot manifest')
+    categories=hr.get('categories')
+    if (hr.get('complete',True) is not True
+            or 'progress' in hr or 'completed_categories' in hr
+            or hr.get('scope')!='all-status'
+            or not isinstance(categories,dict) or len(categories)<36
+            or any(not isinstance(key,str) or not key or type(count) is not int or count<0
+                   for key,count in categories.items())
+            or type(hr.get('category_count')) is not int
+            or hr['category_count']!=len(categories)
+            or type(hr.get('subjects')) is not int or hr['subjects']<1
+            or categories.get('subjekti')!=hr['subjects']
+            or type(hr.get('rows')) is not int or hr['rows']!=sum(categories.values())):
+        raise ValueError('Incomplete or inconsistent HR snapshot')
+    if (gb.get('complete') is not True or gb.get('country')!='GB'
+            or type(gb.get('rows')) is not int or gb['rows']<1):
+        raise ValueError('Incomplete GB snapshot')
+    for data in (hr,gb):
+        identity=data.get('database_sha256')
+        if not isinstance(identity,str) or not re.fullmatch(r'[0-9a-f]{64}',identity):
+            raise ValueError('Missing database identity')
+
 def validate(root):
     root=Path(root)
     result={}
@@ -34,12 +60,7 @@ def validate(root):
     if manifest.get('windows_editions')!={'Full':['HR','GB'],'HR':['HR'],'GB':['GB'],'Online':[]}:
         raise ValueError('Incorrect edition matrix')
     hr,gb=manifest['HR'],manifest['GB']
-    if hr.get('complete') is False or hr.get('scope')!='all-status' or hr.get('category_count',0)<36 or hr.get('subjects',0)<1:
-        raise ValueError('Incomplete HR snapshot')
-    if gb.get('complete') is not True or gb.get('country')!='GB' or gb.get('rows',0)<1:
-        raise ValueError('Incomplete GB snapshot')
-    for data in (hr,gb):
-        if not re.fullmatch(r'[0-9a-f]{64}',data.get('database_sha256','')):raise ValueError('Missing database identity')
+    validate_snapshots(hr,gb)
     sums=root/'SHA256SUMS.txt'
     if sums.is_symlink() or not sums.is_file():raise ValueError('Missing checksums')
     expected={name:info['digest'][7:] for name,info in result.items()}
