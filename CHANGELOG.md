@@ -1,5 +1,15 @@
 # Changelog
 
+## 8.1.5 - pending production acceptance
+
+- Resume checkpointed registry downloads and repair missing rows from original verified pages without overwriting existing records. Require explicit confirmation for a different full snapshot.
+- Check UK monthly catalog availability without downloading an archive again.
+- Harden local HTTP authorization, backup publication, streamed transfers, catalog path validation and release ZIP validation.
+- Reduce the native Rust dependency surface and add RustSec, WPCS and hosting acceptance evidence.
+- Optimize provider counts and full exports; validate million-row JSON, CSV and XLSX workloads in CI.
+- Expand bilingual web and WordPress profiles, separate reproducible fresh-install and upgrade ZIPs, and protect existing catalogs during upgrades.
+- Preserve the complete private national-data distribution gate. This version is prepared for acceptance, not yet published.
+
 ## 8.1.4 — release candidate
 
 - Brand registry workflows as Crawlvora Sync and Crawlvora Connect, reduce technical UI details, retain data provenance, reject ambiguous HTTP request framing and expand browser click coverage.
