@@ -15,3 +15,7 @@ Keep the reference renderer until native feature parity and visual acceptance ar
 ## Intermediate milestone
 
 Use --max-changed-percent 30 to check that each of the seven pages has at most 30% differing RGB pixels. This is a separate development milestone; the default gate remains zero. The latest candidate still fails both gates. Procedural card surfaces, native charts, filters, task indicators and the original launcher assets are now integrated. Reference PNGs remain unchanged.
+
+## Layout geometry iteration
+
+Wide windows use an overlay vertical scrollbar in the outer margin, retaining the reference content width. Narrow windows retain reserved scrollbar space and the responsive card layout. Dashboard card dimensions, chart proportions and six-row chart spacing were corrected; shared typography and progress-bar thickness now more closely follow reference CSS. The experimental custom ttk image-button renderer was excluded because its initial smoke run did not complete promptly. The measured candidate still fails the 30% gate; data and analytics show small regressions. Real DPI and cross-platform pixel acceptance remain open. No source reference images were changed.

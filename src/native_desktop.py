@@ -77,7 +77,7 @@ class Desktop(SecondaryPages):
         self.nav_icons={}
         self.nav_labels=[]
         def nav_label(label):
-            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",9,"bold"))
+            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",-10,"bold"))
             widget.pack(anchor="w",padx=20,pady=(14,5))
             self.nav_labels.append(widget)
         def nav(key,label,command,parent=sidebar):
@@ -118,7 +118,7 @@ class Desktop(SecondaryPages):
         self.hscroll.grid(row=1,column=0,sticky="ew")
         self.vscroll.grid_remove()
         self.hscroll.grid_remove()
-        self.scroll_state=(False,False)
+        self.scroll_state=(False,False,False)
         content=ttk.Frame(self.viewport,padding=(28,14,28,12))
         self.content=content
         self.content_window=self.viewport.create_window(0,0,anchor="nw",window=content)
@@ -164,7 +164,7 @@ class Desktop(SecondaryPages):
                 for label in self.nav_labels:label.pack_configure(pady=(5,2) if short else (14,5))
                 for button in self.nav.values():button.pack_configure(pady=0 if short else 2)
                 style=ttk.Style(self.root)
-                for name in ("Nav.TButton","Active.Nav.TButton"):style.configure(name,padding=(7,3) if short else (11,9))
+                for name in ("Nav.TButton","Active.Nav.TButton"):style.configure(name,padding=(7,3) if short else (11,10))
             self.reflow_layout()
             self.resize_content()
 
@@ -215,17 +215,24 @@ class Desktop(SecondaryPages):
         req_w,req_h=self.content.winfo_reqwidth(),self.content.winfo_reqheight()
         vsize=self.vscroll.winfo_reqwidth()
         hsize=self.hscroll.winfo_reqheight()
+        overlay=self.root.winfo_width()>=1100
         horizontal=req_w>width
         vertical=req_h>height-(hsize if horizontal else 0)
-        horizontal=req_w>width-(vsize if vertical else 0)
+        if not overlay:horizontal=req_w>width-(vsize if vertical else 0)
         vertical=req_h>height-(hsize if horizontal else 0)
-        state=(horizontal,vertical)
+        state=(horizontal,vertical,overlay)
         if state!=self.scroll_state:
             self.scroll_state=state
-            for scrollbar,needed in ((self.hscroll,horizontal),(self.vscroll,vertical)):
-                if needed:scrollbar.grid()
-                else:scrollbar.grid_remove()
-        width-=vsize if vertical else 0
+            self.vscroll.place_forget()
+            self.hscroll.grid_remove()
+            self.vscroll.grid_remove()
+            if horizontal:self.hscroll.grid()
+            if vertical:
+                if overlay:
+                    self.vscroll.place(relx=1,x=-vsize,y=0,width=vsize,relheight=1,height=-hsize if horizontal else 0)
+                    self.vscroll.lift()
+                else:self.vscroll.grid()
+        if vertical and not overlay:width-=vsize
         height-=hsize if horizontal else 0
         target=(max(width,req_w),max(height,req_h))
         if getattr(self,"content_size",None)!=target:
@@ -376,7 +383,7 @@ class Desktop(SecondaryPages):
     def build_overview(self):
         view=self.views["overview"]
         heading=ttk.Frame(view)
-        heading.pack(fill="x",pady=(0,12))
+        heading.pack(fill="x",pady=(0,6))
         copy=ttk.Frame(heading)
         copy.pack(side="left",fill="x",expand=True)
         ttk.Label(copy,text="WEB POSLOVNI PODACI",style="Kicker.TLabel").pack(anchor="w")
@@ -388,8 +395,8 @@ class Desktop(SecondaryPages):
         self.metric_values={}
         for column,(key,label) in enumerate((("total","Tvrtke u bazi"),("cities","Gradovi"),("phones","S telefonom"),("websites","S web stranicom"))):
             metrics.columnconfigure(column,weight=1,uniform="metric")
-            panel=Card(metrics,padding=15)
-            panel.grid(row=0,column=column,sticky="nsew",padx=(0,10 if column<3 else 0))
+            panel=Card(metrics,padding=(15,12))
+            panel.grid(row=0,column=column,sticky="nsew",padx=(0,12 if column<3 else 0))
             row=ttk.Frame(panel,style="PanelInner.TFrame")
             row.pack(fill="x")
             icon=nav_icon(self.root,{"total":"directory","cities":"registry","phones":"data","websites":"analytics"}[key],ACCENT)
@@ -401,17 +408,17 @@ class Desktop(SecondaryPages):
         self.register_grid(metrics,4)
         charts=ttk.Frame(view)
         charts.pack(fill="x",pady=(0,12))
-        charts.columnconfigure(0,weight=6)
-        charts.columnconfigure(1,weight=5)
+        charts.columnconfigure(0,weight=112,uniform="overview")
+        charts.columnconfigure(1,weight=100,uniform="overview")
         city=Card(charts,padding=15)
-        city.grid(row=0,column=0,sticky="nsew",padx=(0,12))
-        ttk.Label(city,text="Najzastupljeniji gradovi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
+        city.grid(row=0,column=0,sticky="nsew",padx=(0,14))
+        ttk.Label(city,text="Najzastupljeniji gradovi",style="PanelTitle.TLabel").pack(anchor="w")
         ttk.Label(city,text="Broj tvrtki po gradu",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
         self.city_chart=tk.Canvas(city,width=220,height=165,bg=PANEL,highlightthickness=0)
         self.city_chart.pack(fill="x",expand=True,pady=(8,0))
         coverage=Card(charts,padding=15)
         coverage.grid(row=0,column=1,sticky="nsew")
-        ttk.Label(coverage,text="Dostupnost podataka",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
+        ttk.Label(coverage,text="Dostupnost podataka",style="PanelTitle.TLabel").pack(anchor="w")
         ttk.Label(coverage,text="Kontaktni podaci u imeniku",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
         self.coverage_chart=tk.Canvas(coverage,width=200,height=130,bg=PANEL,highlightthickness=0)
         self.coverage_chart.pack(fill="x",expand=True,pady=(8,0))
@@ -424,7 +431,7 @@ class Desktop(SecondaryPages):
         recent.pack(fill="both",expand=True)
         top=ttk.Frame(recent,style="PanelInner.TFrame")
         top.pack(fill="x")
-        ttk.Label(top,text="Nedavni zapisi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(side="left")
+        ttk.Label(top,text="Nedavni zapisi",style="PanelTitle.TLabel").pack(side="left")
         ttk.Button(top,text="Otvori imenik",command=lambda:self.show_view("directory")).pack(side="right")
         ttk.Label(recent,text="Brz pristup zapisima iz baze",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
         self.recent=ttk.Treeview(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
@@ -488,7 +495,7 @@ class Desktop(SecondaryPages):
         cities=stats["top_cities"]
         largest=max(1,max((row["n"] for row in cities),default=1))
         for index,row in enumerate(cities[:6]):
-            y=8+30*index
+            y=8+28*index
             self.city_chart.create_text(0,y,anchor="w",text=row["city"][:18],fill=TEXT)
             self.chart_bar(self.city_chart,y+12,width,row["n"]/largest)
             self.city_chart.create_text(width-2,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=MUTED)

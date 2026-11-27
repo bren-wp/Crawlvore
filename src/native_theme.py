@@ -47,7 +47,7 @@ def install(root):
     for name,fill,fg in (("TButton",PANEL2,TEXT),("Accent.TButton",ACCENT,INK),
                          ("Nav.TButton",SIDE,TEXT),("Active.Nav.TButton",ACTIVE,ACCENT)):
         style.configure(name,background=fill,foreground=fg,padding=(11,9),
-                        anchor="w" if "Nav" in name else "center",font=("Segoe UI",10,"bold"),borderwidth=1)
+                        anchor="w" if "Nav" in name else "center",font=("Segoe UI",-13 if "Nav" in name else -12,"bold"),borderwidth=1)
         style.map(name,foreground=[("disabled",MUTED),("active",fg)],background=[("active",fill)])
     style.configure("Upload.TFrame",background=BG,borderwidth=1,relief="solid")
     style.configure("Upload.TLabel",background=BG,foreground=TEXT)
@@ -55,7 +55,7 @@ def install(root):
     style.configure("Header.TFrame",background=SIDE)
     style.configure("Header.TLabel",background=SIDE,foreground=MUTED)
     style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=("Segoe UI",10,"bold"))
-    style.configure("Small.TButton",padding=(9,5),font=("Segoe UI",9,"bold"))
+    style.configure("Small.TButton",padding=(10,6),font=("Segoe UI",-12,"bold"))
     style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=("Segoe UI",9))
     style.configure("Recent.Treeview",rowheight=36)
     style.configure("Card.TFrame",background=BG,borderwidth=0,relief="flat")
@@ -70,13 +70,13 @@ def install(root):
     style.configure("Treeview",font=("Segoe UI",-13))
     style.configure("Panel.TLabel",background=PANEL)
     style.configure("Metric.TLabel",background=PANEL,font=("Segoe UI",-30,"bold"))
-    style.configure("Title.TLabel",font=("Segoe UI",-28,"bold"))
-    style.configure("Kicker.TLabel",foreground=ACCENT,font=("Segoe UI",9,"bold"))
-    style.configure("Muted.TLabel",foreground=MUTED)
+    style.configure("Title.TLabel",font=("Segoe UI",-30,"bold"))
+    style.configure("Kicker.TLabel",foreground=ACCENT,font=("Segoe UI",-10,"bold"))
+    style.configure("Muted.TLabel",foreground=MUTED,font=("Segoe UI",-12))
     style.configure("PanelTitle.TLabel",background=PANEL,font=("Segoe UI",-16,"bold"),padding=0)
-    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED)
+    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED,font=("Segoe UI",-12))
     style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=43,borderwidth=0)
-    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=("Segoe UI",9,"bold"),padding=(8,8))
+    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=("Segoe UI",-10,"bold"),padding=(8,8))
     style.map("Treeview",background=[("selected",ACTIVE)],foreground=[("selected",TEXT)])
     style.configure("TEntry",fieldbackground=BG,padding=(8,8),bordercolor=LINE)
     style.configure("TCombobox",fieldbackground=BG,foreground=TEXT,background=PANEL2,padding=(8,7),arrowsize=14)
@@ -87,7 +87,7 @@ def install(root):
     style.configure("TNotebook",background=BG,borderwidth=0)
     style.configure("TNotebook.Tab",background=PANEL2,foreground=TEXT,padding=(12,8))
     style.map("TNotebook.Tab",background=[("selected",ACTIVE)],foreground=[("selected",ACCENT)])
-    style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT)
+    style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT,thickness=8)
 
 def panel(parent,title=None,padding=15):
     box=ttk.Frame(parent,style="Panel.TFrame",padding=padding)
@@ -141,7 +141,7 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         dx,dy=math.sin(angle),-math.cos(angle)
         span=max(1,dx*(w-1)+dy*(h-1))
         def projection(point):return (dx*point[0]+dy*point[1])/span
-        bands=24
+        bands=48
         for i in range(bands):
             polygon=clip_band(points,projection,i/bands,True)
             polygon=clip_band(polygon,projection,min(1,(i+1)/bands+.002),False)
