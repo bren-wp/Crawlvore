@@ -75,9 +75,13 @@ def run_workspace(args,selection,active):
     gb_download=GBDownload(national.downloaded)
     database=args.data_dir/'companies.sqlite3'
     edition=None
+    default_language='en'
     edition_path=ROOT/'edition.json'
     if edition_path.is_file():
-        edition=json.loads(edition_path.read_text(encoding='utf-8'))['edition']
+        edition_config=json.loads(edition_path.read_text(encoding='utf-8'))
+        edition=edition_config['edition']
+        default_language=edition_config.get('language','en')
+        if default_language not in ('en','hr'): raise ValueError('Invalid edition language.')
         if edition not in ('Full','HR','GB','Online'): raise ValueError('Invalid edition.')
         if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
             if (ROOT/'registry-seed.sqlite3').is_file()!=(edition in ('Full','HR')) or (ROOT/'national-data/GB/manifest.json').is_file()!=(edition in ('Full','GB')) or (ROOT/'tvrtk_output.csv').exists():
@@ -99,6 +103,8 @@ def run_workspace(args,selection,active):
     if database.exists() and inspect_database(database)!='ok': raise RuntimeError('Active workspace integrity check failed. Original preserved.')
     if not installed: verified_backup(database)
     store=Store(database); collector=Collector(store); registry=Registry(store)
+    with store.db() as db:
+        db.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('ui_language',?)",(default_language,))
     recovery=RecoveryCenter(database,root=selection.root)
     transfers=BackupTransfer(recovery)
     protected=ProtectedBackups(database,recovery)

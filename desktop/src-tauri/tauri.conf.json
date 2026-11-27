@@ -1,6 +1,6 @@
 {
   "productName": "Crawlvora",
-  "version": "8.1.5",
+  "version": "8.1.6",
   "identifier": "com.brendigo.crawlvora",
   "build": {
     "frontendDist": "../bootstrap"

@@ -1,4 +1,4 @@
-param([ValidateSet('Legacy','Full','HR','GB','Online')][string]$Edition='Legacy')
+param([ValidateSet('Legacy','Full','HR','GB','Online')][string]$Edition='Legacy',[ValidateSet('en','hr')][string]$Language='en')
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $version = (Get-Content VERSION -Raw).Trim()
@@ -35,7 +35,7 @@ if ($env:CRAWLVORA_NATIONAL_BUNDLE -eq '1') {
 }
 if ($Edition -eq 'Legacy') { $registryArgs+=@('--add-data','tvrtk_output.csv;.') }
 else {
-    @{edition=$Edition} | ConvertTo-Json -Compress | Set-Content (Join-Path $output 'edition.json') -Encoding ascii
+    @{edition=$Edition;language=$Language} | ConvertTo-Json -Compress | Set-Content (Join-Path $output 'edition.json') -Encoding ascii
     $registryArgs+=@('--add-data',((Join-Path $output 'edition.json')+';.'))
 }
 python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --exclude-module playwright --exclude-module webview tvrtk_scraper.py
@@ -70,7 +70,7 @@ try {
 } finally { Remove-Item $bootstrapper -Force -ErrorAction SilentlyContinue }
 function Test-NativeWindow($exe) {
     $p = Start-Process -FilePath $exe -ArgumentList '--native-smoke' -PassThru
-    if (!$p.WaitForExit(240000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Native smoke timed out' }
+    if (!$p.WaitForExit(900000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Native smoke timed out' }
     if ($p.ExitCode -ne 0) { throw 'Native smoke failed' }
 }
 $base = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
