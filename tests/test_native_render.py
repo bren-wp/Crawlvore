@@ -62,3 +62,12 @@ class RoundedSurfaceTests(unittest.TestCase):
         self.assertEqual(header_surface.cache_info().maxsize,4)
         for width in (0,4097):
             with self.assertRaises(ValueError):header_surface(args[0],args[1],width)
+
+    def test_header_fast_path_matches_every_reference_pixel(self):
+        for bg,accent in (("#08131e","#36ebba"),("#ffffff","#000000"),("#000000","#ffffff")):
+            for width in (1,37,320,1024):
+                with self.subTest(bg=bg,accent=accent,width=width):
+                    actual=Image.open(io.BytesIO(header_surface(bg,accent,width))).tobytes()
+                    expected=bytes(c for y in range(119) for x in range(width)
+                                   for c in (*reference_header_color(bg,accent,width,119,x+.5,y+.5),255))
+                    self.assertEqual(actual,expected)
