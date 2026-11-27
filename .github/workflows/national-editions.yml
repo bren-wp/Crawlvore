@@ -112,6 +112,7 @@ jobs:
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
           cd release
           test "$(find . -type f | wc -l)" = 10
+          python ../tools/package_sizes.py . --release full
           for f in *; do test -s "$f"; test "$(stat -c %s "$f")" -lt 2147483648; done
           sha256sum * > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
@@ -152,6 +153,7 @@ jobs:
           cp "$linux/Crawlvora-Linux-x86_64.tar.gz" release/Crawlvora-Linux-HR-Online-x86_64.tar.gz
           cd release
           test "$(find . -type f | wc -l)" = 4
+          python ../tools/package_sizes.py . --release online
           for f in *; do test -s "$f"; test "$(stat -c %s "$f")" -lt 2147483648; done
           sha256sum * > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt

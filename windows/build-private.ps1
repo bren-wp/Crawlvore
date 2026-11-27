@@ -28,7 +28,7 @@ try {
         (Get-FileHash registry-bundle/registry-seed.sqlite3 -Algorithm SHA256).Hash.ToLower() | Set-Content registry-bundle/registry-seed.sha256 -Encoding ascii
         python tools/compress_registry_seed.py registry-bundle
     if ($LASTEXITCODE) { throw 'Registry compression failed' }
-    $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3.gz;.','--add-data','registry-bundle/registry-seed.size;.','--add-data','registry-bundle/registry-seed.sha256;.','--add-data','registry-bundle/registry-seed.json;.')
+    $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3.xz;.','--add-data','registry-bundle/registry-seed.size;.','--add-data','registry-bundle/registry-seed.sha256;.','--add-data','registry-bundle/registry-seed.json;.')
     }
     $edition = if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {'HR'} else {'Online'}
     @{edition=$edition;language='hr'} | ConvertTo-Json -Compress | Set-Content (Join-Path $staging 'edition.json') -Encoding ascii

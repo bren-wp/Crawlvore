@@ -104,7 +104,7 @@ jobs:
           extra=()
           if [ "${CRAWLVORA_REGISTRY_BUNDLE:-}" = 1 ]; then
             python tools/compress_registry_seed.py registry-bundle
-            extra=(--add-data "registry-bundle/registry-seed.sqlite3.gz:." --add-data "registry-bundle/registry-seed.size:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
+            extra=(--add-data "registry-bundle/registry-seed.sqlite3.xz:." --add-data "registry-bundle/registry-seed.size:." --add-data "registry-bundle/registry-seed.sha256:." --add-data "registry-bundle/registry-seed.json:.")
           fi
           mkdir -p native-edition
           python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
@@ -162,7 +162,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          tar -czf release-assets/Crawlvora-Linux-x86_64.tar.gz -C native-preview .
+          tar -I "gzip -9" -cf release-assets/Crawlvora-Linux-x86_64.tar.gz -C native-preview .
           mkdir -p /tmp/crawlvora-extracted
           tar -xzf release-assets/Crawlvora-Linux-x86_64.tar.gz -C /tmp/crawlvora-extracted
           WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /tmp/crawlvora-extracted/Crawlvora --native-smoke
@@ -170,6 +170,14 @@ jobs:
           sudo apt-get install -y ./release-assets/Crawlvora-Linux-amd64.deb
           WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /usr/bin/crawlvora --native-smoke
           sudo apt-get remove -y crawlvora
+      - name: Enforce package size budgets
+        shell: bash
+        env:
+          SIZE_EDITION: ${{ inputs.edition || 'Online' }}
+        run: |
+          python tools/package_sizes.py release-assets --edition "$SIZE_EDITION" --platform "$RUNNER_OS"
+          echo '### Package sizes (bytes)' >> "$GITHUB_STEP_SUMMARY"
+          cat release-assets/PACKAGE-SIZES.json >> "$GITHUB_STEP_SUMMARY"
       - name: Rust dependency vulnerability audit
         if: runner.os == 'Linux'
         working-directory: desktop/src-tauri
@@ -192,6 +200,7 @@ jobs:
         if: inputs.publish_artifacts == true
         with:
           retention-days: 7
+          compression-level: 0
           name: Crawlvora-native-${{ runner.os }}${{ inputs.artifact_suffix }}
           path: release-assets/
           if-no-files-found: error

@@ -83,7 +83,7 @@ def run_workspace(args,selection,active):
         if default_language != 'hr': raise ValueError('Invalid edition language.')
         if edition not in ('HR','Online'): raise ValueError('Invalid edition.')
         if os.environ.get('CRAWLVORA_NATIVE_SMOKE')=='1':
-            if ((ROOT/'registry-seed.sqlite3').is_file() or (ROOT/'registry-seed.sqlite3.gz').is_file())!=(edition=='HR') or (ROOT/'tvrtk_output.csv').exists():
+            if ((ROOT/'registry-seed.sqlite3').is_file() or (ROOT/'registry-seed.sqlite3.gz').is_file() or (ROOT/'registry-seed.sqlite3.xz').is_file())!=(edition=='HR') or (ROOT/'tvrtk_output.csv').exists():
                 raise ValueError('Edition payload mismatch.')
     installed=active=='primary' and install_seed(ROOT,database)
     expected=os.environ.get('CRAWLVORA_EXPECTED_REGISTRY_SHA256')

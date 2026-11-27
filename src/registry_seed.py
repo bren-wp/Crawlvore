@@ -1,6 +1,7 @@
 """Initialize a fresh workspace from a verified, embedded registry database."""
 import gzip
 import hashlib
+import lzma
 import json
 import sqlite3
 import shutil
@@ -10,12 +11,38 @@ import tempfile
 from pathlib import Path
 
 
+CHUNK=1024*1024
+XZ_MEMORY_LIMIT=32*1024*1024
+
+def seed_chunks(source):
+    """Stream one XZ member with explicit decoder memory and output limits."""
+    if source.suffix=='.xz':
+        decoder=lzma.LZMADecompressor(format=lzma.FORMAT_XZ,memlimit=XZ_MEMORY_LIMIT)
+        with source.open('rb') as stream:
+            while not decoder.eof:
+                data=stream.read(CHUNK) if decoder.needs_input else b''
+                if decoder.needs_input and not data:
+                    raise ValueError('Truncated registry XZ seed.')
+                try:
+                    chunk=decoder.decompress(data,max_length=CHUNK)
+                except lzma.LZMAError:
+                    raise ValueError('Invalid registry XZ seed or decoder memory limit exceeded.') from None
+                if chunk: yield chunk
+            if decoder.unused_data or stream.read(1):
+                raise ValueError('Unexpected trailing registry XZ data.')
+    else:
+        with (gzip.open(source,'rb') if source.suffix=='.gz' else source.open('rb')) as stream:
+            while chunk:=stream.read(CHUNK):
+                yield chunk
+
+
 def install_seed(root, destination):
     root=Path(root)
     raw=root/'registry-seed.sqlite3'
+    xz=root/'registry-seed.sqlite3.xz'
     packed=root/'registry-seed.sqlite3.gz'
-    source=packed if packed.exists() else raw
-    compressed=source==packed
+    source=xz if xz.exists() else packed if packed.exists() else raw
+    compressed=source!=raw
     checksums=Path(root)/'registry-seed.sha256'
     destination=Path(destination)
     if destination.exists() or not source.exists():
@@ -43,10 +70,10 @@ def install_seed(root, destination):
         raise ValueError('Invalid registry seed checksum.')
     fd,name=tempfile.mkstemp(prefix='registry-seed-',dir=destination.parent)
     try:
-        with os.fdopen(fd,'wb') as output,(gzip.open(source,'rb') if compressed else source.open('rb')) as data:
+        with os.fdopen(fd,'wb') as output:
             digest=hashlib.sha256()
             copied=0
-            while chunk:=data.read(1024*1024):
+            for chunk in seed_chunks(source):
                 copied+=len(chunk)
                 if copied>size: raise ValueError('Registry seed size mismatch.')
                 digest.update(chunk)

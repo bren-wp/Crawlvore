@@ -2,6 +2,10 @@
 
 ## 8.1.7
 
+- Add measured package-size reports and CI budgets for both Croatian editions.
+
+- Compress the complete offline SQLite seed with XZ/LZMA2, verify the exact decoded bytes with a bounded decoder, retain legacy GZIP support, and avoid recompressing native CI artifacts.
+
 - Add index-backed category ordering and sparse e-mail contact lookup.
 - Introduce signed update manifest and bounded package verification with edition and rollback checks; execution is not yet enabled.
 

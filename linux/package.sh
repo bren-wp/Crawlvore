@@ -31,4 +31,4 @@ Categories=Office;Database;
 StartupNotify=true
 EOF
 mkdir -p release-assets
-dpkg-deb --root-owner-group --build "$root" release-assets/Crawlvora-Linux-amd64.deb
+dpkg-deb -Zxz -z6 --root-owner-group --build "$root" release-assets/Crawlvora-Linux-amd64.deb
