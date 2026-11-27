@@ -1,7 +1,7 @@
 name: Million-record performance
 on:
   push:
-    branches: [data-safety-release]
+    branches: [data-safety-release, product-readme-and-web-packaging]
     paths: ['.github/workflows/million-records.yml', 'tools/performance_check.py']
   workflow_dispatch:
   workflow_call:

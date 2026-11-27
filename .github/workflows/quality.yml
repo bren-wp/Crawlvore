@@ -36,6 +36,7 @@ jobs:
           find wordpress -name '*.php' -print0 | xargs -0 -n1 php -l
           php tests/wordpress_catalog.php
           bash tools/wordpress_acceptance.sh
+          bash tools/apache_storage_acceptance.sh
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
       - run: npm audit --audit-level=moderate
       - run: npm run typecheck

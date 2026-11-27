@@ -110,3 +110,28 @@ running during this review; the cleanup/pinning revision requires fresh CI.
 Actual hosting access rules, comprehensive manual threat review and remaining
 dynamic dead-code/semantic candidates are not fully verified. Original design
 PNGs and approved private national-data distribution remain independent gates.
+
+## Increment 4: verification and performance handoff
+
+The complete native Windows and Linux package workflow 45920343227 passed
+for e0a914fa0905cd76e59a4de13d8478c4f18e3253. The next revision c45b7eff
+passed both quality jobs (45921115429) and the native secure vault workflow
+(45921115356); native package jobs for that revision are separate.
+
+A changed UK cache identity (device, inode, size and timestamps) or manifest
+invalidates the session verification cache. Stable files retain the fast
+path; changed files must pass the full SHA-256 and metadata checks again.
+Tests exercise same-session corruption and the unchanged-file fast path.
+This is change detection, not a proof against a malicious local process
+that controls the filesystem concurrently.
+
+Pinned the three WordPress acceptance images to digests observed in the
+successful quality run 45920343256. Added an Apache/PHP acceptance script
+using the same verified image, a synthetic catalog, explicit AllowOverride
+All and direct requests to storage. Actual Apache CI result remains required;
+this test does not certify a third-party production hosting configuration.
+
+The six RustSec advisory warnings remain documented and are not waived.
+Security verification and the performance work may proceed in parallel;
+complete security acceptance is not claimed while those upstream findings,
+remaining manual review, or latest CI results are unresolved.

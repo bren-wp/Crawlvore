@@ -227,7 +227,12 @@ class Store:
         order={'title':'title COLLATE NOCASE ASC,id','title_desc':'title COLLATE NOCASE DESC,id','city':'city COLLATE NOCASE,title COLLATE NOCASE,id','new':'id DESC'}.get(sort,'id')
         with self.db() as c:
             c.execute('BEGIN')
-            total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
+            if provider and not (q or city or contact or entity_kind):
+                # Drive the provider-only count from the narrower provenance index.
+                # DISTINCT preserves one result per company with multiple source URLs.
+                total=c.execute('SELECT count(DISTINCT company_id) FROM origins WHERE provider=? AND EXISTS (SELECT 1 FROM companies WHERE id=origins.company_id)',(provider,)).fetchone()[0]
+            else:
+                total=c.execute('SELECT count(*) FROM companies'+where,args).fetchone()[0]  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             rows=c.execute('SELECT id,title,city,address,postal,phone,website,description,oib,email,industry,entity_kind,(SELECT group_concat(DISTINCT provider) FROM origins WHERE company_id=companies.id) providers FROM companies'+where+' ORDER BY '+order+' LIMIT ? OFFSET ?',(*args,limit,(page-1)*limit))  # nosec B608 -- Store.where returns only fixed clauses; all data is bound, sort is allowlisted.
             return {'total':total,'rows':[dict(r) for r in rows]}
     def cities(self):
