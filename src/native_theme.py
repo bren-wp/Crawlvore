@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk
-from native_render import rounded_surface, stroke_icon, surface_color
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -96,9 +96,6 @@ def panel(parent,title=None,padding=15):
     if title:ttk.Label(box,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
     return box
 
-def mix(a,b,t):
-    return "#"+"".join(f"{round(int(a[i:i+2],16)*(1-t)+int(b[i:i+2],16)*t):02x}" for i in (1,3,5))
-
 def clip_band(points,projection,bound,keep_above):
     if not points:return []
     result=[]
@@ -185,12 +182,11 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         dx,dy=math.sin(angle),-math.cos(angle)
         span=max(1,dx*(w-1)+dy*(h-1))
         def projection(point):return (dx*point[0]+dy*point[1])/span
-        bands=48
-        for i in range(bands):
-            polygon=clip_band(points,projection,i/bands,True)
-            polygon=clip_band(polygon,projection,min(1,(i+1)/bands+.002),False)
+        for left,right,color in gradient_bands(start,end):
+            polygon=clip_band(points,projection,left,True)
+            polygon=clip_band(polygon,projection,min(1,right+.001),False)
             if len(polygon)>=3:
-                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(start,end,(i+.5)/bands),outline="",tags="surface")
+                canvas.create_polygon(*[v for point in polygon for v in point],fill=color,outline="",tags="surface")
         if border:
             canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
     def resized(_event):
@@ -217,26 +213,29 @@ class Card(ttk.Frame):
         if title:ttk.Label(self,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
 
 def header_glow(parent):
-    """Native procedural header accent; no screenshot or web rendering."""
+    """Cached procedural raster, not an image of the reference screen."""
     canvas=tk.Canvas(parent,height=119,bg=BG,highlightthickness=0,borderwidth=0,takefocus=0)
     canvas.place(x=0,y=0,relwidth=1)
     canvas.tk.call("lower",canvas._w)
-    def draw(event):
-        w,h=event.width,event.height
-        if w<20:return
+    pending=None
+    last=0
+    def draw():
+        nonlocal pending,last
+        pending=None
+        w=canvas.winfo_width()
+        if not 20<=w<=4096 or w==last:return
+        last=w
+        canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w))
         canvas.delete("glow")
-        # Header surface follows the reference's rising diagonal.
-        points=[(.80*w,0),(w,0),(w,h),(.56*w,h),(.70*w,.43*h)]
-        def projection(point):
-            return point[0]/w-(.80-.24*point[1]/h)
-        for i in range(24):
-            lo=i*.44/24;hi=(i+1)*.44/24
-            polygon=clip_band(points,projection,lo,True)
-            polygon=clip_band(polygon,projection,hi+.001,False)
-            if len(polygon)>=3:
-                alpha=.24*math.exp(-lo*13)
-                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(BG,ACCENT,alpha),outline="",tags="glow")
-    canvas.bind("<Configure>",draw)
+        canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
+    def resized(_event):
+        nonlocal pending
+        if pending is not None:canvas.after_cancel(pending)
+        pending=canvas.after(60,draw)
+    def destroyed(_event):
+        if pending is not None:canvas.after_cancel(pending)
+    canvas.bind("<Configure>",resized)
+    canvas.bind("<Destroy>",destroyed)
     return canvas
 
 def product_icon(root):

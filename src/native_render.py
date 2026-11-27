@@ -4,6 +4,7 @@ import struct
 import zlib
 from functools import lru_cache
 
+@lru_cache(maxsize=64)
 def rgb(color):
     if len(color)!=7 or color[0]!="#":
         raise ValueError("Expected RGB hex color")
@@ -86,3 +87,51 @@ def surface_color(start,end,width,height,x,y):
     dx,dy=math.sin(angle),-math.cos(angle)
     fraction=max(0,min(1,(dx*x+dy*y)/max(1,dx*width+dy*height)))
     return "#"+"".join(f"{channel:02x}" for channel in blend(rgb(start),rgb(end),fraction))
+
+@lru_cache(maxsize=32)
+def gradient_bands(start,end):
+    """Exact channel-rounding intervals for an opaque sRGB linear gradient."""
+    a,b=rgb(start),rgb(end)
+    cuts={0.0,1.0}
+    for lo,hi in zip(a,b):
+        if lo!=hi:
+            cuts.update((i+.5)/abs(hi-lo) for i in range(abs(hi-lo)))
+    bounds=sorted(cuts)
+    return tuple((left,right,"#"+"".join(f"{v:02x}" for v in blend(a,b,(left+right)/2)))
+                 for left,right in zip(bounds,bounds[1:]))
+
+HEADER_DX=math.sin(math.radians(161))
+HEADER_DY=-math.cos(math.radians(161))
+
+def reference_header_color(bg,accent,width,height,x,y):
+    """Composite the two reference header gradients at a logical pixel."""
+    base,ink=rgb(bg),rgb(accent)
+    # Radial ellipse centered above the header.
+    radial=math.hypot((x/width-.83)/.75,(y/height+.8)/1.5)
+    opacity=.30*max(0,1-radial/.76)
+    # Clip to the polygon in the reference CSS.
+    if x/width < .80-.24*y/height:opacity=0
+    base=blend(base,ink,opacity)
+    # The second layer is a narrow diagonal highlight on the right 57%.
+    local=x-.43*width
+    if local<0 or y>110:return base
+    w=.57*width
+    if local/w < max(0,.70*(1-y/110)):return base
+    t=(HEADER_DX*local+HEADER_DY*y)/(HEADER_DX*w+HEADER_DY*110)
+    stops=((.45,0),(.46,.55),(.49,.14),(.64,0))
+    if not .45<t<.64:return base
+    for (lo,a),(hi,b) in zip(stops,stops[1:]):
+        if lo<=t<=hi:return blend(base,ink,a+(b-a)*(t-lo)/(hi-lo))
+    return base
+
+@lru_cache(maxsize=4)
+def header_surface(bg,accent,width,height=119):
+    if type(width) is not int or not 1<=width<=4096 or height!=119:
+        raise ValueError("Invalid header geometry")
+    rows=[]
+    for y in range(height):
+        row=bytearray()
+        for x in range(width):
+            row.extend((*reference_header_color(bg,accent,width,height,x+.5,y+.5),255))
+        rows.append(bytes(row))
+    return png(width,height,rows)

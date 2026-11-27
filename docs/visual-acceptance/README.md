@@ -27,3 +27,7 @@ The logo surface and navigation line icons now use bounded, supersampled RGBA PN
 ## Local gradient sampling
 
 Native card labels, nested panel frames and chart canvases now sample the local gradient color instead of displaying uniform panel-colored rectangles. Styles inherit their existing font, foreground and control semantics. Sampling occurs after layout settles and pending callbacks are cancelled on destruction. The original controls remain interactive; nested card decorations are excluded. All seven views reduced changed pixels at the measured 1280x700 viewport. The 30% gate is still failing; no production readiness or DPI equivalence is inferred. Reference images remain unchanged.
+
+## Gradient intervals and header accent
+
+The card renderer now derives its band boundaries from RGB channel rounding instead of generating 48 fixed polygons. It retains live native controls and bounded caches. The procedural header raster approximates the two layered reference gradients and is cached by viewport width (four entries, maximum width 4096). It does not embed reference images. Local measurement at 1280x700 shows fewer differing pixels on all seven views; 30% and exact acceptance remain unmet. Physical DPI and cross-platform pixel equivalence have not been verified. No production data was used.
