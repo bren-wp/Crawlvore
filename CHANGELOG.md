@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Move the runtime entry point into src without changing source workspace or packaged data paths.
+- Introduce Croatian NSIS installer with isolated install, upgrade and uninstall acceptance.
+
 - Focus exclusively on Croatian Court Registry desktop editions for Windows and Linux.
 - Move Python runtime modules into src and separate legacy data resources.
 - Retain existing workspaces and verified snapshot archive.

@@ -26,7 +26,7 @@ def dependencies():
 
 def run():
     unused=[]; clones=collections.defaultdict(list); review=[]; funcs=0
-    for path in sorted((ROOT/'src').glob('*.py'))+[ROOT/'tvrtk_scraper.py']:
+    for path in sorted((ROOT/'src').glob('*.py')):
         tree=ast.parse(path.read_text(encoding='utf-8')); used={n.id for n in ast.walk(tree) if isinstance(n,ast.Name) and isinstance(n.ctx,ast.Load)}
         # A literal __all__ is an explicit public compatibility contract.
         for statement in tree.body:

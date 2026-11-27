@@ -25,7 +25,7 @@ def run():
         env={k:v for k,v in os.environ.items() if not k.startswith(('SUDREG_','CRAWLVORA_REGISTRY_'))}
         # Do not leave an unread stderr pipe that can block a worker during shutdown.
         worker_log=(Path(tmp)/'worker-stderr.log').open('w+b')
-        worker=subprocess.Popen([sys.executable,str(ROOT/'tvrtk_scraper.py'),'--worker','--port','0','--data-dir',str(data)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=worker_log,text=True,env=env,cwd=tmp)
+        worker=subprocess.Popen([sys.executable,str(ROOT/'src/tvrtk_scraper.py'),'--worker','--port','0','--data-dir',str(data)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=worker_log,text=True,env=env,cwd=tmp)
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
                 future=pool.submit(worker.stdout.readline)

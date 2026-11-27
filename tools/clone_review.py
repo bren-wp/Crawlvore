@@ -21,7 +21,7 @@ class Normalize(ast.NodeTransformer):
 def report():
     groups=collections.defaultdict(list)
     functions=windows=0
-    for path in sorted((ROOT/'src').glob('*.py'))+[ROOT/'tvrtk_scraper.py']:
+    for path in sorted((ROOT/'src').glob('*.py')):
         tree=ast.parse(path.read_text(encoding='utf-8'))
         for node in ast.walk(tree):
             if not isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)): continue

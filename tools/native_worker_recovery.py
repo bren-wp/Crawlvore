@@ -106,4 +106,4 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--worker',type=Path)
     args=parser.parse_args()
-    run([str(args.worker.resolve())] if args.worker else [sys.executable,str(ROOT/'tvrtk_scraper.py')])
+    run([str(args.worker.resolve())] if args.worker else [sys.executable,str(ROOT/'src/tvrtk_scraper.py')])

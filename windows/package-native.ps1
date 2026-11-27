@@ -28,7 +28,7 @@ if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {
 }
 @{edition=$Edition;language=$Language} | ConvertTo-Json -Compress | Set-Content (Join-Path $output 'edition.json') -Encoding ascii
 $registryArgs+=@('--add-data',((Join-Path $output 'edition.json')+';.'))
-python -m PyInstaller --paths src @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+python -m PyInstaller --paths src @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath dist/embedded --add-data 'static;static' --exclude-module playwright --exclude-module webview src/tvrtk_scraper.py
 if ($LASTEXITCODE) { throw 'Embedded worker build failed' }
 $worker = (Resolve-Path dist/embedded/CrawlvoraWorker.exe).Path
 $env:CRAWLVORA_WORKER_SIZE = (Get-Item $worker).Length.ToString()
@@ -39,8 +39,8 @@ $cargoTarget = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { 'desk
 python tools/pack_portable.py (Join-Path $cargoTarget 'release/crawlvora-desktop.exe') $worker (Join-Path $output 'Portable.exe') $env:CRAWLVORA_WORKER_SHA256 $env:CRAWLVORA_WORKER_SIZE
 if ($LASTEXITCODE) { throw 'Portable payload assembly failed' }
 Remove-Item Env:CRAWLVORA_WORKER_SIZE,Env:CRAWLVORA_WORKER_SHA256
-$iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-if (!(Test-Path $iscc)) { throw 'Inno Setup 6 is missing' }
+$nsis = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+if (!(Test-Path $nsis)) { throw 'NSIS compiler is missing' }
 # Bundle Microsoft's signed Evergreen bootstrapper for systems missing WebView2.
 $bootstrapper = Join-Path (Resolve-Path windows).Path 'MicrosoftEdgeWebview2Setup.exe'
 if (Test-Path $bootstrapper) { throw 'Existing WebView2 bootstrapper must not be overwritten.' }
@@ -49,12 +49,12 @@ $signature = Get-AuthenticodeSignature $bootstrapper
 if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'CN=Microsoft Corporation(,|$)') { throw 'Invalid Microsoft WebView2 installer signature' }
 $acceptance = $null
 try {
-    & $iscc "/DAppVersion=$version" "/DPrivatePortable=$(Join-Path $output 'Portable.exe')" "/DPrivateOutput=$output" windows/Crawlvora-native.iss
-    if ($LASTEXITCODE) { throw 'Native installer build failed' }
-        $acceptance = Join-Path $env:TEMP ('cv-acceptance-' + [guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Directory -Path $acceptance | Out-Null
-        & $iscc "/DAppVersion=$version" "/DPrivatePortable=$(Join-Path $output 'Portable.exe')" "/DPrivateOutput=$acceptance" '/DPrivateSmoke=1' windows/Crawlvora-native.iss
-        if ($LASTEXITCODE) { throw 'Isolated acceptance installer build failed' }
+    & $nsis /INPUTCHARSET UTF8 "/DAPP_VERSION=$version" "/DAPP_EXE=$(Join-Path $output 'Portable.exe')" "/DSETUP_EXE=$(Join-Path $output 'Setup.exe')" "/DWEBVIEW_BOOTSTRAPPER=$bootstrapper" windows/Crawlvora.nsi
+    if ($LASTEXITCODE) { throw 'NSIS installer build failed' }
+    $acceptance = Join-Path $env:TEMP ('cv-acceptance-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $acceptance | Out-Null
+    & $nsis /INPUTCHARSET UTF8 "/DAPP_VERSION=$version" "/DAPP_EXE=$(Join-Path $output 'Portable.exe')" "/DSETUP_EXE=$(Join-Path $acceptance 'Setup.exe')" "/DWEBVIEW_BOOTSTRAPPER=$bootstrapper" /DACCEPTANCE windows/Crawlvora.nsi
+    if ($LASTEXITCODE) { throw 'Isolated NSIS acceptance installer build failed' }
 } finally { Remove-Item $bootstrapper -Force -ErrorAction SilentlyContinue }
 function Test-NativeWindow($exe) {
     $p = Start-Process -FilePath $exe -ArgumentList '--native-smoke' -PassThru
@@ -70,12 +70,20 @@ try {
     Test-NativeWindow (Join-Path $output 'Portable.exe')
     $install = Join-Path $smoke 'installed'
     $setup = Join-Path $acceptance 'Setup.exe'
-    $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $install + '"'),('/LOG="' + $log + '"')) -Wait -PassThru
-    if ($p.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log -Tail 100 }; throw "Native installer failed (exit $($p.ExitCode))" }
+    $p = Start-Process -FilePath $setup -ArgumentList ('/S /D=' + $install) -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw "NSIS installer failed (exit $($p.ExitCode))" }
     if ((Get-FileHash (Join-Path $install 'Crawlvora.exe')).Hash -ne (Get-FileHash (Join-Path $output 'Portable.exe')).Hash) { throw 'Edition installer payload mismatch' }
     Test-NativeWindow (Join-Path $install 'Crawlvora.exe')
-    $p = Start-Process -FilePath (Join-Path $install 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
-    if ($p.ExitCode -ne 0) { throw 'Native uninstall failed' }
+    # Prove update and uninstall never recursively remove arbitrary files.
+    $sentinel = Join-Path $install 'user-data-sentinel.sqlite3'
+    'synthetic data must survive' | Set-Content -LiteralPath $sentinel -Encoding ascii
+    $before = (Get-FileHash $sentinel).Hash
+    $p = Start-Process -FilePath $setup -ArgumentList ('/S /D=' + $install) -Wait -PassThru
+    if ($p.ExitCode -ne 0 -or (Get-FileHash $sentinel).Hash -ne $before) { throw 'NSIS update acceptance failed' }
+    if ((Get-FileHash (Join-Path $install 'Crawlvora.exe')).Hash -ne (Get-FileHash (Join-Path $output 'Portable.exe')).Hash) { throw 'Updated payload mismatch' }
+    Test-NativeWindow (Join-Path $install 'Crawlvora.exe')
+    $p = Start-Process -FilePath (Join-Path $install 'Uninstall-Crawlvora.exe') -ArgumentList '/S' -Wait -PassThru
+    if ($p.ExitCode -ne 0 -or (Test-Path (Join-Path $install 'Crawlvora.exe')) -or (Get-FileHash $sentinel).Hash -ne $before) { throw 'NSIS uninstall/data preservation failed' }
 } finally {
     Remove-Item $smoke -Recurse -Force -ErrorAction SilentlyContinue
     if ($acceptance) { Remove-Item $acceptance -Recurse -Force -ErrorAction SilentlyContinue }

@@ -14,7 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 class LanguageTests(unittest.TestCase):
     def test_croatian_default_english_persistence(self):
         with tempfile.TemporaryDirectory() as directory:
-            p=subprocess.Popen([sys.executable,str(ROOT/'tvrtk_scraper.py'),'--worker','--port','0','--data-dir',directory],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            p=subprocess.Popen([sys.executable,str(ROOT/'src/tvrtk_scraper.py'),'--worker','--port','0','--data-dir',directory],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             try:
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     future=executor.submit(p.stdout.readline)

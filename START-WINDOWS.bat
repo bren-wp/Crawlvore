@@ -6,7 +6,7 @@ if not exist .venv\Scripts\python.exe %PY% -m venv .venv
 if errorlevel 1 goto error
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 if errorlevel 1 goto error
-.venv\Scripts\python.exe tvrtk_scraper.py
+.venv\Scripts\python.exe src/tvrtk_scraper.py
 if errorlevel 1 goto error
 exit /b 0
 :error

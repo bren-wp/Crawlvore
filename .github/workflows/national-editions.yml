@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main, refactor/hr-only-desktop]
-    paths: ['src/**', 'frontend/**', 'static/**', 'desktop/**', 'windows/**', 'linux/**', 'tools/**', 'tests/**', 'VERSION', 'tvrtk_scraper.py', '.github/workflows/national-editions.yml']
+    paths: ['src/**', 'frontend/**', 'static/**', 'desktop/**', 'windows/**', 'linux/**', 'tools/**', 'tests/**', 'VERSION', '.github/workflows/national-editions.yml']
 permissions:
   contents: read
 env:
@@ -29,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          test "$(gh repo view "$GITHUB_REPOSITORY" --json visibility --jq .visibility)" = PRIVATE
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
           gh release download registry-data-1370 --dir registry-archive
           (cd registry-archive && sha256sum -c SHA256SUMS.txt)
           python tools/restore_registry_archive.py registry-archive registry-bundle
@@ -105,7 +105,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(gh repo view "$GITHUB_REPOSITORY" --json visibility --jq .visibility)" = PRIVATE
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
           tag="v$(tr -d '\r\n' < VERSION)-hr"
           gh release create "$tag" --draft --prerelease --latest=false --target "$GITHUB_SHA" --title "Crawlvora $tag" --notes 'Croatian desktop editions: HR Full with verified snapshot 1370 and HR Online with no bundled records. Windows Setup and Portable; Linux DEB and TAR.GZ. Private distribution only.' release/*
           gh release view "$tag" --json assets > remote.json

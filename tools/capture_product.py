@@ -33,7 +33,7 @@ def capture(output):
                if not k.startswith(("SUDREG_", "CRAWLVORA_"))}
         with (Path(tmp) / "worker.log").open("w+b") as log:
             worker = subprocess.Popen(
-                [sys.executable, str(ROOT / "tvrtk_scraper.py"), "--worker",
+                [sys.executable, str(ROOT / "src" / "tvrtk_scraper.py"), "--worker",
                  "--port", "0", "--data-dir", str(workspace)],
                 cwd=tmp, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=log, text=True)

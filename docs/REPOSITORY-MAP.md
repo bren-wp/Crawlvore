@@ -10,4 +10,4 @@
 - `branding/` and `docs/`: visual references and documentation.
 - `.github/workflows/`: CI, snapshot restoration and release verification.
 
-From the root, run `python -m pip install -e . --no-deps` before direct module imports or tests, or set PYTHONPATH to the absolute src directory. The original launcher remains compatible.
+From the root, run `python -m pip install -e . --no-deps` before direct module imports or tests, or set PYTHONPATH to the absolute src directory. The source launcher is src/tvrtk_scraper.py. START-WINDOWS.bat and start-linux.sh retain their original root paths.

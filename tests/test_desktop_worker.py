@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 class DesktopWorkerTests(unittest.TestCase):
     def test_worker_requires_session_and_exits_on_parent_eof(self):
         with tempfile.TemporaryDirectory() as directory:
-            p=subprocess.Popen([sys.executable,str(ROOT/'tvrtk_scraper.py'),'--worker','--port','0','--data-dir',directory],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            p=subprocess.Popen([sys.executable,str(ROOT/'src/tvrtk_scraper.py'),'--worker','--port','0','--data-dir',directory],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             try:
                 # Use a bounded wait so failed initialization cannot hang the suite.
                 from concurrent.futures import ThreadPoolExecutor

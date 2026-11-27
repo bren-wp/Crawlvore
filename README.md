@@ -68,7 +68,7 @@ Two Croatian editions are built for Windows and Linux.
 | HR Full | Verified Croatian Court Registry snapshot |
 | HR Online | Empty workspace on first launch |
 
-Croatian is the default interface language; English remains optional. Existing user databases and language preferences are preserved during upgrades. Full distribution uses only the verified Croatian data archive and never embeds API credentials.
+Croatian is the default interface language; English remains optional. Existing user databases are preserved during upgrades. Full distribution uses only the verified Croatian data archive and never embeds API credentials.
 
 ## Get Crawlvora
 

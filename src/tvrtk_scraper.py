@@ -7,7 +7,6 @@ import time
 import webbrowser
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parent/'src'))
 from core import Store, Collector
 from local_http_routes import make_handler
 from registry import Registry, RegistryAccess, start_registry
@@ -22,7 +21,9 @@ from backup_transfer import BackupTransfer
 from protected_backups import ProtectedBackups
 from workspace_integrity import WorkspaceIntegrity, inspect_database, check_search_index
 
-ROOT=Path(__file__).resolve().parent
+# Frozen workers resolve assets inside the PyInstaller bundle. Source runs
+# retain the repository root, including the original default data directory.
+ROOT=Path(sys._MEIPASS) if getattr(sys,'frozen',False) else Path(__file__).resolve().parents[1]
 TOKEN=secrets.token_hex(32)
 
 def main():

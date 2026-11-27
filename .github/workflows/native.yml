@@ -109,7 +109,7 @@ jobs:
           mkdir -p native-edition
           python -c 'import json,os; print(json.dumps({"edition":os.environ["SELECTED_EDITION"] or "Online","language":os.environ["SELECTED_LANGUAGE"]}))' > native-edition/edition.json
           extra+=(--add-data "native-edition/edition.json:.")
-          python -m PyInstaller --paths src "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+          python -m PyInstaller --paths src "${extra[@]}" --noconfirm --clean --onedir --console --name CrawlvoraWorker --add-data "static:static" --exclude-module playwright --exclude-module webview src/tvrtk_scraper.py
           mkdir -p native-preview
           cp -R dist/CrawlvoraWorker native-preview/worker
           if [ "$RUNNER_OS" = Windows ]; then
@@ -153,8 +153,8 @@ jobs:
           SELECTED_LANGUAGE: ${{ inputs.language || 'hr' }}
         shell: pwsh
         run: |
-          choco install innosetup -y --no-progress
-          if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE) { throw 'NSIS compiler installation failed' }
           $edition = if ($env:SELECTED_EDITION) { $env:SELECTED_EDITION } else { 'Online' }
           ./windows/package-native.ps1 -Edition $edition -Language $env:SELECTED_LANGUAGE
       - name: Archive tested Linux package
