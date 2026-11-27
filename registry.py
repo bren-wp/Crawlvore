@@ -60,6 +60,7 @@ class Registry:
         with store.db() as c:
             c.executescript('''CREATE TABLE IF NOT EXISTS registry_runs(snapshot TEXT PRIMARY KEY, manifest TEXT NOT NULL, complete INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS registry_pages(snapshot TEXT NOT NULL, category TEXT NOT NULL, offset INTEGER NOT NULL, n INTEGER NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(snapshot,category,offset));
+            CREATE INDEX IF NOT EXISTS registry_page_digest ON registry_pages(snapshot,category,digest);
             CREATE TABLE IF NOT EXISTS registry_rows(snapshot TEXT NOT NULL, category TEXT NOT NULL, ordinal INTEGER NOT NULL, mbs TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(snapshot,category,ordinal));
             CREATE INDEX IF NOT EXISTS registry_mbs ON registry_rows(snapshot,mbs,category);
             CREATE TABLE IF NOT EXISTS registry_progress(snapshot TEXT NOT NULL, category TEXT NOT NULL, next_offset INTEGER NOT NULL, done INTEGER NOT NULL, total INTEGER, PRIMARY KEY(snapshot,category));''')
@@ -102,7 +103,87 @@ class Registry:
                     if isinstance(v,(list,dict)): v=json.dumps(v,ensure_ascii=False)
                     values.append(formula_safe(str(v) if v is not None else ''))
                 yield line(values)
-    def sync(self,bot,client,limit=500,*,pinned_snapshot=None):
+    def _repair_category(self,bot,client,snap,name,params):
+        """Repair only missing rows covered by immutable saved page receipts."""
+        with self.store.db() as c:
+            progress=c.execute('SELECT next_offset,done,total FROM registry_progress WHERE snapshot=? AND category=?',(snap,name)).fetchone()
+            actual,first,last=c.execute('SELECT count(*),min(ordinal),max(ordinal) FROM registry_rows WHERE snapshot=? AND category=?',(snap,name)).fetchone()
+            pages=c.execute('SELECT offset,n,digest FROM registry_pages WHERE snapshot=? AND category=? ORDER BY offset',(snap,name)).fetchall()
+        if progress is None:
+            if actual or pages: raise ValueError('Uncheckpointed registry rows; existing data retained.')
+            return False
+        offset,done,total=progress
+        if type(offset) is not int or type(total) is not int or not 0<=offset<=total or done not in (0,1) or bool(done)!=(offset==total):
+            raise ValueError('Invalid registry checkpoint; existing data retained.')
+        end=0
+        paged={'offset','limit'}<=params
+        for start,count,digest in pages:
+            if type(start) is not int or type(count) is not int or start!=end or not 0<=count<=offset-end or (paged and count>1000) or (count==0 and offset!=0) or not isinstance(digest,str) or not re.fullmatch(r'[a-f0-9]{64}',digest):
+                raise ValueError('Invalid registry page receipts; existing data retained.')
+            end+=count
+        if not pages or end!=offset or actual>offset or (actual and (first<0 or last>=offset)):
+            raise ValueError('Inconsistent registry checkpoint; existing data retained.')
+        with bot.lock: bot.state['reused']=bot.state.get('reused',0)+actual
+        if actual==offset:
+            return False
+        # A missing row is recoverable only from its original snapshot and page.
+        # Mark incomplete before repair; a failure must never leave a complete claim.
+        with self.store.db() as c:
+            c.execute('UPDATE registry_runs SET complete=0 WHERE snapshot=?',(snap,))
+        repaired=0
+        for start,count,digest in pages:
+            bot.wait(0)
+            with self.store.db() as c:
+                found=c.execute('SELECT count(*) FROM registry_rows WHERE snapshot=? AND category=? AND ordinal>=? AND ordinal<?',(snap,name,start,start+count)).fetchone()[0]
+            if found==count: continue
+            q=self._page_query(snap,params,start,count)
+            h,p=client.get(name,q); rows=self._page_rows(h,p,params)
+            if str(h.get('X-Snapshot-Id',''))!=snap or len(rows)!=count or (paged and int(h.get('X-Total-Count',-1))!=total):
+                raise ValueError('Repair snapshot or page count mismatch; existing data retained.')
+            if 'X-Rows-Returned' in h and int(h['X-Rows-Returned'])!=count:
+                raise ValueError('Repair response count mismatch.')
+            if self._page_digest(rows)!=digest:
+                raise ValueError('Repair page checksum mismatch; existing data retained.')
+            with self.store.db() as c:
+                c.execute('BEGIN IMMEDIATE')
+                saved=dict((r[0],(r[1],json.loads(r[2]))) for r in c.execute('SELECT ordinal,mbs,payload FROM registry_rows WHERE snapshot=? AND category=? AND ordinal>=? AND ordinal<?',(snap,name,start,start+count)))
+                missing=[]
+                for i,row in enumerate(rows,start):
+                    mbs=normalized_id(row.get('mbs'),9)
+                    if i in saved:
+                        if saved[i]!=(mbs,row): raise ValueError('Existing registry row conflicts with repair; retained.')
+                    else:
+                        missing.append((snap,name,i,mbs,json.dumps(row,ensure_ascii=False)))
+                c.executemany('INSERT INTO registry_rows VALUES (?,?,?,?,?)',missing)
+                repaired+=len(missing)
+            with bot.lock: bot.state['processed']+=count
+        with bot.lock: bot.state['repaired']=bot.state.get('repaired',0)+repaired
+        bot.log(f'Repaired {repaired} missing registry rows in {name}.')
+        return bool(repaired)
+
+    @staticmethod
+    def _page_query(snap,params,offset,limit):
+        q={'snapshot_id':snap}
+        if {'offset','limit'}<=params:q.update(offset=offset,limit=limit)
+        if 'only_active' in params:q['only_active']='false'
+        if 'expand_relations' in params:q['expand_relations']='true'
+        if 'omit_nulls' in params:q['omit_nulls']='false'
+        if 'no_data_error' in params:q['no_data_error']='0'
+        return q
+
+    @staticmethod
+    def _page_rows(headers,payload,params):
+        # The public API explicitly permits an empty object for no_data_error=0.
+        # Require a confirming zero-row header; never mistake an error object for data.
+        if payload=={} and 'no_data_error' in params and str(headers.get('X-Rows-Returned',''))=='0':
+            return []
+        return rows_of(payload)
+
+    @staticmethod
+    def _page_digest(rows):
+        return hashlib.sha256(json.dumps(rows,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+
+    def sync(self,bot,client,limit=500,*,pinned_snapshot=None,allow_full_refresh=True):
         spec=client.spec(); cats=catalog(spec)
         _,payload=client.get('snapshots'); snaps=rows_of(payload)
         latest=next((x for x in snaps if str(x.get('staleness'))=='1'),None)
@@ -121,22 +202,32 @@ class Registry:
             snap=next((r[0] for r in pending if r[0] in available),snap)
         with self.store.db() as c:
             old=c.execute('SELECT * FROM registry_runs WHERE snapshot=?',(snap,)).fetchone()
+            prior=c.execute('SELECT snapshot FROM registry_runs ORDER BY CAST(snapshot AS INTEGER) DESC LIMIT 1').fetchone()
+            if old is None and prior is not None and not allow_full_refresh:
+                bot.update(update_available=snap,local_snapshot=prior[0])
+                bot.log('A different registry snapshot is available. Full refresh requires explicit confirmation.')
+                return False
             if old and old['manifest']!=manifest: raise ValueError('Specifikacija se promijenila tijekom snimke; potreban je novi snapshot.')
-            if old and old['complete']: bot.log('Najnovija snimka već je preuzeta.'); return
+            was_complete=bool(old and old['complete'])
             c.execute('INSERT OR IGNORE INTO registry_runs(snapshot,manifest) VALUES (?,?)',(snap,manifest))
         bot.update(last=len(cats)); bot.log(f'Snimka {snap} · {len(cats)} skupnih kategorija')
+        repaired=False
         for index,(name,params) in enumerate(cats.items(),1):
             bot.update(page=index); bot.log(f'{name} · {index}/{len(cats)}')
+            try:
+                repaired=self._repair_category(bot,client,snap,name,params) or repaired
+            except ValueError:
+                with self.store.db() as c:c.execute('UPDATE registry_runs SET complete=0 WHERE snapshot=?',(snap,))
+                raise
             with self.store.db() as c: old=c.execute('SELECT * FROM registry_progress WHERE snapshot=? AND category=?',(snap,name)).fetchone()
+            if was_complete and (not old or not old['done']):
+                with self.store.db() as c:c.execute('UPDATE registry_runs SET complete=0 WHERE snapshot=?',(snap,))
+                was_complete=False
             if old and old['done']: continue
             offset=old['next_offset'] if old else 0; total=old['total'] if old else None; paged={'offset','limit'}<=params
             while True:
-                bot.wait(0); q={'snapshot_id':snap}
-                if paged: q.update(offset=offset,limit=limit)
-                if 'only_active' in params: q['only_active']='false'
-                if 'expand_relations' in params: q['expand_relations']='true'
-                if 'omit_nulls' in params: q['omit_nulls']='false'
-                h,p=client.get(name,q); rows=rows_of(p)
+                bot.wait(0); q=self._page_query(snap,params,offset,limit)
+                h,p=client.get(name,q); rows=self._page_rows(h,p,params)
                 if str(h.get('X-Snapshot-Id',''))!=snap: raise ValueError('Snapshot zaglavlje ne odgovara traženoj snimci.')
                 if 'X-Rows-Returned' in h and int(h['X-Rows-Returned'])!=len(rows): raise ValueError('Broj redaka ne odgovara zaglavlju.')
                 if paged:
@@ -146,7 +237,7 @@ class Registry:
                     total=count
                     if offset+len(rows)>total or len(rows)>limit or (not rows and offset<total): raise ValueError('Nekonzistentna paginacija.')
                 else: total=len(rows)
-                digest=hashlib.sha256(json.dumps(rows,sort_keys=True,ensure_ascii=False).encode()).hexdigest(); nxt=offset+len(rows); done=nxt==total
+                digest=self._page_digest(rows); nxt=offset+len(rows); done=nxt==total
                 with self.store.db() as c:
                     if rows and c.execute('SELECT 1 FROM registry_pages WHERE snapshot=? AND category=? AND digest=?',(snap,name,digest)).fetchone(): raise ValueError('API ponavlja istu stranicu.')
                     c.executemany('INSERT INTO registry_rows VALUES (?,?,?,?,?)',[(snap,name,offset+i,normalized_id(row.get('mbs'),9),json.dumps(row,ensure_ascii=False)) for i,row in enumerate(rows)])
@@ -155,8 +246,12 @@ class Registry:
                 with bot.lock: bot.state['processed']+=len(rows)
                 offset=nxt
                 if done: break
+        if was_complete and not repaired:
+            bot.log('Latest registry snapshot already downloaded.')
+            return True
         self.merge(snap,bot)
         with self.store.db() as c: c.execute('UPDATE registry_runs SET complete=1 WHERE snapshot=?',(snap,))
+        return True
     def merge(self,snap,bot,connection=None):
         # Keep original payloads; project documented v3 fields into the directory.
         def value(record,*keys):
@@ -213,7 +308,7 @@ class Registry:
                 if email: row['email']=email
                 if self.store.upsert(c,row,provider='registry',origin=BASE+'/subjekti'): bot.inc('added')
 
-def start_registry(bot,registry,creds,limit=500,check=False,*,pinned_snapshot=None):
+def start_registry(bot,registry,creds,limit=500,check=False,*,pinned_snapshot=None,allow_full_refresh=True):
     if not all(creds): raise ValueError('Nedostaje privatna konfiguracija Sudskog registra.')
     if not 1<=limit<=1000: raise ValueError('Veličina stranice mora biti 1–1000.')
     with bot.lock:

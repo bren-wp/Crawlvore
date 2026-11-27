@@ -19,6 +19,35 @@ class DownloadCancelled(Exception):
     pass
 
 
+def advertised_snapshots(session,check=lambda:None):
+    """Read only the small official listing; never download a catalog here."""
+    check()
+    with session.get(SOURCE,timeout=(15,20),allow_redirects=False,stream=True) as response:
+        if response.status_code!=200: raise ValueError('UK catalog temporarily unavailable.')
+        content=bytearray()
+        for chunk in response.iter_content(65536):
+            check()
+            if len(content)+len(chunk)>1024**2:raise ValueError('Unexpected catalog listing size.')
+            content.extend(chunk)
+    matches=set()
+    for value in PATTERN.findall(content.decode('utf-8',errors='replace')):
+        try: snapshot=date.fromisoformat(value)
+        except ValueError: continue
+        if snapshot<=date.today():matches.add(snapshot.isoformat())
+    if not matches:raise ValueError('No official snapshot found.')
+    return sorted(matches,reverse=True)
+
+
+def check_update(installed_snapshot):
+    if not isinstance(installed_snapshot,str) or date.fromisoformat(installed_snapshot).isoformat()!=installed_snapshot:
+        raise ValueError('Invalid installed UK snapshot.')
+    with requests.Session() as session:
+        session.trust_env=False
+        latest=advertised_snapshots(session)[0]
+    return {'installed':installed_snapshot,'latest':latest,'update_available':latest>installed_snapshot,
+            'requires_full_archive':latest>installed_snapshot,'downloaded_bytes':0}
+
+
 def fetch_snapshot(destination,check=lambda:None,progress=lambda **kw:None):
     destination=Path(destination)
     if destination.exists(): raise ValueError('UK catalog already installed.')
@@ -36,16 +65,8 @@ def fetch_snapshot(destination,check=lambda:None,progress=lambda **kw:None):
     else:
         with requests.Session() as session:
             session.trust_env=False
-            check(); progress(phase='listing')
-            with session.get(SOURCE,timeout=(15,20),allow_redirects=False,stream=True) as response:
-                if response.status_code!=200: raise ValueError('UK catalog temporarily unavailable.')
-                content=b''
-                for chunk in response.iter_content(65536):
-                    check()
-                    content+=chunk
-                    if len(content)>1024**2: raise ValueError('Unexpected catalog listing size.')
-            matches=sorted(set(PATTERN.findall(content.decode('utf-8',errors='replace'))),reverse=True)
-            if not matches: raise ValueError('No official snapshot found.')
+            progress(phase='listing')
+            matches=advertised_snapshots(session,check)
             # Prefer a previously started snapshot if it is still advertised.
             snapshot=next((d for d in matches if any(candidates(downloads,f'BasicCompanyDataAsOneFile-{d}.zip'))),matches[0])
             snapshot=date.fromisoformat(snapshot).isoformat()

@@ -188,7 +188,7 @@ go('overview');
 $('xlsx-export').onclick = () => location.href = '/api/export-xlsx';
 $('filtered-xlsx').onclick = () => location.href = '/api/export-xlsx?' + filters();
 let regSelection = null, regPage = 1, regTotal = 0;
-let previousRegistryAuthorization = false;
+let previousRegistryAuthorization = false, registryRefreshAvailable = false;
 let regRefreshBusy = false, regRowsSerial = 0, regSearchTimer;
 async function registryRefresh() {
     if (regRefreshBusy)
@@ -197,6 +197,7 @@ async function registryRefresh() {
     try {
         const [r, s] = await Promise.all([api('/api/registry'), api('/api/status')]);
         const active = ['running', 'stopping'].includes(s.status), ours = ['registry', 'registry-check'].includes(s.kind ?? '');
+        registryRefreshAvailable = ours && s.status === 'update_available';
         $('reg-config').textContent = r.configured ? translate('Pristup omogućen') : translate('Pristup nije omogućen');
         $('reg-config').dataset.state = r.configured ? 'ready' : 'warning';
         if (!!r.authorized !== previousRegistryAuthorization) {
@@ -207,8 +208,9 @@ async function registryRefresh() {
         $('reg-start').disabled = !r.configured || active;
         $('reg-check').disabled = !r.configured || active;
         $('reg-stop').disabled = !ours || s.status !== 'running';
-        $('reg-status').textContent = active && !ours ? translate('Druga operacija je u tijeku') : ours ? (({ running: translate('Aktivno'), stopping: translate('Zaustavljanje'), completed: translate('Završeno'), failed: translate('Pogreška'), stopped: translate('Zaustavljeno') })[s.status] || s.status) : translate('Spremno');
-        $('reg-logs').textContent = ours ? translate('Priprema osvježavanja…') : translate('Nema aktivnog osvježavanja.');
+        $('reg-status').textContent = active && !ours ? translate('Druga operacija je u tijeku') : ours ? (({ running: translate('Aktivno'), stopping: translate('Zaustavljanje'), completed: translate('Završeno'), update_available: translate('Dostupna nova snimka'), failed: translate('Pogreška'), stopped: translate('Zaustavljeno') })[s.status] || s.status) : translate('Spremno');
+        $('reg-start').textContent = registryRefreshAvailable ? translate('Preuzmi novu snimku') : translate('Nastavi sinkronizaciju');
+        $('reg-logs').textContent = registryRefreshAvailable ? translate('Dostupna je nova snimka. Potpuno preuzimanje zahtijeva potvrdu.') + ' ' + (s.local_snapshot || '') + ' → ' + (s.update_available || '') : ours && s.kind === 'registry' ? translate('Sačuvani redci') + ': ' + n(s.reused || 0) + ' · ' + translate('Preuzeti redci') + ': ' + n(s.processed || 0) + ' · ' + translate('Popravljeni redci') + ': ' + n(s.repaired || 0) : translate('Nema aktivnog osvježavanja.');
         const progress = ours && s.kind === 'registry' && s.last ? Math.min(100, s.status === 'completed' ? 100 : Math.max(0, (s.page - 1) / s.last * 100)) : 0;
         $('reg-progress-label').textContent = ours && s.kind === 'registry' && s.last ? translate('Kategorija ') + n(s.page) + ' / ' + n(s.last) : translate('Nema aktivne sinkronizacije');
         $('reg-percent').textContent = progress ? Math.floor(progress) + '%' : '—';
@@ -276,7 +278,12 @@ $('reg-search').oninput = () => { clearTimeout(regSearchTimer); regSearchTimer =
 $('reg-check').onclick = () => post('/api/registry/check', { permission: $('reg-permission').checked }).then(registryRefresh).catch(fail);
 $('reg-export-csv').onclick = () => { if (regSelection)
     location.href = '/api/registry/export-csv?' + new URLSearchParams({ snapshot: regSelection.snapshot, category: regSelection.category }); };
-$('reg-start').onclick = () => post('/api/registry/start', { limit: +$('reg-limit').value, permission: $('reg-permission').checked }).then(registryRefresh).catch(fail);
+$('reg-start').onclick = () => {
+    const full = registryRefreshAvailable;
+    if (full && !confirm(translate('Nova snimka zahtijeva potpuno preuzimanje. Postojeći podaci ostaju sačuvani. Nastaviti?')))
+        return;
+    post('/api/registry/start', { limit: +$('reg-limit').value, permission: $('reg-permission').checked, full_refresh: full }).then(registryRefresh).catch(fail);
+};
 $('reg-stop').onclick = () => post('/api/stop', {}).then(registryRefresh).catch(fail);
 $('reg-reload').onclick = () => registryRefresh().catch(fail);
 $('reg-prev').onclick = () => { if (regPage > 1) {
@@ -294,7 +301,7 @@ $('reg-export').onclick = () => { if (regSelection)
 for (const format of ['xlsx', 'xml', 'sql'])
     $('reg-export-' + format).onclick = () => { if (regSelection)
         location.href = '/api/registry/export-' + format + '?' + new URLSearchParams({ snapshot: regSelection.snapshot, category: regSelection.category }); };
-const jobLabels = { retry_wait: translate('Čeka ponavljanje'), queued: translate('Na čekanju'), running: translate('Aktivno'), completed: translate('Završeno'), completed_with_errors: translate('S pogreškama'), failed: translate('Pogreška'), stopped: translate('Zaustavljeno'), interrupted: translate('Prekinuto'), cancelled: translate('Otkazano') };
+const jobLabels = { update_available: translate('Dostupna nova snimka'), retry_wait: translate('Čeka ponavljanje'), queued: translate('Na čekanju'), running: translate('Aktivno'), completed: translate('Završeno'), completed_with_errors: translate('S pogreškama'), failed: translate('Pogreška'), stopped: translate('Zaustavljeno'), interrupted: translate('Prekinuto'), cancelled: translate('Otkazano') };
 let jobsRefreshSequence = 0, jobsRendered = '';
 async function refreshJobs(init = false) { const request = ++jobsRefreshSequence; const r = await api('/api/jobs'); if (request !== jobsRefreshSequence)
     return; if (init) {
@@ -697,7 +704,7 @@ $('protected-restore-test').onclick = () => recoveryAction(async () => {
     $('recovery-status').textContent = translate('Test oporavka uspješan') + ' · ' + translate('Zapisa') + ': ' + n(r.records);
 });
 $('protected-manifest').onclick = () => { const a = document.createElement('a'), id = $('protected-archive').value; a.href = '/api/recovery/protected-manifest?' + new URLSearchParams({ id }); a.download = id + '.manifest.json'; document.body.append(a); a.click(); a.remove(); };
-let nationalPage = 1, nationalSequence = 0;
+let nationalPage = 1, nationalSequence = 0, nationalInstalled = false;
 function showNationalDownload(state) {
     const paused = ['paused', 'cancelled', 'failed'].includes(state.status), running = state.status === 'running';
     $('national-download').disabled = running;
@@ -717,7 +724,9 @@ async function nationalSearch(nextPage) {
         const status = await api('/api/national/status');
         if (seq !== nationalSequence)
             return;
-        $('national-download').hidden = Boolean(status[country]?.available);
+        nationalInstalled = Boolean(status[country]?.available);
+        $('national-download').hidden = false;
+        $('national-download').textContent = translate(nationalInstalled ? 'Provjeri ažuriranja' : 'Preuzmi britansku bazu');
         if (!status[country]?.available) {
             const state = await api('/api/national/gb/download');
             if (seq !== nationalSequence)
@@ -773,6 +782,22 @@ async function nationalDetail(number) {
 $('national-country').onchange = () => nationalSearch(1).catch(fail);
 $('national-search').onclick = () => nationalSearch(1).catch(fail);
 $('national-download').onclick = async () => {
+    if (nationalInstalled) {
+        $('national-download').disabled = true;
+        try {
+            const r = await post('/api/national/gb/update-check', {});
+            $('national-status').textContent = r.update_available
+                ? translate('Dostupna je nova britanska snimka. Potreban je cijeli novi arhiv.') + ' ' + r.installed + ' ? ' + r.latest
+                : translate('Britanska baza je aktualna. Nema ponovnog preuzimanja.') + ' ? ' + r.installed;
+        }
+        catch (e) {
+            fail(e);
+        }
+        finally {
+            $('national-download').disabled = false;
+        }
+        return;
+    }
     if (!confirm(translate('Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.')))
         return;
     $('national-download').disabled = true;

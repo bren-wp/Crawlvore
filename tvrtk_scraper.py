@@ -33,6 +33,7 @@ def main():
     ap.add_argument('--primary-workspace',action='store_true',help='Open the original workspace without changing the saved selection')
     ap.add_argument('--registry-sync',action='store_true')
     ap.add_argument('--registry-limit',type=int,default=500)
+    ap.add_argument('--registry-full-refresh',action='store_true',help='Explicitly allow downloading a different full registry snapshot')
     ap.add_argument('--desktop',action='store_true')
     ap.add_argument('--worker',action='store_true',help='Run the authenticated desktop worker on loopback')
     ap.add_argument('--self-test',type=Path,help='Write packaged runtime smoke test result and exit')
@@ -118,7 +119,7 @@ def run_workspace(args,selection,active):
         print('Registry provisioning failed; authorized secure storage required.',file=sys.stderr)
     if args.registry_sync:
         if not 1 <= args.registry_limit <= 1000: raise ValueError('Invalid registry page size.')
-        start_registry(collector,registry,registry_access.credentials(),args.registry_limit)
+        start_registry(collector,registry,registry_access.credentials(),args.registry_limit,allow_full_refresh=args.registry_full_refresh)
         last=None
         try:
             while True:

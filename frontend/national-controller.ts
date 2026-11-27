@@ -1,4 +1,4 @@
-let nationalPage=1,nationalSequence=0;
+let nationalPage=1,nationalSequence=0,nationalInstalled=false;
 type NationalDownloadState={status:string;phase?:string;bytes?:number;saved_bytes?:number;total?:number};
 function showNationalDownload(state:NationalDownloadState){
     const paused=['paused','cancelled','failed'].includes(state.status),running=state.status==='running';
@@ -16,7 +16,9 @@ async function nationalSearch(nextPage:number){
     try{
         const status=await api<Record<string,{available:boolean}>>('/api/national/status');
         if(seq!==nationalSequence)return;
-        $('national-download').hidden=Boolean(status[country]?.available);
+        nationalInstalled=Boolean(status[country]?.available);
+        $('national-download').hidden=false;
+        $('national-download').textContent=translate(nationalInstalled?'Provjeri ažuriranja':'Preuzmi britansku bazu');
         if(!status[country]?.available){
             const state=await api<NationalDownloadState>('/api/national/gb/download');
             if(seq!==nationalSequence)return;
@@ -47,6 +49,17 @@ async function nationalDetail(number:string){
 $('national-country').onchange=()=>nationalSearch(1).catch(fail);
 $('national-search').onclick=()=>nationalSearch(1).catch(fail);
 $('national-download').onclick=async()=>{
+    if(nationalInstalled){
+        $('national-download').disabled=true;
+        try{
+            const r=await post('/api/national/gb/update-check',{}) as {installed:string;latest:string;update_available:boolean};
+            $('national-status').textContent=r.update_available
+                ?translate('Dostupna je nova britanska snimka. Potreban je cijeli novi arhiv.')+' '+r.installed+' ? '+r.latest
+                :translate('Britanska baza je aktualna. Nema ponovnog preuzimanja.')+' ? '+r.installed;
+        }catch(e){fail(e)}finally{$('national-download').disabled=false}
+        return;
+    }
+
     if(!confirm(translate('Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.')))return;
     $('national-download').disabled=true;
     try{

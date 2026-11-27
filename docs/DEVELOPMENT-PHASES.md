@@ -53,3 +53,27 @@ workflows are modified. The new commit requires its own CI evidence.
   initiated categories, 17 completed of 36 expected; run complete=0.
   No complete HR distribution or backup asserted. Original reference
   archive not found. All release and private distribution gates preserved.
+
+
+## Incremental synchronization follow-up
+
+HR checkpoint coverage and selective repair, explicit full-refresh
+confirmation, documented zero-row response handling and indexed receipts
+implemented; UK installed-date check does not download the archive.
+See INCREMENTAL-SYNC.md for source-specific limits. Actual cross-snapshot
+bulk delta is not available in the documented HR API; authorized GB
+streaming integration is outstanding.
+
+Prior commit 90fa482 passed quality/security (45923643580): 189 Python
+tests, 28 PHP routes, real WordPress integration, Apache and Nginx storage
+denial, 140 bilingual web layouts and 320 desktop views / 80 dialogs.
+RustSec confirmed 440 crates and exactly three remaining allowed warnings.
+WPCS baseline: 1,805 errors and 95 warnings (1,807 fixable findings);
+collect grouped sniff evidence and formatting preview, not automatic
+application. Strict production WPCS gate remains intact.
+
+Local HR snapshot 1370 read-only: 8,662,305 offsets, 17 completed categories
+of 36 expected, 18 initiated, complete=0. Existing synchronization was
+not stopped. Four-hour endurance and million XLSX still require completion;
+production hosting, locked references and complete release packages remain
+unverified.

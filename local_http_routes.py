@@ -11,6 +11,7 @@ from local_http_security import token_matches, allowed_host, session_cookie_name
 from sources import NAMES
 from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import start_registry
+from gb_download import check_update as check_gb_update
 from snapshot_diff import compare
 from registry_export import export as registry_export
 from field_export import export_selected, selected_fields
@@ -173,6 +174,10 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
                 if len(raw)!=n: raise ValueError('Incomplete request body.')
                 data=json.loads(raw or b'{}')
                 if not isinstance(data,dict): raise ValueError('Invalid request body.')
+                if self.path=='/api/national/gb/update-check':
+                    status=national.status()['GB']
+                    if not status['available']:raise ValueError('Install the UK catalog first.')
+                    return self.send_data(check_gb_update(status['snapshot']))
                 if self.path=='/api/national/gb/download':
                     if data.get('confirmed') is not True: raise ValueError('Confirm UK catalog download.')
                     if national.status()['GB']['available']: raise ValueError('UK catalog already installed.')
@@ -257,7 +262,7 @@ def make_handler(*, ROOT, TOKEN, args, active, collector, database, gb_download,
                         pair,authorized=registry_access.current()
                         if not authorized and data.get('permission') is not True:
                             raise ValueError('Potvrdite korištenje javnog API-ja.')
-                        return start_registry(collector,registry,pair,int(data.get('limit',500)),check=self.path.endswith('/check'))
+                        return start_registry(collector,registry,pair,int(data.get('limit',500)),check=self.path.endswith('/check'),allow_full_refresh=data.get('full_refresh') is True)
                     queue.direct(synchronize); return self.send_data({'ok':True})
                 if self.path=='/api/stop': collector.stop(); return self.send_data({'ok':True})
                 return self.send_data({'error':'Nepoznata adresa.'},status=404)

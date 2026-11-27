@@ -136,12 +136,34 @@ jobs:
           python -c "import json; r=json.load(open('wpcs-report.json')); print(r['totals']); assert 'files' in r"
           test "$status" -le 3
           if [ "${{ inputs.strict_visual }}" = true ]; then test "$status" -eq 0; fi
+      - name: Summarize coding-standard findings and preview safe formatting
+        if: always() && hashFiles('wpcs-report.json') != ''
+        run: |
+          python - <<'PY'
+          import collections,json
+          with open('wpcs-report.json') as f: report=json.load(f)
+          counts=collections.Counter()
+          for entry in report.get('files',{}).values():
+              for message in entry.get('messages',[]):
+                  counts[(message['source'],message['type'],bool(message['fixable']))]+=1
+          for (source,kind,fixable),count in counts.most_common():
+              print(f'{count:5} {kind:7} fixable={fixable} {source}')
+          PY
+          mkdir -p "$RUNNER_TEMP/wpcs-preview"
+          cp -a wordpress "$RUNNER_TEMP/wpcs-preview/"
+          set +e
+          "$RUNNER_TEMP/wpcs/vendor/bin/phpcbf" --standard=WordPress --extensions=php "$RUNNER_TEMP/wpcs-preview/wordpress"
+          result=$?
+          set -e
+          test "$result" -le 2
+          diff -ru wordpress "$RUNNER_TEMP/wpcs-preview/wordpress" > wpcs-formatting-preview.patch || test "$?" -eq 1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: wordpress-coding-standards
           path: |
             wpcs-report.json
+            wpcs-formatting-preview.patch
             ${{ runner.temp }}/wpcs/composer.lock
           if-no-files-found: error
           retention-days: 7
