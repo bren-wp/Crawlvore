@@ -25,7 +25,21 @@ class RegistryTests(unittest.TestCase):
     def test_catalog(self): self.assertEqual(list(catalog(spec())),['subjekti','sjedista']); self.assertEqual(normalized_id(123,9),'000000123')
     def test_mirror(self):
         f=Fake(); self.reg.sync(self.bot,f,1); self.assertEqual(self.reg.browse('21','subjekti')['total'],2); self.assertEqual(self.store.stats()['total'],2); self.assertEqual(self.reg.summary()['runs'][0]['complete'],1)
+        self.assertEqual(self.bot.snapshot()['phase'],'complete')
+        self.assertEqual(self.bot.snapshot()['projected'],2)
         self.reg.sync(self.bot,f,1); self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
+    def test_completed_snapshot_repairs_missing_projection_without_redownload(self):
+        self.reg.sync(self.bot,Fake(),1)
+        with self.store.db() as c:
+            identifier=c.execute("SELECT id FROM companies WHERE mbs='000000002'").fetchone()[0]
+            c.execute("DELETE FROM origins WHERE company_id=?",(identifier,))
+            c.execute("DELETE FROM companies WHERE id=?",(identifier,))
+        f=Fake()
+        self.reg.sync(self.bot,f,1)
+        self.assertEqual(self.store.query(q='000000002')['total'],1)
+        self.assertEqual(self.store.stats()['total'],2)
+        self.assertFalse(any(name=='subjekti' for name,_ in f.calls))
+        self.assertEqual(self.reg.summary()['runs'][0]['complete'],1)
     def test_mismatch(self):
         with self.assertRaises(ValueError): self.reg.sync(self.bot,Fake(True),1)
         self.assertEqual(self.reg.browse('21','subjekti')['total'],0)
@@ -66,6 +80,38 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(row['year'],'2001')
         self.assertEqual(self.reg.browse('21','email_adrese')['total'],2)
         self.assertEqual(self.store.query(q='Deleted Example')['total'],1)
+
+    def test_official_activity_codebook_is_projected_and_filterable(self):
+        class Activity(Fake):
+            def spec(self):
+                result=spec()
+                for category in ('pretezite_djelatnosti','nacionalna_klasifikacija_djelatnosti'):
+                    result['paths']['/'+category]={'get':{'parameters':[{'in':'query','name':'snapshot_id'}]}}
+                return result
+            def get(self,name,q=None):
+                if name=='pretezite_djelatnosti':
+                    return {'X-Snapshot-Id':'21'},[{'mbs':1,'nacionalna_klasifikacija_djelatnosti_id':44}]
+                if name=='nacionalna_klasifikacija_djelatnosti':
+                    return {'X-Snapshot-Id':'21'},[{'id':44,'verzija':'NKD 2025','sifra':'62.10','puni_naziv':'Računalno programiranje'}]
+                return super().get(name,q)
+        self.reg.sync(self.bot,Activity(),1)
+        label='NKD 2025 · 62.10 · Računalno programiranje'
+        self.assertEqual(self.store.industries(),[label])
+        self.assertEqual(self.store.query(industry=label)['total'],1)
+        self.assertEqual(self.store.query(industry=label,q='000000002')['total'],0)
+        self.assertEqual(self.store.query(industry=label)['rows'][0]['industry'],label)
+
+    def test_subject_without_published_name_is_not_dropped(self):
+        class Nameless(Fake):
+            def get(self,name,q=None):
+                headers,rows=super().get(name,q)
+                if name=='subjekti':
+                    for row in rows: row.pop('tvrtka_naziv',None)
+                return headers,rows
+        self.reg.sync(self.bot,Nameless(),1)
+        self.assertEqual(self.store.stats()['total'],2)
+        self.assertEqual(self.store.query(q='000000002')['rows'][0]['title'],'MBS 000000002')
+        self.assertEqual(self.reg.browse('21','subjekti')['total'],2)
 
     def test_all_subjects_explicit_scope(self):
         class AllSubjects(Fake):

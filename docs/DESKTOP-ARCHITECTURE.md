@@ -68,5 +68,5 @@ reorganization alone.
 
 The authenticated HTTP handler is now constructed by local_http_routes.make_handler
 with explicit per-workspace dependencies. Startup, workspace lifecycle and
-shutdown remain in tvrtk_scraper.py. Route behavior, tokens and permissions
+shutdown remain in src/tvrtk_scraper.py. Route behavior, tokens and permissions
 are preserved.

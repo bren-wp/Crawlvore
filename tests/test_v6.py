@@ -7,7 +7,6 @@ from core import Store,Collector
 from registry import Registry
 from registry_export import export
 from automation import Queue
-from detection import inspect_html
 from test_registry import Fake
 
 class V6(unittest.TestCase):
@@ -39,12 +38,3 @@ class V6(unittest.TestCase):
         q.enqueue('registry',{'permission':True});
         with self.store.db() as c: c.execute("UPDATE jobs SET state='running'")
         q=Queue(self.store,self.bot,self.reg,lambda:('','')); self.assertEqual(q.summary()['jobs'][0]['state'],'interrupted')
-    def test_semantics(self):
-        html=''.join(f'<article class="company"><h2>Company {i}</h2><a href="mailto:office{i}@example.org">Email</a><span data-oib="12345678901"></span><span itemprop="postalCode">10000</span></article>' for i in range(3))
-        d=inspect_html(html); self.assertEqual(d['preview'][0]['email'],'office0@example.org'); self.assertEqual(d['preview'][0]['oib'],'12345678901'); self.assertEqual(d['preview'][0]['postal'],'10000')
-    def test_dynamic_dispatch(self):
-        from sources import run_external
-        with patch('sources.validated_url'),patch('dynamic.Renderer') as R:
-            R.return_value.render.return_value=b'<article><h2>Dynamic</h2></article>'
-            run_external(self.bot,'html','https://example.org/','article',{'title':'h2'},'',3,1,engine='playwright')
-            self.assertEqual(self.store.stats()['total'],1); R.return_value.close.assert_called_once()

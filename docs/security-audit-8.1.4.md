@@ -10,7 +10,7 @@ This is a bounded static-analysis review, not a full application security sign-o
 | B105 registry.py TOKEN_URL | Public OAuth endpoint URL, not a credential. |
 | B105 registry.py Client.token | Empty initial token state, not a hardcoded credential. Token obtained at runtime from authorized OAuth response. |
 | B406 registry_export.py | XMLGenerator writes XML; no untrusted XML parsing or entity resolution. Data values use escaped XML output and JSON encoding. |
-| B101 tvrtk_scraper.py | Fixed: explicit RuntimeError on browser smoke mismatch, including optimized Python builds. |
+| B101 src/tvrtk_scraper.py | Fixed: explicit RuntimeError on browser smoke mismatch, including optimized Python builds. |
 
 No blanket scanner suppressions added. Existing exclusions and other prior
 nosec annotations are outside this five-finding review and require separate

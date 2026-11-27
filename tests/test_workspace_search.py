@@ -84,7 +84,7 @@ class WorkspaceSearchTests(unittest.TestCase):
 
             @contextmanager
             def worker():
-                process=subprocess.Popen([sys.executable,str(project/'tvrtk_scraper.py'),'--worker','--port','0','--data-dir',str(root)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env,cwd=root)
+                process=subprocess.Popen([sys.executable,str(project/'src/tvrtk_scraper.py'),'--worker','--port','0','--data-dir',str(root)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env,cwd=root)
                 try:
                     with ThreadPoolExecutor(max_workers=1) as pool:
                         future=pool.submit(process.stdout.readline)

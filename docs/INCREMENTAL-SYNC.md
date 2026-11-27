@@ -39,30 +39,3 @@ from the verified all-status raw snapshot. This revision does not
 implement that overlay or claim a cross-snapshot bulk delta.
 
 https://sudreg-data.gov.hr/api/javni/dokumentacija/open_api
-
-## United Kingdom
-
-Initial or interrupted monthly ZIP downloads retain their strong ETag,
-Range/If-Range identity and durable byte checkpoints. An already verified
-installed catalog exposes a Check for updates action. This reads only the
-official small listing, compares the installed date against the latest
-advertised valid date, and returns zero downloaded archive bytes. It
-does not transfer or replace the existing catalog. A newer complete
-monthly archive is reported, not automatically installed. A genuine
-Companies House Streaming API integration requires authorized access,
-a compatible initial snapshot/timepoint, persistent stream cursor,
-transactional event application, tombstones and a reconciliation strategy.
-The monthly basic-company-data ZIP itself is not a delta feed.
-
-https://www.gov.uk/guidance/companies-house-data-products
-https://developer-specs.company-information.service.gov.uk/streaming-api/guides/overview
-
-## Acceptance and non-destructive migration
-
-Regression tests cover unchanged snapshot, interrupted page, missing
-previously completed page, mismatched digest, confirmation before full
-refresh, documented empty API responses and a metadata-only UK update
-check. Existing local databases were not altered or migrated during
-development. The new index is created by the upgraded application
-on opening a workspace. Distribution still requires all national
-categories, complete snapshot verification and private release review.

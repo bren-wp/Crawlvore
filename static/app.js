@@ -6,7 +6,7 @@ function $(id) {
     return element;
 }
 const token = document.querySelector('meta[name="local-token"]')?.content || document.querySelector('meta[name="csrf-token"]')?.content || '';
-const nf = new Intl.NumberFormat(UI_LANGUAGE === 'hr' ? 'hr-HR' : 'en-US');
+const nf = new Intl.NumberFormat('hr-HR');
 const n = (v) => nf.format(Number(v ?? 0));
 let page = 1, total = 0, serial = 0, timer, current = 'overview';
 const make = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined)
@@ -17,18 +17,20 @@ async function api(path, opts = {}) { const r = await fetch(path, opts); const d
 function toast(msg) { $('toast').textContent = msg; $('toast').hidden = false; clearTimeout(timer); timer = setTimeout(() => $('toast').hidden = true, 5500); }
 const fail = (e) => toast(e instanceof Error ? e.message : translate('Pogreška pri povezivanju.'));
 function post(path, data) { return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token }, body: JSON.stringify(data) }); }
-function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value }); }
+function filters() { return new URLSearchParams({ q: $('search').value, city: $('city').value, contact: $('contact').value, provider: $('source-filter').value, entity_kind: $('entity-kind').value, industry: $('industry-filter').value }); }
 function download(filtered = false) { location.href = '/api/export' + (filtered ? '?' + filters() : ''); }
-function go(view) { current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === (view === 'national' ? 'directory' : view); e.classList.toggle('active', selected); if (selected)
+function go(view) { if (view !== 'directory') {
+    directoryRequest?.abort();
+    $('company-rows').removeAttribute('aria-busy');
+} current = view; document.querySelectorAll('.view').forEach(e => e.hidden = e.id !== view); document.querySelectorAll('[data-view]').forEach(e => { const selected = e.dataset.view === view; e.classList.toggle('active', selected); if (selected)
     e.setAttribute('aria-current', 'page');
 else
-    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), national: translate('Crawlvora UK'), registry: translate('Crawlvora Sync'), data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
+    e.removeAttribute('aria-current'); }); $('crumb').textContent = { overview: translate('Pregled'), directory: translate('Poslovni imenik'), registry: 'Crawlvora', data: translate('Uvoz i izvoz'), jobs: translate('Zadaci i raspored'), analytics: translate('Analitika i izvještaji'), settings: translate('Postavke') }[view] ?? ''; if (view === 'analytics')
     refreshAnalytics().catch(fail); if (view === 'settings')
     refreshSettings().catch(fail); if (view === 'jobs')
     refreshJobs(true).catch(fail); if (view === 'overview')
     overview().catch(fail); if (view === 'directory')
-    directory().catch(fail); if (view === 'national')
-    nationalSearch(1).catch(fail); if (view === 'registry')
+    directory().catch(fail); if (view === 'registry')
     registryRefresh().catch(fail); window.scrollTo(0, 0); }
 function safeLink(value) { if (typeof value !== 'string')
     return null; try {
@@ -59,7 +61,7 @@ function rows(target, items) { const body = $(target); body.replaceChildren(); f
     btn.addEventListener('click', () => detail(r.id).catch(fail));
     action.append(btn);
     const source = make('td');
-    source.append(make('span', (r.providers || '').split(',').filter(Boolean).map(x => providerNames[x] || x).join(' · ') || '—', 'source-chip'));
+    source.append(make('span', [...new Set((r.providers || '').split(',').filter(Boolean).map(x => providerNames[x] || 'Postojeći podaci'))].join(' · ') || '—', 'source-chip'));
     tr.append(web, source, action);
     body.append(tr);
 } if (!items.length) {
@@ -94,75 +96,123 @@ async function overview() { const [s, p] = await Promise.all([api('/api/stats'),
 } }
 async function cities() { const v = $('city').value; const cs = await api('/api/cities'); $('city').replaceChildren(new Option(translate('Svi gradovi'), '')); for (const c of cs)
     $('city').add(new Option(c, c)); $('city').value = v; }
-async function directory() { const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); const d = await api('/api/companies?' + p); if (seq !== serial)
-    return; total = d.total; const pages = Math.max(1, Math.ceil(total / 25)); if (page > pages) {
+async function industries() {
+    const select = $('industry-filter'), old = select.value;
+    const values = await api('/api/industries');
+    select.replaceChildren(new Option('Sve djelatnosti', ''));
+    for (const value of values)
+        select.add(new Option(value, value));
+    select.value = old;
+}
+let directoryRequest;
+async function directory() { directoryRequest?.abort(); const controller = new AbortController(); directoryRequest = controller; const seq = ++serial, p = filters(); p.set('page', String(page)); p.set('sort', $('sort').value); $('company-rows').setAttribute('aria-busy', 'true'); $('result-count').textContent = 'Učitavanje…'; $('prev').disabled = true; $('next').disabled = true; let d; try {
+    d = await api('/api/companies?' + p, { signal: controller.signal });
+}
+catch (e) {
+    if (controller.signal.aborted)
+        return;
+    if (seq === serial) {
+        $('result-count').textContent = 'Pretraga nije uspjela. Pokušajte ponovno.';
+        $('company-rows').removeAttribute('aria-busy');
+    }
+    throw e;
+} if (seq !== serial)
+    return; $('company-rows').removeAttribute('aria-busy'); total = d.total; const pages = Math.max(1, Math.ceil(total / 25)); if (page > pages) {
     page = pages;
     return directory();
 } rows('company-rows', d.rows); $('result-count').textContent = n(total) + translate(' rezultata'); $('page-label').textContent = translate('Stranica ') + n(page) + translate(' od ') + n(pages); $('prev').disabled = page <= 1; $('next').disabled = page >= pages; }
 const detailFields = { entity_kind: translate('Vrsta subjekta'), oib: 'OIB', email: translate('Poslovni e-mail'), industry: translate('Djelatnost'), address: translate('Adresa'), postal: translate('Poštanski broj'), city: translate('Grad'), country: translate('Država'), phone: translate('Telefon'), fax: translate('Telefon / faks'), website: translate('Web stranica'), social: translate('Društvene mreže'), person: translate('Kontakt osoba'), year: translate('Godina osnivanja'), employees: translate('Broj zaposlenih'), account: translate('Broj računa'), mbs: 'MBS', rating: translate('Ocjena'), description: translate('Opis'), products: translate('Proizvodi i usluge') };
-async function detail(id) { const r = await api('/api/company/' + id); $('detail-title').textContent = r.title; $('detail-sub').textContent = [r.city, r.country].filter(Boolean).join(' · '); const body = $('detail-body'); body.replaceChildren(); for (const [key, label] of Object.entries(detailFields)) {
-    const el = make('div', undefined, 'detail-field profile-property');
-    el.append(make('small', label, 'muted'));
-    const u = ['website', 'social', 'logo', 'source'].includes(key) && safeLink(r[key]);
-    if (u) {
-        const a = make('a', u);
-        a.href = u;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        el.append(a);
+let detailSequence = 0;
+async function detail(id) {
+    const request = ++detailSequence;
+    const r = await api('/api/company/' + id);
+    if (request !== detailSequence)
+        return;
+    $('detail-title').textContent = r.title;
+    $('detail-sub').textContent = [r.city, r.country].filter(Boolean).join(' · ');
+    const body = $('detail-body');
+    body.replaceChildren();
+    const groups = { 'Identifikacija i djelatnost': ['oib', 'mbs', 'entity_kind', 'industry', 'year'], 'Kontakt i sjedište': ['email', 'phone', 'fax', 'website', 'social', 'address', 'postal', 'city', 'country', 'person'], 'Poslovni podaci': ['employees', 'account', 'rating', 'description', 'products'] };
+    for (const [heading, keys] of Object.entries(groups)) {
+        const group = make('section', undefined, 'profile-property profile-group');
+        group.append(make('h3', heading));
+        const fields = make('div', undefined, 'profile-grid');
+        for (const key of keys) {
+            const el = make('div', undefined, 'detail-field');
+            el.append(make('small', detailFields[key], 'muted'));
+            const u = ['website', 'social'].includes(key) && safeLink(r[key]);
+            if (u) {
+                const a = make('a', u);
+                a.href = u;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                el.append(a);
+            }
+            else
+                el.append(make('div', r[key] || '—'));
+            if (key === 'email' && typeof r.email === 'string' && r.email.trim()) {
+                const button = make('button', 'Sastavi e-poštu', 'btn secondary small');
+                button.onclick = () => openMail(r).catch(fail);
+                el.append(button);
+            }
+            fields.append(el);
+        }
+        group.append(fields);
+        body.append(group);
     }
-    else
-        el.append(make('div', r[key] || '—'));
-    body.append(el);
-} const src = make('div', undefined, 'detail-field profile-sources'); src.append(make('h3', translate('Podrijetlo podataka'))); if (!(r.sources || []).length)
-    src.append(make('p', translate('Nema povezanih izvora.'), 'muted')); for (const x of r.sources || []) {
-    src.append(make('div', (providerNames[x.provider] || x.provider) + ' · ' + x.updated));
-    const u = safeLink(x.url);
-    if (u) {
-        const a = make('a', u);
-        a.href = u;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        src.append(a);
+    const alt = make('div', undefined, 'alternate-values');
+    alt.append(make('h3', translate('Sačuvane alternativne vrijednosti')));
+    if (!(r.alternate_values || []).length)
+        alt.append(make('p', translate('Nema alternativnih vrijednosti.'), 'muted'));
+    for (const v of r.alternate_values || []) {
+        const item = make('div', undefined, 'history-event');
+        item.append(make('strong', detailFields[v.field] || v.field), make('p', v.value), make('small', (providerNames[v.provider] || 'Postojeći podaci') + ' · ' + v.observed_at + ' UTC', 'muted'));
+        alt.append(item);
     }
-} const alt = make('div', undefined, 'alternate-values'); alt.append(make('h3', translate('Sačuvane alternativne vrijednosti'))); if (!(r.alternate_values || []).length)
-    alt.append(make('p', translate('Nema alternativnih vrijednosti.'), 'muted')); for (const v of r.alternate_values || []) {
-    const item = make('div', undefined, 'history-event');
-    item.append(make('strong', detailFields[v.field] || v.field), make('p', v.value), make('small', (providerNames[v.provider] || v.provider) + ' · ' + v.observed_at + ' UTC', 'muted'));
-    alt.append(item);
-} src.append(alt); body.append(src); const hist = make('div', undefined, 'detail-field history-block'); hist.append(make('h3', translate('Povijest promjena'))); body.append(hist); addRegistryProfile(id, body); setProfileTab('details'); $('detail').showModal(); try {
-    const changes = await api('/api/history/' + id);
-    if (!changes.length)
-        hist.append(make('p', translate('Nema zabilježenih promjena od ove verzije.'), 'muted'));
-    for (const r of changes) {
-        const group = make('div', undefined, 'history-event');
-        group.append(make('strong', r.changed_at + ' UTC · ' + (providerNames[r.provider] || r.provider)));
-        for (const [k, v] of Object.entries(r.changes))
-            group.append(make('p', (detailFields[k] || k) + ': ' + (v.before || '—') + ' → ' + (v.after || '—')));
-        hist.append(group);
+    const hist = make('div', undefined, 'detail-field history-block');
+    hist.append(make('h3', translate('Povijest promjena')));
+    hist.append(alt);
+    body.append(hist);
+    addRegistryProfile(id, body);
+    setProfileTab('details');
+    if (!$('detail').open)
+        $('detail').showModal();
+    try {
+        const changes = await api('/api/history/' + id);
+        if (request !== detailSequence)
+            return;
+        if (!changes.length)
+            hist.append(make('p', translate('Nema zabilježenih promjena od ove verzije.'), 'muted'));
+        for (const r of changes) {
+            const group = make('div', undefined, 'history-event');
+            group.append(make('strong', r.changed_at + ' UTC · ' + (providerNames[r.provider] || 'Postojeći podaci')));
+            for (const [k, v] of Object.entries(r.changes))
+                group.append(make('p', (detailFields[k] || k) + ': ' + (v.before || '—') + ' → ' + (v.after || '—')));
+            hist.append(group);
+        }
+    }
+    catch (e) {
+        hist.append(make('p', translate('Povijest nije dostupna.'), 'muted'));
     }
 }
-catch (e) {
-    hist.append(make('p', translate('Povijest nije dostupna.'), 'muted'));
-} }
 document.querySelectorAll('[data-view]').forEach(e => e.addEventListener('click', () => { if (e.dataset.view)
     go(e.dataset.view); }));
 document.querySelectorAll('[data-go]').forEach(e => e.addEventListener('click', () => { if (e.dataset.go)
     go(e.dataset.go); }));
 $('all-export').onclick = () => download();
 $('filtered-export').onclick = () => download(true);
-$('close-detail').onclick = () => $('detail').close();
+$('close-detail').onclick = () => { detailSequence++; $('detail').close(); };
 $('prev').onclick = () => { page--; directory().catch(fail); };
 $('next').onclick = () => { page++; directory().catch(fail); };
 let debounce;
 $('search').oninput = () => { clearTimeout(debounce); debounce = setTimeout(() => { page = 1; directory().catch(fail); }, 250); };
-for (const id of ['city', 'contact', 'sort', 'source-filter', 'entity-kind'])
+for (const id of ['city', 'contact', 'sort', 'source-filter', 'entity-kind', 'industry-filter'])
     $(id).onchange = () => { page = 1; directory().catch(fail); };
-$('reset').onclick = () => { for (const id of ['search', 'city', 'contact', 'source-filter', 'entity-kind'])
+$('reset').onclick = () => { for (const id of ['search', 'city', 'contact', 'source-filter', 'entity-kind', 'industry-filter'])
     $(id).value = ''; $('sort').value = 'title'; page = 1; directory().catch(fail); };
-const providerNames = { tvrtke: 'Tvrtke.hr', companywall: 'CompanyWall.hr', registry: translate('Crawlvora Sync'), company: 'Company.hr', html: translate('Prilagođeni web'), json: translate('Prilagođeni API'), csv: translate('CSV / postojeći podaci') };
+const providerNames = { registry: 'Crawlvora', tvrtke: 'Postojeći podaci', companywall: 'Postojeći podaci', company: 'Postojeći podaci', html: 'Uvezeni podaci', json: 'Uvezeni podaci', csv: 'Uvezeni podaci' };
 async function providers() { const list = await api('/api/providers'), select = $('source-filter'), old = select.value; select.replaceChildren(new Option(translate('Svi izvori'), '')); $('source-summary').replaceChildren(); for (const p of list) {
-    const label = providerNames[p.provider] || p.label;
+    const label = providerNames[p.provider] || 'Postojeći podaci';
     select.append(new Option(label, p.provider));
     const r = make('div', undefined, 'source-row');
     r.append(make('span', label), make('strong', n(p.n)));
@@ -180,15 +230,15 @@ $('export-clear-all').onclick = () => { for (const field of exportFields)
 $('export-selected').onclick = () => { const selected = exportFields.filter(field => field.checked).map(field => field.value); if (!selected.length)
     return; const p = $('export-filtered').checked ? filters() : new URLSearchParams(); p.set('fields', selected.join(',')); p.set('format', $('export-format').value); p.set('distinct', $('export-distinct').checked ? '1' : '0'); p.set('omit_empty', '1'); location.href = '/api/export-fields?' + p; };
 syncExportFields();
-let themeWrite = Promise.resolve();
-$('theme').onclick = () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = t; themeWrite = themeWrite.then(async () => { await post('/api/preferences/theme', { theme: t }); }).catch(fail); };
 cities().catch(fail);
+industries().catch(fail);
 providers().catch(fail);
 go('overview');
 $('xlsx-export').onclick = () => location.href = '/api/export-xlsx';
 $('filtered-xlsx').onclick = () => location.href = '/api/export-xlsx?' + filters();
 let regSelection = null, regPage = 1, regTotal = 0;
 let previousRegistryAuthorization = false, registryRefreshAvailable = false;
+let lastRegistryActive = false, completionRefresh = false;
 let regRefreshBusy = false, regRowsSerial = 0, regSearchTimer;
 async function registryRefresh() {
     if (regRefreshBusy)
@@ -211,10 +261,13 @@ async function registryRefresh() {
         $('reg-status').textContent = active && !ours ? translate('Druga operacija je u tijeku') : ours ? (({ running: translate('Aktivno'), stopping: translate('Zaustavljanje'), completed: translate('Završeno'), update_available: translate('Dostupna nova snimka'), failed: translate('Pogreška'), stopped: translate('Zaustavljeno') })[s.status] || s.status) : translate('Spremno');
         $('reg-start').textContent = registryRefreshAvailable ? translate('Preuzmi novu snimku') : translate('Nastavi sinkronizaciju');
         $('reg-logs').textContent = registryRefreshAvailable ? translate('Dostupna je nova snimka. Potpuno preuzimanje zahtijeva potvrdu.') + ' ' + (s.local_snapshot || '') + ' → ' + (s.update_available || '') : ours && s.kind === 'registry' ? translate('Sačuvani redci') + ': ' + n(s.reused || 0) + ' · ' + translate('Preuzeti redci') + ': ' + n(s.processed || 0) + ' · ' + translate('Popravljeni redci') + ': ' + n(s.repaired || 0) : translate('Nema aktivnog osvježavanja.');
-        const progress = ours && s.kind === 'registry' && s.last ? Math.min(100, s.status === 'completed' ? 100 : Math.max(0, (s.page - 1) / s.last * 100)) : 0;
-        $('reg-progress-label').textContent = ours && s.kind === 'registry' && s.last ? translate('Kategorija ') + n(s.page) + ' / ' + n(s.last) : translate('Nema aktivne sinkronizacije');
-        $('reg-percent').textContent = progress ? Math.floor(progress) + '%' : '—';
+        const projecting = s.phase === 'projection', finalizing = s.phase === 'finalizing';
+        const completedCategories = r.categories.filter(c => c.snapshot === s.snapshot_id && c.done).length;
+        const progress = ours && s.kind === 'registry' && s.last ? Math.min(100, s.status === 'completed' ? 100 : projecting ? (s.projection_total ? 100 * (s.projected || 0) / s.projection_total : 0) : finalizing ? 100 : 100 * completedCategories / s.last) : 0;
+        $('reg-progress-label').textContent = projecting ? 'Obrada subjekata: ' + n(s.projected) + ' / ' + n(s.projection_total) : finalizing ? 'Završna provjera i spremanje imenika' : ours && s.kind === 'registry' && s.last ? 'Preuzete kategorije: ' + n(completedCategories) + ' / ' + n(s.last) : 'Nema aktivne sinkronizacije';
+        $('reg-percent').textContent = ours && s.kind === 'registry' ? Math.floor(progress) + '%' : '—';
         $('reg-progress-bar').style.width = progress + '%';
+        observeRegistryCompletion(s);
         updateDiffOptions(r.runs);
         const selected = $('reg-snapshot').value;
         const options = [make('option', translate('Sve snimke'))];
@@ -294,8 +347,39 @@ $('reg-next').onclick = () => { if (regPage * 50 < regTotal) {
     regPage++;
     registryRows().catch(fail);
 } };
-setInterval(() => { if (current === 'registry' && !document.hidden)
-    registryRefresh().catch(() => { }); }, 2500);
+function observeRegistryCompletion(s) {
+    if (s.kind !== 'registry')
+        return;
+    const active = ['running', 'stopping'].includes(s.status), completed = lastRegistryActive && s.status === 'completed';
+    lastRegistryActive = active;
+    if (!completed || completionRefresh)
+        return;
+    completionRefresh = true;
+    void Promise.all([cities(), industries(), providers()]).then(() => {
+        if (current === 'registry') {
+            page = 1;
+            go('directory');
+            toast('Sinkronizacija je završena. Poslovni imenik je osvježen.');
+        }
+        else if (current === 'directory')
+            return directory();
+        else if (current === 'overview')
+            return overview();
+    }).catch(fail).finally(() => { completionRefresh = false; });
+}
+let statusPolling = false;
+setInterval(() => {
+    if (document.hidden)
+        return;
+    if (current === 'registry') {
+        registryRefresh().catch(() => { });
+        return;
+    }
+    if (statusPolling)
+        return;
+    statusPolling = true;
+    api('/api/status').then(observeRegistryCompletion).catch(() => { }).finally(() => { statusPolling = false; });
+}, 3500);
 $('reg-export').onclick = () => { if (regSelection)
     location.href = '/api/registry/export?' + new URLSearchParams({ snapshot: regSelection.snapshot, category: regSelection.category }); };
 for (const format of ['xlsx', 'xml', 'sql'])
@@ -314,7 +398,7 @@ async function refreshJobs(init = false) { const request = ++jobsRefreshSequence
     m.append(el);
 } const b = $('job-rows'); b.replaceChildren(); for (const j of r.jobs) {
     const tr = make('tr');
-    for (const v of [j.id, providerNames[j.kind] || j.kind, jobLabels[j.state] || j.state, j.created, j.finished || '—', String(j.attempts || 0) + (j.next_run ? ' · ' + new Date(j.next_run * 1000).toLocaleString(UI_LANGUAGE === 'hr' ? 'hr-HR' : 'en-US') : '')])
+    for (const v of [j.id, providerNames[j.kind] || j.kind, jobLabels[j.state] || j.state, j.created, j.finished || '—', String(j.attempts || 0) + (j.next_run ? ' · ' + new Date(j.next_run * 1000).toLocaleString('hr-HR') : '')])
         tr.append(make('td', String(v)));
     const td = make('td');
     if (['queued', 'retry_wait'].includes(j.state)) {
@@ -404,40 +488,15 @@ async function refreshAnalytics() {
     renderChart('analytics-history', h.days.map(x => ({ label: x.day, n: x.n })));
     await providers();
 }
-function syncSettings() {
-    const dark = document.documentElement.dataset.theme !== 'light';
-    $('settings-dark').setAttribute('aria-pressed', String(dark));
-    $('settings-light').setAttribute('aria-pressed', String(!dark));
-    $('settings-en').setAttribute('aria-pressed', String(UI_LANGUAGE === 'en'));
-    $('settings-hr').setAttribute('aria-pressed', String(UI_LANGUAGE === 'hr'));
-}
 async function refreshSettings() {
-    syncSettings();
     const [s, r] = await Promise.all([api('/api/stats'), api('/api/registry')]);
     $('settings-count').textContent = n(s.total);
     $('settings-api').textContent = translate(r.configured ? 'Pristup omogućen' : 'Pristup nije omogućen');
     await refreshRecovery();
 }
-function syncQuickFilters() {
-    document.querySelectorAll('[data-contact-filter]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.contactFilter === $('contact').value)));
-}
-document.querySelectorAll('[data-contact-filter]').forEach(b => b.addEventListener('click', () => { $('contact').value = b.dataset.contactFilter || ''; $('contact').dispatchEvent(new Event('change')); syncQuickFilters(); }));
-$('contact').addEventListener('change', syncQuickFilters);
-$('reset').addEventListener('click', syncQuickFilters);
-syncQuickFilters();
 $('analytics-export').onclick = () => download();
 $('analytics-xlsx').onclick = () => location.href = '/api/export-xlsx';
 $('analytics-json').onclick = () => location.href = '/api/export-json';
-$('settings-dark').onclick = () => { if (document.documentElement.dataset.theme === 'light')
-    $('theme').click(); syncSettings(); };
-$('settings-light').onclick = () => { if (document.documentElement.dataset.theme !== 'light')
-    $('theme').click(); syncSettings(); };
-$('settings-en').onclick = () => { if (UI_LANGUAGE !== 'en')
-    $('language').click(); };
-$('settings-hr').onclick = () => { if (UI_LANGUAGE !== 'hr')
-    $('language').click(); };
-$('theme').addEventListener('click', syncSettings);
-syncSettings();
 function setProfileTab(tab) {
     const dialog = $('detail');
     dialog.dataset.profileTab = tab;
@@ -476,6 +535,7 @@ $('import-btn').onclick = async () => { const f = $('file').files?.[0]; if (!f |
     const r = await api(f.name.toLowerCase().endsWith('.json') ? '/api/import-json' : '/api/import', { method: 'POST', headers: { 'X-Local-Token': token }, body: f });
     toast(translate('Učitano ') + n(r.read) + translate(' · novih ') + n(r.added));
     await cities();
+    await industries();
     await providers();
     $('file').value = '';
     $('file-name').textContent = translate('Nije odabrana datoteka.');
@@ -704,137 +764,6 @@ $('protected-restore-test').onclick = () => recoveryAction(async () => {
     $('recovery-status').textContent = translate('Test oporavka uspješan') + ' · ' + translate('Zapisa') + ': ' + n(r.records);
 });
 $('protected-manifest').onclick = () => { const a = document.createElement('a'), id = $('protected-archive').value; a.href = '/api/recovery/protected-manifest?' + new URLSearchParams({ id }); a.download = id + '.manifest.json'; document.body.append(a); a.click(); a.remove(); };
-let nationalPage = 1, nationalSequence = 0, nationalInstalled = false;
-function showNationalDownload(state) {
-    const paused = ['paused', 'cancelled', 'failed'].includes(state.status), running = state.status === 'running';
-    $('national-download').disabled = running;
-    $('national-download').textContent = translate(paused && state.saved_bytes ? 'Nastavi preuzimanje' : 'Preuzmi britansku bazu');
-    const message = running ? translate('Preuzimanje i priprema baze…') : paused ? (state.saved_bytes ? translate('Prethodno preuzeti podaci su sačuvani.') : translate('Preuzimanje nije uspjelo. Pokušajte ponovno.')) : translate('Nacionalna baza nije ugrađena u ovo izdanje.');
-    const saved = state.saved_bytes || 0, total = state.total || 0;
-    $('national-status').textContent = message + (saved && total ? ' · ' + translate('Spremljeno na disk') + ': ' + n(Math.floor(saved / 1048576)) + ' / ' + n(Math.ceil(total / 1048576)) + ' MiB' : '');
-}
-async function nationalSearch(nextPage) {
-    const seq = ++nationalSequence, country = $('national-country').value;
-    $('national-status').textContent = translate('Učitavanje…');
-    $('national-rows').replaceChildren();
-    $('national-prev').disabled = true;
-    $('national-next').disabled = true;
-    $('national-search').disabled = true;
-    try {
-        const status = await api('/api/national/status');
-        if (seq !== nationalSequence)
-            return;
-        nationalInstalled = Boolean(status[country]?.available);
-        $('national-download').hidden = false;
-        $('national-download').textContent = translate(nationalInstalled ? 'Provjeri ažuriranja' : 'Preuzmi britansku bazu');
-        if (!status[country]?.available) {
-            const state = await api('/api/national/gb/download');
-            if (seq !== nationalSequence)
-                return;
-            showNationalDownload(state);
-            $('national-page').textContent = '';
-            return;
-        }
-        const result = await api('/api/national/gb/search?' + new URLSearchParams({ q: $('national-query').value, page: String(nextPage) }));
-        if (seq !== nationalSequence)
-            return;
-        nationalPage = result.page;
-        $('national-status').textContent = n(result.total_snapshot) + ' · ' + result.snapshot;
-        $('national-page').textContent = translate('Stranica ') + nationalPage;
-        for (const record of result.rows) {
-            const row = make('tr');
-            for (const value of [record.name, record.registration_number, record.city, record.status])
-                row.append(make('td', value || '—'));
-            const action = make('td'), button = make('button', translate('Detalji →'), 'textbtn');
-            button.onclick = () => nationalDetail(record.registration_number).catch(fail);
-            action.append(button);
-            row.append(action);
-            $('national-rows').append(row);
-        }
-        if (!result.rows.length) {
-            const row = make('tr'), td = make('td', translate('Nema rezultata za odabrane kriterije.'));
-            td.colSpan = 5;
-            row.append(td);
-            $('national-rows').append(row);
-        }
-        $('national-prev').disabled = nationalPage <= 1;
-        $('national-next').disabled = !result.next;
-    }
-    finally {
-        if (seq === nationalSequence)
-            $('national-search').disabled = false;
-    }
-}
-async function nationalDetail(number) {
-    const data = await api('/api/national/gb/detail?' + new URLSearchParams({ number }));
-    $('national-title').textContent = data.CompanyName;
-    const body = $('national-detail-body');
-    body.replaceChildren();
-    for (const [key, value] of Object.entries(data)) {
-        if (!value)
-            continue;
-        const line = make('div', undefined, 'detail-field');
-        line.append(make('small', key), make('p', value));
-        body.append(line);
-    }
-    $('national-detail').showModal();
-}
-$('national-country').onchange = () => nationalSearch(1).catch(fail);
-$('national-search').onclick = () => nationalSearch(1).catch(fail);
-$('national-download').onclick = async () => {
-    if (nationalInstalled) {
-        $('national-download').disabled = true;
-        try {
-            const r = await post('/api/national/gb/update-check', {});
-            $('national-status').textContent = r.update_available
-                ? translate('Dostupna je nova britanska snimka. Potreban je cijeli novi arhiv.') + ' ' + r.installed + ' ? ' + r.latest
-                : translate('Britanska baza je aktualna. Nema ponovnog preuzimanja.') + ' ? ' + r.installed;
-        }
-        catch (e) {
-            fail(e);
-        }
-        finally {
-            $('national-download').disabled = false;
-        }
-        return;
-    }
-    if (!confirm(translate('Preuzeti britansku bazu? Potrebna je internetska veza i najmanje 20 GiB slobodnog prostora.')))
-        return;
-    $('national-download').disabled = true;
-    try {
-        await post('/api/national/gb/download', { confirmed: true });
-        $('national-status').textContent = translate('Preuzimanje i priprema baze…');
-        const timer = setInterval(async () => {
-            try {
-                const state = await api('/api/national/gb/download');
-                if (state.status === 'running') {
-                    showNationalDownload(state);
-                    return;
-                }
-                clearInterval(timer);
-                $('national-download').disabled = false;
-                if (state.status === 'complete')
-                    await nationalSearch(1);
-                else
-                    showNationalDownload(state);
-            }
-            catch (e) {
-                clearInterval(timer);
-                $('national-download').disabled = false;
-                fail(e);
-            }
-        }, 2000);
-    }
-    catch (e) {
-        $('national-download').disabled = false;
-        fail(e);
-    }
-};
-$('national-query').onkeydown = event => { if (event.key === 'Enter')
-    nationalSearch(1).catch(fail); };
-$('national-prev').onclick = () => nationalSearch(nationalPage - 1).catch(fail);
-$('national-next').onclick = () => nationalSearch(nationalPage + 1).catch(fail);
-$('national-close').onclick = () => $('national-detail').close();
 function addRegistryProfile(id, body) {
     const panel = make('div', undefined, 'detail-field profile-registry');
     panel.append(make('h3', translate('Dodatni poslovni podaci')));
@@ -870,13 +799,13 @@ function addRegistryProfile(id, body) {
                 }
                 records.append(section);
             }
-            status.textContent = data.rows.length ? data.snapshot + ' · ' + (offset + 1) + '–' + (offset + data.rows.length) : translate('Nema povezanih registarskih zapisa.');
+            status.textContent = data.rows.length ? data.snapshot + ' · ' + (offset + 1) + '–' + (offset + data.rows.length) : translate('Nema dodatnih poslovnih zapisa.');
             prev.disabled = offset === 0;
             next.disabled = !data.next;
         }
         catch (e) {
             if (request === seq)
-                status.textContent = translate('Registarski podaci nisu dostupni.');
+                status.textContent = translate('Dodatni poslovni podaci nisu dostupni.');
         }
     }
     select.onchange = () => { offset = 0; void load(); };
@@ -884,3 +813,143 @@ function addRegistryProfile(id, body) {
     prev.onclick = () => { offset = Math.max(0, offset - 25); void load(); };
     void load();
 }
+'use strict';
+let mailCompany = 0, mailBusy = false, mailConfigured = false;
+const mailStates = { pending: 'Ishod još nije potvrđen', accepted: 'SMTP je prihvatio poruku', unknown: 'Ishod nepoznat — provjerite prije ponovnog slanja', rejected: 'Odbijeno' };
+function mailControls() { $('mail-send').disabled = mailBusy || !mailConfigured || !$('mail-confirm').checked || !$('mail-basis').value || !$('mail-subject').value.trim() || !$('mail-body').value.trim(); }
+async function mailSettings() {
+    const s = await api('/api/mail/settings');
+    mailConfigured = s.configured;
+    $('mail-config-status').textContent = s.configured ? 'SMTP pristup spremljen.' : s.vault_available ? 'SMTP nije konfiguriran.' : 'Sigurna pohrana nije dostupna.';
+    $('mail-host').value = s.host || '';
+    $('mail-port').value = String(s.port || 587);
+    $('mail-user').value = s.username || '';
+    $('mail-sender').value = s.sender || '';
+    mailControls();
+}
+async function mailHistory() {
+    const company = mailCompany, entries = await api('/api/mail/history?company_id=' + company);
+    if (company !== mailCompany)
+        return;
+    const target = $('mail-history');
+    target.replaceChildren();
+    if (!entries.length)
+        target.append(make('p', 'Nema evidentiranih poruka.', 'muted'));
+    for (const entry of entries) {
+        const item = make('div', undefined, 'history-event');
+        item.append(make('strong', entry.subject), make('p', entry.recipient), make('small', new Date(entry.created * 1000).toLocaleString('hr-HR') + ' · ' + (mailStates[entry.state] || entry.state)));
+        target.append(item);
+    }
+}
+async function openMail(company) {
+    if (mailBusy)
+        return;
+    if (typeof company.email !== 'string' || !company.email.trim())
+        throw Error('Subjekt nema adresu e-pošte.');
+    mailCompany = company.id;
+    $('mail-company').textContent = company.title;
+    $('mail-recipient').value = company.email.trim();
+    $('mail-template').value = 'custom';
+    $('mail-subject').value = '';
+    $('mail-body').value = '';
+    $('mail-basis').value = '';
+    $('mail-confirm').checked = false;
+    $('mail-password').value = '';
+    $('mail-result').textContent = '';
+    mailConfigured = false;
+    mailControls();
+    $('mail-dialog').showModal();
+    await Promise.all([mailSettings(), mailHistory()]);
+}
+$('mail-close').onclick = () => { if (!mailBusy)
+    $('mail-dialog').close(); };
+$('mail-dialog').addEventListener('cancel', e => { if (mailBusy)
+    e.preventDefault(); });
+$('mail-dialog').addEventListener('close', () => { $('mail-password').value = ''; $('mail-subject').value = ''; $('mail-body').value = ''; $('mail-confirm').checked = false; });
+$('mail-save').onclick = async () => {
+    if (mailBusy)
+        return;
+    try {
+        if (!confirm('Spremiti pristupne podatke u sigurnu pohranu operacijskog sustava?'))
+            return;
+        mailBusy = true;
+        mailControls();
+        await post('/api/mail/configure', { host: $('mail-host').value.trim(), port: Number($('mail-port').value), username: $('mail-user').value, password: $('mail-password').value, sender: $('mail-sender').value.trim(), confirmed: true });
+        await mailSettings();
+    }
+    catch (e) {
+        $('mail-result').textContent = e instanceof Error ? e.message : 'Postavke nisu spremljene.';
+    }
+    finally {
+        $('mail-password').value = '';
+        mailBusy = false;
+        mailControls();
+    }
+};
+$('mail-forget').onclick = async () => { if (mailBusy || !confirm('Ukloniti SMTP pristup iz sigurne pohrane?'))
+    return; try {
+    mailBusy = true;
+    mailControls();
+    await post('/api/mail/forget', {});
+    await mailSettings();
+}
+catch (e) {
+    $('mail-result').textContent = e instanceof Error ? e.message : 'Pristup nije uklonjen.';
+}
+finally {
+    mailBusy = false;
+    mailControls();
+} };
+$('mail-template').onchange = async () => { if (mailBusy)
+    return; try {
+    const key = $('mail-template').value;
+    const templates = await api('/api/mail/templates');
+    if ($('mail-template').value === key) {
+        $('mail-subject').value = templates[key].subject;
+        $('mail-body').value = templates[key].body;
+        mailControls();
+    }
+}
+catch (e) {
+    fail(e);
+} };
+for (const id of ['mail-subject', 'mail-body', 'mail-basis', 'mail-confirm'])
+    $(id).addEventListener('input', mailControls);
+$('mail-block').onclick = async () => { if (mailBusy || !confirm('Zabraniti buduće slanje na ovu adresu?'))
+    return; try {
+    mailBusy = true;
+    mailControls();
+    await post('/api/mail/block', { recipient: $('mail-recipient').value, confirmed: true });
+    $('mail-result').textContent = 'Adresa je dodana na popis zabrane slanja.';
+    $('mail-confirm').checked = false;
+}
+catch (e) {
+    fail(e);
+}
+finally {
+    mailBusy = false;
+    mailControls();
+} };
+$('mail-send').onclick = async () => {
+    if (mailBusy || $('mail-send').disabled)
+        return;
+    const recipient = $('mail-recipient').value, subject = $('mail-subject').value, body = $('mail-body').value, basis = $('mail-basis').value;
+    if (!confirm('Poslati jednu poruku na ' + recipient + '?\n\nPredmet: ' + subject))
+        return;
+    mailBusy = true;
+    mailControls();
+    $('mail-result').textContent = 'Slanje je u tijeku…';
+    try {
+        const r = await post('/api/mail/send', { company_id: mailCompany, recipient, subject, body, basis, confirmed: true, request_id: crypto.randomUUID() });
+        $('mail-result').textContent = mailStates[r.state] || 'Ishod nije potvrđen.';
+        await mailHistory();
+    }
+    catch (e) {
+        $('mail-result').textContent = (e instanceof Error ? e.message : 'Ishod nije potvrđen.') + ' Provjerite evidenciju prije ponavljanja.';
+    }
+    finally {
+        $('mail-confirm').checked = false;
+        mailBusy = false;
+        mailControls();
+    }
+};

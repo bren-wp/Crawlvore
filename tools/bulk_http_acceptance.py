@@ -45,7 +45,7 @@ def run(size=MAX_SIZE,count=20000):
         make_fixture(source,size,count)
         env={k:v for k,v in os.environ.items() if not k.startswith(('SUDREG_','CRAWLVORA_'))}
         with (folder/'worker.log').open('w+b') as log:
-            worker=subprocess.Popen([sys.executable,str(ROOT/'tvrtk_scraper.py'),'--worker','--port','0','--data-dir',str(data)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,env=env,cwd=tmp)  # nosec B603 -- fixed local program and arguments
+            worker=subprocess.Popen([sys.executable,str(ROOT/'src/tvrtk_scraper.py'),'--worker','--port','0','--data-dir',str(data)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,env=env,cwd=tmp)  # nosec B603 -- fixed local program and arguments
             try:
                 with ThreadPoolExecutor(max_workers=1) as pool:
                     future=pool.submit(worker.stdout.readline)

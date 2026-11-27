@@ -7,6 +7,8 @@ on:
         required: false
       SUDREG_CLIENT_SECRET:
         required: false
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
 permissions:
   contents: read
 jobs:

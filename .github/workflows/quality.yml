@@ -12,6 +12,8 @@ on:
       strict_visual:
         type: boolean
         default: false
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
 permissions:
   contents: read
 jobs:
@@ -22,42 +24,27 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt pip-audit bandit vulture pillow packaging
+      - run: python -m pip install -r requirements.txt -r requirements-native-build.txt -r requirements-audit.txt
       - run: python -m pip check
       - run: python -m unittest discover -s tests -v
-      - name: Validate JSON website
-        run: |
-          php -l webstranica/index.php
-          php -l webstranica/catalog.php
-          python -m unittest discover -s tests -p test_web_catalog.py -v
-          python tools/web_http_acceptance.py
-      - name: Validate WordPress plugin
-        run: |
-          find wordpress -name '*.php' -print0 | xargs -0 -n1 php -l
-          php tests/wordpress_catalog.php
-          bash tools/wordpress_acceptance.sh
-          bash tools/apache_storage_acceptance.sh
-          sudo apt-get update && sudo apt-get install -y nginx
-          python tools/nginx_storage_acceptance.py
       - run: if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit; else npm install --ignore-scripts --no-audit; fi
       - run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npm run build:frontend
       - run: node --check static/app.js && node --check static/locale.js
       - run: python -m pip_audit --strict
-      - run: python -m bandit -r . -x ./tests,./tools -ll
+      - run: python -m bandit -r src tools -ll
       - name: Source and normalized clone audit
         run: |
           set -euo pipefail
           python tools/source_audit.py --strict-deps | tee source-audit.json
           python tools/clone_review.py | tee clone-review.json
-      - run: python -m vulture . --exclude tests,tools --min-confidence 90
+      - run: python -m vulture src tools --min-confidence 90
       - name: Extended static audit evidence (review candidates)
         run: |
-          python -m bandit -r . -x ./tests -f json -o bandit-extended.json --exit-zero
-          python -m vulture . --exclude tests --min-confidence 60 > dead-code-candidates.txt || test "$?" -eq 3
+          python -m bandit -r src tools -f json -o bandit-extended.json --exit-zero
+          python -m vulture src tools --min-confidence 60 > dead-code-candidates.txt || test "$?" -eq 3
       - run: python -m playwright install --with-deps chromium
-      - run: python tools/web_layout_acceptance.py
       - run: python tools/ui_e2e.py
       - run: python tools/layout_acceptance.py layout-evidence
       - run: python tools/visual_check.py
@@ -68,26 +55,12 @@ jobs:
           python tools/import_design_references.py --verify
           python tools/pixel_diff.py --strict
       - run: python tools/performance_check.py --records 100000 > performance.json
-      - name: Build verified shared-hosting candidate
-        run: |
-          mkdir -p "${{ runner.temp }}/web-packages"
-          python tools/package_web.py "${{ runner.temp }}/web-packages/Crawlvora-Web.zip" --ref "$GITHUB_SHA"
-          python tools/package_web.py "${{ runner.temp }}/web-packages/Crawlvora-Web-Upgrade.zip" --ref "$GITHUB_SHA" --upgrade
-          python tools/package_wordpress.py "${{ runner.temp }}/web-packages/Crawlvora-WordPress.zip" --ref "$GITHUB_SHA"
-          cd "${{ runner.temp }}/web-packages"
-          sha256sum *.zip > SHA256SUMS.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: github.event_name == 'pull_request'
-        with:
-          name: Crawlvora-Web-PR
-          path: ${{ runner.temp }}/web-packages/
-          if-no-files-found: error
-          retention-days: 7
+      - run: python tools/worker_endurance.py --seconds 60 --records 25000 > worker-endurance.json
       - name: Record audit evidence in job summary
         if: always()
         shell: bash
         run: |
-          for report in source-audit.json clone-review.json pixel-diff.json performance.json layout-evidence/layout-report.json; do
+          for report in bandit-extended.json dead-code-candidates.txt source-audit.json clone-review.json pixel-diff.json performance.json worker-endurance.json layout-evidence/layout-report.json; do
             if [ -s "$report" ]; then
               { printf '\n### %s\n\n```json\n' "$report"; head -c 160000 "$report"; printf '\n```\n'; } >> "$GITHUB_STEP_SUMMARY"
             fi
@@ -105,6 +78,7 @@ jobs:
             clone-review.json
             pixel-diff.json
             performance.json
+            worker-endurance.json
             layout-evidence/layout-report.json
             branding/*fixture.png
   rust-dependencies:
@@ -115,55 +89,3 @@ jobs:
         run: cargo install cargo-audit --version 0.23.0 --locked
       - name: Audit native dependency lock
         run: cargo audit --file desktop/src-tauri/Cargo.lock
-
-  wordpress-coding-standards:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Install WPCS in isolated tooling directory
-        run: |
-          mkdir -p "$RUNNER_TEMP/wpcs"
-          cd "$RUNNER_TEMP/wpcs"
-          composer init --name=crawlvora/audit --no-interaction
-          composer config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-          composer require --dev --no-interaction "wp-coding-standards/wpcs:3.4.1"
-      - name: Record complete WPCS findings
-        run: |
-          set +e
-          "$RUNNER_TEMP/wpcs/vendor/bin/phpcs" --standard=WordPress --extensions=php --report=json wordpress > wpcs-report.json
-          status=$?
-          set -e
-          python -c "import json; r=json.load(open('wpcs-report.json')); print(r['totals']); assert 'files' in r"
-          test "$status" -le 3
-          if [ "${{ inputs.strict_visual }}" = true ]; then test "$status" -eq 0; fi
-      - name: Summarize coding-standard findings and preview safe formatting
-        if: always() && hashFiles('wpcs-report.json') != ''
-        run: |
-          python - <<'PY'
-          import collections,json
-          with open('wpcs-report.json') as f: report=json.load(f)
-          counts=collections.Counter()
-          for entry in report.get('files',{}).values():
-              for message in entry.get('messages',[]):
-                  counts[(message['source'],message['type'],bool(message['fixable']))]+=1
-          for (source,kind,fixable),count in counts.most_common():
-              print(f'{count:5} {kind:7} fixable={fixable} {source}')
-          PY
-          mkdir -p "$RUNNER_TEMP/wpcs-preview"
-          cp -a wordpress "$RUNNER_TEMP/wpcs-preview/"
-          set +e
-          "$RUNNER_TEMP/wpcs/vendor/bin/phpcbf" --standard=WordPress --extensions=php "$RUNNER_TEMP/wpcs-preview/wordpress"
-          result=$?
-          set -e
-          test "$result" -le 2
-          diff -ru wordpress "$RUNNER_TEMP/wpcs-preview/wordpress" > wpcs-formatting-preview.patch || test "$?" -eq 1
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: always()
-        with:
-          name: wordpress-coding-standards
-          path: |
-            wpcs-report.json
-            wpcs-formatting-preview.patch
-            ${{ runner.temp }}/wpcs/composer.lock
-          if-no-files-found: error
-          retention-days: 7

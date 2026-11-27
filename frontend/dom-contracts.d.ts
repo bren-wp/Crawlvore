@@ -1,5 +1,24 @@
 // DOM bindings shared by the classic-script frontend. No emitted runtime code.
 interface InterfaceElements {
+  "mail-dialog":HTMLDialogElement;
+  "mail-company":HTMLElement;
+  "mail-host":HTMLInputElement;
+  "mail-port":HTMLSelectElement;
+  "mail-user":HTMLInputElement;
+  "mail-sender":HTMLInputElement;
+  "mail-password":HTMLInputElement;
+  "mail-config-status":HTMLElement;
+  "mail-recipient":HTMLInputElement;
+  "mail-template":HTMLSelectElement;
+  "mail-subject":HTMLInputElement;
+  "mail-body":HTMLTextAreaElement;
+  "mail-basis":HTMLSelectElement;
+  "mail-confirm":HTMLInputElement;
+  "mail-send":HTMLButtonElement;
+  "mail-result":HTMLElement;
+  "mail-history":HTMLElement;
+
+  "industry-filter":HTMLSelectElement;
   "entity-kind":HTMLSelectElement;
   "export-selected":HTMLButtonElement;
   "export-select-all":HTMLButtonElement;
@@ -7,19 +26,6 @@ interface InterfaceElements {
   "export-filtered":HTMLInputElement;
   "export-distinct":HTMLInputElement;
   "export-format":HTMLSelectElement;
-  "national-country":HTMLSelectElement;
-  "national-query":HTMLInputElement;
-  "national-status":HTMLElement;
-  "national-download":HTMLButtonElement;
-  "national-rows":HTMLElement;
-  "national-page":HTMLElement;
-  "national-prev":HTMLButtonElement;
-  "national-next":HTMLButtonElement;
-  "national-search":HTMLButtonElement;
-  "national-close":HTMLButtonElement;
-  "national-detail":HTMLDialogElement;
-  "national-title":HTMLElement;
-  "national-detail-body":HTMLElement;
   "protected-manifest":HTMLButtonElement;
   "protected-restore-test":HTMLButtonElement;
   "vault-status":HTMLElement;
@@ -76,13 +82,6 @@ interface InterfaceElements {
   "analytics-json": HTMLElementTagNameMap["button"];
   "settings-count": HTMLElementTagNameMap["div"];
   "settings-api": HTMLElementTagNameMap["div"];
-  "settings-dark": HTMLElementTagNameMap["button"];
-  "settings-light": HTMLElementTagNameMap["button"];
-  "settings-en": HTMLElementTagNameMap["button"];
-  "settings-hr": HTMLElementTagNameMap["button"];
-  "language": HTMLElementTagNameMap["button"];
-  "language-label": HTMLElementTagNameMap["span"];
-  "theme": HTMLElementTagNameMap["button"];
   "crumb": HTMLElementTagNameMap["strong"];
   "top-export": HTMLElementTagNameMap["button"];
   "overview": HTMLElementTagNameMap["section"];

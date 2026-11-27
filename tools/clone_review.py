@@ -21,7 +21,7 @@ class Normalize(ast.NodeTransformer):
 def report():
     groups=collections.defaultdict(list)
     functions=windows=0
-    for path in sorted(ROOT.glob('*.py')):
+    for path in sorted((ROOT/'src').glob('*.py')):
         tree=ast.parse(path.read_text(encoding='utf-8'))
         for node in ast.walk(tree):
             if not isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)): continue
@@ -35,6 +35,6 @@ def report():
                 groups[key].append({'file':path.name,'function':node.name,'line':statements[0].lineno})
                 windows+=1
     candidates=[items for items in groups.values() if len({(x['file'],x['function']) for x in items})>1]
-    return {'scope':'top-level Python runtime; normalized four-statement windows; manual review required; no semantic equivalence proof','functions':functions,'windows':windows,'candidates':candidates}
+    return {'scope':'src Python runtime and launcher; normalized four-statement windows; manual review required; no semantic equivalence proof','functions':functions,'windows':windows,'candidates':candidates}
 
 if __name__=='__main__': print(json.dumps(report(),indent=2))

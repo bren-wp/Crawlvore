@@ -13,9 +13,9 @@ function addRegistryProfile(id: number|string,body:HTMLElement){
             if(!select.options.length){for(const s of data.snapshots)select.add(new Option(s.snapshot+(s.complete?'':' · '+translate('Nepotpuna snimka')),s.snapshot));select.value=data.snapshot;}
             records.replaceChildren();
             for(const row of data.rows){const section=make('details');section.append(make('summary',row.category+' · '+row.ordinal));for(const [k,v] of Object.entries(row.data)){const field=make('div',undefined,'detail-field');field.append(make('small',k),make('p',typeof v==='object'?JSON.stringify(v):String(v??'—')));section.append(field)}records.append(section)}
-            status.textContent=data.rows.length?data.snapshot+' · '+(offset+1)+'–'+(offset+data.rows.length):translate('Nema povezanih registarskih zapisa.');
+            status.textContent=data.rows.length?data.snapshot+' · '+(offset+1)+'–'+(offset+data.rows.length):translate('Nema dodatnih poslovnih zapisa.');
             prev.disabled=offset===0;next.disabled=!data.next;
-        }catch(e){if(request===seq)status.textContent=translate('Registarski podaci nisu dostupni.');}
+        }catch(e){if(request===seq)status.textContent=translate('Dodatni poslovni podaci nisu dostupni.');}
     }
     select.onchange=()=>{offset=0;void load()};next.onclick=()=>{offset+=25;void load()};prev.onclick=()=>{offset=Math.max(0,offset-25);void load()};void load();
 }

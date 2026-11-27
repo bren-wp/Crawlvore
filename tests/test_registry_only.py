@@ -42,12 +42,17 @@ class RegistryOnlyTests(unittest.TestCase):
             self.assertEqual(store.stats()['total'],2)
             self.assertEqual(store.detail(1)['email'],'test@example.com')
 
-    def test_bundled_dataset_idempotent(self):
-        path=Path(__file__).resolve().parents[1]/'tvrtk_output.csv'
+    def test_csv_import_idempotent(self):
+        import io
+        from core import FIELDS
+        import csv
+        stream=io.StringIO()
+        writer=csv.DictWriter(stream,fieldnames=FIELDS)
+        writer.writeheader()
+        for i in range(3): writer.writerow({FIELDS[0]:f'Synthetic company {i}'})
+        payload=stream.getvalue()
         with tempfile.TemporaryDirectory() as tmp:
             store=Store(Path(tmp)/'db.sqlite')
-            with path.open(encoding='utf-8-sig',newline='') as stream:
-                self.assertEqual(store.import_csv(stream),{'read':26261,'added':26261})
-            with path.open(encoding='utf-8-sig',newline='') as stream:
-                self.assertEqual(store.import_csv(stream),{'read':26261,'added':0})
-            self.assertEqual(store.stats()['total'],26261)
+            self.assertEqual(store.import_csv(io.StringIO(payload)),{'read':3,'added':3})
+            self.assertEqual(store.import_csv(io.StringIO(payload)),{'read':3,'added':0})
+            self.assertEqual(store.stats()['total'],3)

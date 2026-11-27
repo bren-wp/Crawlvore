@@ -11,7 +11,7 @@ def compare(reference,actual):
     for entry in sorted(lock['files']):
         path=reference/Path(entry).name
         if path.stem in ('collector','studio'): continue  # retired by registry-only product scope
-        capture=actual/('en-'+path.stem+'-dark-1440-fixture.png')
+        capture=actual/(path.stem+'-dark-1440-fixture.png')
         row={'screen':path.stem,'identical':False}
         if not path.is_file() or not capture.is_file():
             row.update(missing_reference=not path.is_file(),missing_capture=not capture.is_file())

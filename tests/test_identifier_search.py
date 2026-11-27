@@ -17,6 +17,20 @@ class IdentifierSearchTests(unittest.TestCase):
     def titles(self,query,**filters):
         return [row['title'] for row in self.store.query(q=query,**filters)['rows']]
 
+    def test_email_filter_excludes_missing_addresses(self):
+        with self.store.db() as db:
+            self.store.upsert(db,{'title':'Synthetic e-mail contact','email':'contact@example.invalid'})
+        self.assertEqual(self.titles('',contact='email'),['Synthetic e-mail contact'])
+
+    def test_category_sort_and_email_index(self):
+        with self.store.db() as db:
+            self.store.upsert(db,{'title':'Zeta','industry':'NKD 2025','email':'z@example.invalid'})
+            self.store.upsert(db,{'title':'Alpha','industry':'NKD 2025','email':'a@example.invalid'})
+            plan=' '.join(r[3] for r in db.execute("EXPLAIN QUERY PLAN SELECT id,title FROM companies WHERE industry=? ORDER BY title COLLATE NOCASE,id LIMIT 25",('NKD 2025',)))
+            self.assertIn('idx_industry_title',plan)
+            self.assertNotIn('TEMP B-TREE',plan)
+        self.assertEqual(self.titles('',industry='NKD 2025',contact='email'),['Alpha','Zeta'])
+
     def test_name_search(self):
         self.assertEqual(self.titles('ČELIK'),['Čelik primjer'])
         self.assertEqual(self.titles('primjer'),['Čelik primjer'])

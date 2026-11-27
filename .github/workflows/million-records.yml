@@ -5,6 +5,8 @@ on:
     paths: ['.github/workflows/million-records.yml', 'tools/performance_check.py', 'tools/full_export_check.py', 'bulk_io.py']
   workflow_dispatch:
   workflow_call:
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
 permissions:
   contents: read
 jobs:

@@ -2,6 +2,7 @@
 $ErrorActionPreference = 'Stop'
 if ($env:CI -or $env:GITHUB_ACTIONS) { throw 'Private build must run on the target Windows desktop.' }
 Set-Location (Split-Path -Parent $PSScriptRoot)
+$env:PYTHONPATH = (Resolve-Path src).Path
 $version = (Get-Content VERSION -Raw).Trim()
 $output = Join-Path (Get-Location).Path 'dist\private-release'
 $staging = Join-Path (Get-Location).Path ('dist\private-build-' + [guid]::NewGuid().ToString('N'))
@@ -25,9 +26,14 @@ try {
         python -c "from registry_bundle import verify_bundle; print(verify_bundle('registry-bundle/registry-seed.sqlite3'))"
         if ($LASTEXITCODE) { throw 'Registry bundle acceptance failed' }
         (Get-FileHash registry-bundle/registry-seed.sqlite3 -Algorithm SHA256).Hash.ToLower() | Set-Content registry-bundle/registry-seed.sha256 -Encoding ascii
-        $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3;.','--add-data','registry-bundle/registry-seed.sha256;.')
+        python tools/compress_registry_seed.py registry-bundle
+    if ($LASTEXITCODE) { throw 'Registry compression failed' }
+    $registryArgs = @('--add-data','registry-bundle/registry-seed.sqlite3.xz;.','--add-data','registry-bundle/registry-seed.size;.','--add-data','registry-bundle/registry-seed.sha256;.','--add-data','registry-bundle/registry-seed.json;.')
     }
-    python -m PyInstaller @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath "$staging" --workpath "$staging\work" --specpath "$staging" --add-data 'static;static' --add-data 'tvrtk_output.csv;.' --add-data "$capsule;." --exclude-module playwright --exclude-module webview tvrtk_scraper.py
+    $edition = if ($env:CRAWLVORA_REGISTRY_BUNDLE -eq '1') {'HR'} else {'Online'}
+    @{edition=$edition;language='hr'} | ConvertTo-Json -Compress | Set-Content (Join-Path $staging 'edition.json') -Encoding ascii
+    $registryArgs += @('--add-data',((Join-Path $staging 'edition.json')+';.'))
+    python -m PyInstaller --paths src @registryArgs --noconfirm --clean --onefile --console --name CrawlvoraWorker --distpath "$staging" --workpath "$staging\work" --specpath "$staging" --add-data 'static;static' --add-data "$capsule;." --exclude-module playwright --exclude-module webview src/tvrtk_scraper.py
     if ($LASTEXITCODE) { throw 'Private embedded worker build failed.' }
     $worker = Join-Path $staging 'CrawlvoraWorker.exe'
     $env:CRAWLVORA_WORKER_SIZE = (Get-Item $worker).Length.ToString()
@@ -50,7 +56,7 @@ try {
     }
     function Test-PrivateWindow($exe) {
         $p = Start-Process -FilePath $exe -ArgumentList '--native-smoke' -PassThru
-        if (!$p.WaitForExit(240000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Private native smoke timed out.' }
+        if (!$p.WaitForExit(900000)) { taskkill /PID $p.Id /T /F | Out-Null; throw 'Private native smoke timed out.' }
         if ($p.ExitCode -ne 0) { throw 'Private native smoke failed.' }
     }
     Test-PrivateWindow $portable

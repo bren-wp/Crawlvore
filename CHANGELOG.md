@@ -1,5 +1,53 @@
 # Changelog
 
+## 8.1.7
+
+- Add reviewed duplicate reconciliation, verified pre-merge backup, preservation of alternate fields, history and original records, and reimport protection.
+- Port profile history and additional business data into native widgets; check directory coverage before skipping a completed snapshot.
+
+- Port the original dark palette, sidebar, dashboard metrics/charts and additional directory filters into the native candidate.
+- Require the complete Windows/Linux edition matrix in one stable release; allow Online updater selection from the combined signed release.
+
+- Begin WebView-free native migration with real Tcl/Tk directory, filters, profiles, synchronization, and backup creation, authenticated API-only worker mode and independent Windows/Linux build acceptance.
+- Normalize the expected Windows installer path in updater acceptance tests.
+
+- Polish loading, focus and profile dialogs; repair obsolete visual-test navigation.
+- Build standalone Windows and Linux update clients with pinned Ed25519 trust anchor, bounded HTTPS downloads, signed manifests and explicit installer confirmation.
+
+- Use Crawlvora branding throughout the visible desktop interface, remove the provenance tab and raw provider links while retaining underlying provenance and alternate values in history.
+- Add isolated signed update staging and authenticated worker load measurements.
+
+- Retire unreachable historical web scraping, configurable connector, browser renderer and studio engines; keep legacy imported data, provenance labels and active regression coverage.
+- Separate runtime dependencies from browser and audit tooling.
+
+- Require authenticated sessions in source and packaged mode; stop logging session URLs in HTTP access logs and bound worker concurrency and idle socket timeouts.
+- Remove obsolete PyWebView fallback and use a dependency-free-of-browser worker self-test.
+- Update SHA-2 and build dependencies; retain stable Tauri 2 pending full native migration.
+
+- Add measured package-size reports and CI budgets for both Croatian editions.
+
+- Compress the complete offline SQLite seed with XZ/LZMA2, verify the exact decoded bytes with a bounded decoder, retain legacy GZIP support, and avoid recompressing native CI artifacts.
+
+- Add index-backed category ordering and sparse e-mail contact lookup.
+- Introduce signed update manifest and bounded package verification with edition and rollback checks; execution is not yet enabled.
+
+- Add single-recipient TLS SMTP correspondence with OS vault, explicit confirmation, security notice template, suppression list, and persistent delivery status.
+- Group company profiles and abort stale client-side directory requests.
+- Separate database-free publication from the restricted full catalog release.
+
+- Project official primary NKD activity codes with revision labels and add a directory/export activity filter.
+
+- Separate download and directory-projection progress, commit completion atomically, and refresh the business directory immediately after successful synchronization.
+
+- Fixed Croatian dark interface, remove duplicate contact shortcuts and add an e-mail contact filter.
+
+- Move the runtime entry point into src without changing source workspace or packaged data paths.
+- Introduce Croatian NSIS installer with isolated install, upgrade and uninstall acceptance.
+
+- Focus exclusively on Croatian Court Registry desktop editions for Windows and Linux.
+- Move Python runtime modules into src and separate legacy data resources.
+- Retain existing workspaces and verified snapshot archive.
+
 ## 8.1.6
 
 - Separate Croatian and English national and database-free editions.

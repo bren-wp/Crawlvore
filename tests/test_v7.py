@@ -5,7 +5,6 @@ from core import Store, Collector
 from registry import Registry
 from automation import Queue
 from snapshot_diff import compare
-from detection import inspect_html
 from network import public_addresses, PublicHTTPSConnection, public_session
 from urllib3.exceptions import NewConnectionError
 from test_registry import Fake
@@ -46,9 +45,6 @@ class V7(unittest.TestCase):
         self.assertEqual(job['state'],'update_available')
         self.assertEqual(job['attempts'],1)
 
-    def test_table_detection(self):
-        html='<table><thead><tr><th>OIB</th><th>Naziv</th><th>Grad</th></tr></thead><tbody><tr><td>01234567890</td><td>Alpha</td><td>Zagreb</td></tr><tr><td>01234567891</td><td>Beta</td><td>Split</td></tr></tbody></table>'
-        r=inspect_html(html); self.assertEqual(r['preview'][0]['title'],'Alpha'); self.assertEqual(r['preview'][0]['oib'],'01234567890')
     def test_dns_private_mixed(self):
         def address(ip): return (socket.AF_INET,socket.SOCK_STREAM,6,'',(ip,443))
         with patch('network.socket.getaddrinfo',return_value=[address('8.8.8.8'),address('127.0.0.1')]):

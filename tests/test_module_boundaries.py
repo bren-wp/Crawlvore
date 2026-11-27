@@ -26,8 +26,8 @@ class ModuleBoundaryTests(unittest.TestCase):
     def test_http_handler_uses_only_its_workspace_token(self):
         def handler(token):
             dependencies = dict.fromkeys((
-                "ROOT", "active", "collector", "database", "gb_download",
-                "import_lock", "integrity", "national", "protected", "queue",
+                "ROOT", "active", "collector", "database",
+                "import_lock", "integrity", "protected", "queue",
                 "recovery", "registry", "registry_access", "search_integrity",
                 "selection", "store", "transfers", "ui_ready", "ui_ready_lock"))
             cls = make_handler(TOKEN=token, args=SimpleNamespace(worker=True),
