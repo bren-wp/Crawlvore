@@ -129,9 +129,17 @@ def header_surface(bg,accent,width,height=119):
     if type(width) is not int or not 1<=width<=4096 or height!=119:
         raise ValueError("Invalid header geometry")
     rows=[]
+    base_pixel=bytes((*rgb(bg),255))
+    rgb(accent)
     for y in range(height):
-        row=bytearray()
-        for x in range(width):
-            row.extend((*reference_header_color(bg,accent,width,height,x+.5,y+.5),255))
+        py=y+.5
+        # Both clipped layers are transparent before their leftmost edge.
+        # Leave one pixel of margin for floating-point boundary rounding.
+        radial_edge=(.80-.24*py/height)*width
+        highlight_edge=(.43+.57*max(0,.70*(1-py/110)))*width if py<=110 else width
+        prefix=max(0,int(min(radial_edge,highlight_edge))-1)
+        row=bytearray(base_pixel*prefix)
+        for x in range(prefix,width):
+            row.extend((*reference_header_color(bg,accent,width,height,x+.5,py),255))
         rows.append(bytes(row))
     return png(width,height,rows)
