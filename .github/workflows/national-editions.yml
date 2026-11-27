@@ -126,6 +126,8 @@ jobs:
         run: |
           python tools/sign_release_updates.py release "$(tr -d '\r\n' < VERSION)" HR
           (cd release && rm SHA256SUMS.txt && sha256sum -- * > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Verify complete signed release matrix
+        run: python tools/complete_release.py release "$(tr -d '\r\n' < VERSION)"
       - name: Publish two verified desktop editions
         env:
           GH_TOKEN: ${{ github.token }}
@@ -134,57 +136,6 @@ jobs:
           test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
           tag="v$(tr -d '\r\n' < VERSION)-hr"
           gh release create "$tag" --draft --prerelease --latest=false --target "$GITHUB_SHA" --title "Crawlvora $tag" --notes 'Croatian desktop editions: HR Full with verified snapshot 1370 and HR Online with no bundled records. Windows Setup and Portable; Linux DEB and TAR.GZ. Private distribution only.' release/*
-          gh release view "$tag" --json assets > remote.json
-          python -c 'import json,hashlib,pathlib; a=json.load(open("remote.json"))["assets"]; p=pathlib.Path("release"); assert {x["name"] for x in a}=={f.name for f in p.iterdir()}; assert all(x["size"]==(p/x["name"]).stat().st_size and x["digest"]=="sha256:"+hashlib.file_digest((p/x["name"]).open("rb"),"sha256").hexdigest() for x in a)'
-          gh release edit "$tag" --draft=false --prerelease --latest=false
-
-  publish_online:
-    needs: [online, quality, vault]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-        with:
-          pattern: Crawlvora-native-*-HR-Online
-          path: packages
-      - name: Verify and assemble four database-free packages
-        run: |
-          set -euo pipefail
-          mkdir release
-          windows=packages/Crawlvora-native-Windows-HR-Online
-          linux=packages/Crawlvora-native-Linux-HR-Online
-          python -c 'from tools.edition_acceptance import verify_edition; import os,sys; verify_edition(sys.argv[1],os.environ["GITHUB_SHA"],{},"Online")' "$windows"
-          cp "$windows/Setup-Online.exe" release/Setup-HR-Online.exe
-          cp "$windows/Portable-Online.exe" release/Portable-HR-Online.exe
-          cp "$linux/Crawlvora-Linux-amd64.deb" release/Crawlvora-Linux-HR-Online-amd64.deb
-          cp "$linux/Crawlvora-Linux-x86_64.tar.gz" release/Crawlvora-Linux-HR-Online-x86_64.tar.gz
-          cp "$windows/Update.exe" release/Update.exe
-          cp "$linux/crawlvora-update" release/crawlvora-update
-          cd release
-          test "$(find . -type f | wc -l)" = 6
-          python ../tools/package_sizes.py . --release online
-          for f in *; do test -s "$f"; test "$(stat -c %s "$f")" -lt 2147483648; done
-          sha256sum * > SHA256SUMS.txt
-          sha256sum -c SHA256SUMS.txt
-      - name: Install release signing dependency
-        run: python -m pip install cryptography==50.0.2
-      - name: Sign release update manifest
-        env:
-          CRAWLVORA_UPDATE_SIGNING_KEY: ${{ secrets.CRAWLVORA_UPDATE_SIGNING_KEY }}
-        run: |
-          python tools/sign_release_updates.py release "$(tr -d '\r\n' < VERSION)" Online
-          (cd release && rm SHA256SUMS.txt && sha256sum -- * > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
-      - name: Publish only database-free packages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="v$(tr -d '\r\n' < VERSION)-online"
-          gh release create "$tag" --draft --prerelease --latest=false --target "$GITHUB_SHA" --title "Crawlvora $tag" --notes 'Croatian Windows and Linux edition without a bundled database. Existing workspaces are preserved.' release/*
-          # Drafts are not necessarily returned by tag lookups in all API clients.
           id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name==\"$tag\" and .draft) | .id")"
           test -n "$id"
           gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate --slurp > remote.json

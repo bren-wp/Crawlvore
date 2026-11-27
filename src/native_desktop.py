@@ -12,8 +12,11 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
 
-BG, PANEL, TEXT, MUTED, ACCENT = "#111923", "#1a2735", "#e7edf5", "#a9b9cb", "#43d2af"
-CONTACTS = {"Sve adrese": "", "Ima e-poštu": "email", "Ima telefon": "phone", "Ima web": "web"}
+BG, PANEL, TEXT, MUTED, ACCENT = "#0b101a", "#111b2a", "#edf2f9", "#95a5bb", "#52d6b0"
+SIDE, PANEL2, LINE, ACTIVE, INK = "#0d1420", "#162335", "#243247", "#153b35", "#06291f"
+CONTACTS = {"Svi zapisi": "", "Ima telefon": "phone", "Ima web": "web", "Ima e-poštu": "email", "Bez telefona i weba": "missing"}
+KINDS = {"Sve vrste":"","Trgovačka društva":"company","Poduzetnici i obrti":"entrepreneur","Institucije":"institution","Neprofitne organizacije":"nonprofit","Neklasificirani subjekti":"unknown"}
+SORTS = {"Naziv A–Ž":"title","Naziv Ž–A":"title_desc","Grad":"city","Zadnje dodani":"new"}
 GROUPS = {
     "Identifikacija": (("oib","OIB"),("mbs","MBS"),("industry","Djelatnost"),("year","Godina osnivanja")),
     "Kontakt i sjedište": (("email","E-pošta"),("phone","Telefon"),("website","Web"),("address","Adresa"),("postal","Poštanski broj"),("city","Grad")),
@@ -41,8 +44,8 @@ class Desktop:
         self.pending_search = False
         self.search_timer = None
         root.title("Crawlvora")
-        root.geometry("1120x730")
-        root.minsize(820, 540)
+        root.geometry("1280x820")
+        root.minsize(960, 600)
         root.configure(bg=BG)
         root.protocol("WM_DELETE_WINDOW", self.close)
         style = ttk.Style(root)
@@ -50,28 +53,67 @@ class Desktop:
         style.configure(".", background=BG, foreground=TEXT, fieldbackground=PANEL, font=("Segoe UI", 10))
         style.configure("TButton", background=PANEL, padding=(12,8), borderwidth=0)
         style.map("TButton", background=[("active","#30475a"),("pressed","#30475a")])
-        style.configure("Accent.TButton", background=ACCENT, foreground=BG)
+        style.configure("Accent.TButton", background=ACCENT, foreground=INK)
+        style.configure("Nav.TButton", background=SIDE, foreground=MUTED, anchor="w", padding=(12,11))
+        style.configure("Active.Nav.TButton", background=ACTIVE, foreground=ACCENT, anchor="w")
+        style.configure("Panel.TFrame", background=PANEL)
+        style.configure("Panel.TLabel", background=PANEL)
+        style.configure("Metric.TLabel", background=PANEL, font=("Segoe UI",24,"bold"))
+        style.configure("Title.TLabel",font=("Segoe UI",26,"bold"))
         style.configure("Treeview", background=PANEL, fieldbackground=PANEL, foreground=TEXT, rowheight=32)
         style.configure("Treeview.Heading", background=BG, foreground=MUTED, relief="flat")
         style.map("Treeview", background=[("selected","#245668")])
         style.configure("TCombobox", fieldbackground=PANEL, foreground=TEXT)
         style.map("TCombobox", fieldbackground=[("readonly",PANEL)], foreground=[("readonly",TEXT)])
-        style.configure("Title.TLabel", font=("Segoe UI",20,"bold"))
+        style.configure("Title.TLabel", font=("Segoe UI",26,"bold"))
         style.configure("Muted.TLabel", foreground=MUTED)
         self.status = tk.StringVar(value="Priprema radnog prostora…")
-        self.header = ttk.Frame(root,padding=18)
+        shell=ttk.Frame(root)
+        shell.pack(fill="both",expand=True)
+        sidebar=tk.Frame(shell,bg=SIDE,width=242,highlightbackground=LINE,highlightthickness=1)
+        sidebar.pack(side="left",fill="y")
+        sidebar.pack_propagate(False)
+        brand=tk.Frame(sidebar,bg=SIDE)
+        brand.pack(fill="x",padx=20,pady=(28,25))
+        logo=tk.Canvas(brand,width=42,height=42,bg=SIDE,highlightthickness=0)
+        logo.pack(side="left",padx=(0,12))
+        logo.create_polygon(6,0,36,0,42,6,42,36,36,42,6,42,0,36,0,6,fill=ACCENT,outline="")
+        logo.create_polygon(21,8,33,15,33,28,21,35,9,28,9,15,outline=INK,fill="",width=2)
+        logo.create_line(9,15,21,22,33,15,21,8,21,22,21,35,fill=INK,width=2)
+        tk.Label(brand,text="Crawlvora",bg=SIDE,fg=TEXT,font=("Segoe UI",17,"bold")).pack(anchor="w")
+        tk.Label(brand,text="DATA INTELLIGENCE",bg=SIDE,fg=MUTED,font=("Segoe UI",8)).pack(anchor="w")
+        self.nav={}
+        def nav_label(label):
+            tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",9,"bold")).pack(anchor="w",padx=20,pady=(14,5))
+        def nav(key,label,command):
+            button=ttk.Button(sidebar,text=label,style="Nav.TButton",command=command)
+            button.pack(fill="x",padx=16,pady=2)
+            self.nav[key]=button
+        nav_label("RADNI PROSTOR")
+        nav("overview","Pregled",lambda:self.show_view("overview"))
+        nav("directory","Poslovni imenik",lambda:self.show_view("directory"))
+        nav("registry","Crawlvora",self.sync_dialog)
+        nav_label("UPRAVLJANJE")
+        nav("backup","Izrada sigurnosne kopije",self.backup_dialog)
+        tk.Label(sidebar,text="●  Lokalni radni prostor",bg=SIDE,fg=ACCENT,font=("Segoe UI",10)).pack(side="bottom",anchor="w",padx=20,pady=24)
+        main=ttk.Frame(shell)
+        main.pack(side="left",fill="both",expand=True)
+        self.header=ttk.Frame(main,padding=(34,18))
         self.header.pack(fill="x")
-        ttk.Label(self.header,text="Crawlvora",style="Title.TLabel").pack(side="left")
-        self.stats = tk.StringVar(value="")
+        self.crumb=tk.StringVar(value="Radni prostor / Pregled")
+        ttk.Label(self.header,textvariable=self.crumb,style="Muted.TLabel").pack(side="left")
+        self.stats=tk.StringVar(value="")
         ttk.Label(self.header,textvariable=self.stats,style="Muted.TLabel").pack(side="right")
-        self.body = ttk.Frame(root,padding=(18,0,18,14))
-        self.body.pack(fill="both",expand=True)
-        ttk.Label(root,textvariable=self.status,style="Muted.TLabel",padding=(18,8)).pack(fill="x")
-        navigation=ttk.Frame(self.body)
-        navigation.pack(fill="x",pady=(0,12))
-        ttk.Button(navigation,text="Sinkronizacija",command=self.sync_dialog).pack(side="left")
-        ttk.Button(navigation,text="Izrada kopije",command=self.backup_dialog).pack(side="left",padx=8)
+        ttk.Separator(main).pack(fill="x")
+        content=ttk.Frame(main,padding=(34,24,34,14))
+        content.pack(fill="both",expand=True)
+        self.views={key:ttk.Frame(content) for key in ("overview","directory")}
+        self.body=self.views["directory"]
         self.build_directory()
+        self.build_overview()
+        self.current_view=""
+        self.show_view("overview")
+        ttk.Label(main,textvariable=self.status,style="Muted.TLabel",padding=(34,8)).pack(fill="x")
         self.root.after(40,self.drain)
         self.submit(lambda:WorkerProcess(workspace,smoke=smoke,cancel=self.cancel_start),self.started)
 
@@ -105,13 +147,113 @@ class Desktop:
         self.worker, self.client = worker, worker.client
         self.status.set("Spremno.")
         self.submit(lambda:(self.client.request("/api/cities"),self.client.request("/api/industries")),self.facets)
-        self.refresh()
+        if self.current_view=="overview":self.refresh_overview()
+        else:self.refresh()
         self.poll_sync()
 
     def facets(self, result):
         cities,industries = result
         self.citybox.configure(values=["Svi gradovi"]+[x if isinstance(x,str) else x.get("city","") for x in cities])
         self.industrybox.configure(values=["Sve djelatnosti"]+industries)
+
+    def show_view(self,key):
+        if self.current_view:
+            self.views[self.current_view].pack_forget()
+            self.nav[self.current_view].configure(style="Nav.TButton")
+        self.current_view=key
+        self.nav[key].configure(style="Active.Nav.TButton")
+        self.views[key].pack(fill="both",expand=True)
+        self.crumb.set("Radni prostor / "+("Pregled" if key=="overview" else "Poslovni imenik"))
+        if self.client:
+            if key=="overview":self.refresh_overview()
+            else:self.refresh()
+
+    def build_overview(self):
+        view=self.views["overview"]
+        ttk.Label(view,text="POSLOVNI PODACI",foreground=ACCENT).pack(anchor="w")
+        ttk.Label(view,text="Pregled imenika",style="Title.TLabel").pack(anchor="w",pady=(4,4))
+        ttk.Label(view,text="Pronađite, istražite i organizirajte podatke o tvrtkama na jednom mjestu.",style="Muted.TLabel").pack(anchor="w",pady=(0,18))
+        metrics=ttk.Frame(view)
+        metrics.pack(fill="x",pady=(0,16))
+        self.metric_values={}
+        for column,(key,label) in enumerate((("total","Tvrtke u bazi"),("cities","Gradovi"),("phones","S telefonom"),("websites","S web stranicom"))):
+            metrics.columnconfigure(column,weight=1,uniform="metric")
+            panel=ttk.Frame(metrics,style="Panel.TFrame",padding=14)
+            panel.grid(row=0,column=column,sticky="nsew",padx=(0,10 if column<3 else 0))
+            ttk.Label(panel,text=label,style="Panel.TLabel").pack(anchor="w")
+            value=tk.StringVar(value="—")
+            ttk.Label(panel,textvariable=value,style="Metric.TLabel").pack(anchor="w",pady=(12,0))
+            self.metric_values[key]=value
+        charts=ttk.Frame(view)
+        charts.pack(fill="x",pady=(0,16))
+        charts.columnconfigure(0,weight=6)
+        charts.columnconfigure(1,weight=5)
+        city=ttk.Frame(charts,style="Panel.TFrame",padding=14)
+        city.grid(row=0,column=0,sticky="nsew",padx=(0,12))
+        ttk.Label(city,text="Najzastupljeniji gradovi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
+        self.city_chart=tk.Canvas(city,height=152,bg=PANEL,highlightthickness=0)
+        self.city_chart.pack(fill="x",expand=True,pady=(8,0))
+        coverage=ttk.Frame(charts,style="Panel.TFrame",padding=14)
+        coverage.grid(row=0,column=1,sticky="nsew")
+        ttk.Label(coverage,text="Dostupnost podataka",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
+        self.coverage_chart=tk.Canvas(coverage,height=152,bg=PANEL,highlightthickness=0)
+        self.coverage_chart.pack(fill="x",expand=True,pady=(8,0))
+        self.overview_data=None
+        for canvas in (self.city_chart,self.coverage_chart):
+            canvas.bind("<Configure>",lambda _e:self.draw_charts())
+        recent=ttk.Frame(view,style="Panel.TFrame",padding=14)
+        recent.pack(fill="both",expand=True)
+        top=ttk.Frame(recent,style="Panel.TFrame")
+        top.pack(fill="x")
+        ttk.Label(top,text="Nedavni zapisi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(side="left")
+        ttk.Button(top,text="Otvori imenik",command=lambda:self.show_view("directory")).pack(side="right")
+        self.recent=ttk.Treeview(recent,columns=("name","city","phone"),show="headings",height=5)
+        for key,label,width in (("name","Tvrtka",300),("city","Grad",120),("phone","Telefon",120)):
+            self.recent.heading(key,text=label)
+            self.recent.column(key,width=width)
+        self.recent.pack(fill="both",expand=True,pady=(10,0))
+        def open_recent(_event):
+            if self.recent.selection():
+                identifier=int(self.recent.selection()[0])
+                self.submit(lambda:self.client.request(f"/api/company/{identifier}"),self.profile)
+        self.recent.bind("<Double-1>",open_recent)
+        self.recent.bind("<Return>",open_recent)
+
+    def refresh_overview(self):
+        def done(result):
+            stats,companies=result
+            self.overview_data=stats
+            for key,value in self.metric_values.items():value.set(f"{stats[key]:,}".replace(",","."))
+            self.draw_charts()
+            self.recent.delete(*self.recent.get_children())
+            for row in companies["rows"]:
+                self.recent.insert("","end",iid=str(row["id"]),values=(row["title"],row.get("city") or "—",row.get("phone") or "—"))
+            if self.smoke:
+                if stats["total"]!=1 or len(self.recent.get_children())!=1 or self.metric_values["total"].get()!="1":self.close();return
+                self.show_view("directory")
+        self.submit(lambda:(self.client.request("/api/stats"),self.client.request("/api/companies",{"limit":5,"sort":"new"})),done)
+
+    def draw_charts(self):
+        if not self.overview_data:return
+        stats=self.overview_data
+        for canvas in (self.city_chart,self.coverage_chart):canvas.delete("all")
+        width=max(180,self.city_chart.winfo_width())
+        cities=stats["top_cities"]
+        largest=max(1,max((row["n"] for row in cities),default=1))
+        for index,row in enumerate(cities[:6]):
+            y=12+24*index
+            self.city_chart.create_text(0,y,anchor="w",text=row["city"][:18],fill=TEXT)
+            self.city_chart.create_rectangle(115,y-4,width-55,y+4,fill=PANEL2,outline="")
+            self.city_chart.create_rectangle(115,y-4,115+max(0,width-170)*row["n"]/largest,y+4,fill=ACCENT,outline="")
+            self.city_chart.create_text(width-2,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=MUTED)
+        width=max(180,self.coverage_chart.winfo_width())
+        for index,(key,label) in enumerate((("phones","Telefonski broj"),("websites","Web stranica"))):
+            y=15+65*index
+            pct=100*stats[key]/max(1,stats["total"])
+            self.coverage_chart.create_text(0,y,anchor="w",text=label,fill=MUTED)
+            self.coverage_chart.create_text(width-2,y,anchor="e",text=f"{pct:.0f}%",fill=TEXT)
+            self.coverage_chart.create_rectangle(0,y+14,width,y+23,fill=PANEL2,outline="")
+            self.coverage_chart.create_rectangle(0,y+14,width*pct/100,y+23,fill=ACCENT,outline="")
 
     def build_directory(self):
         ttk.Label(self.body,text="Poslovni imenik",style="Title.TLabel").pack(anchor="w",pady=(0,12))
@@ -120,7 +262,9 @@ class Desktop:
         self.query=tk.StringVar()
         self.city=tk.StringVar(value="Svi gradovi")
         self.industry=tk.StringVar(value="Sve djelatnosti")
-        self.contact=tk.StringVar(value="Sve adrese")
+        self.contact=tk.StringVar(value="Svi zapisi")
+        self.kind=tk.StringVar(value="Sve vrste")
+        self.sort=tk.StringVar(value="Naziv A–Ž")
         ttk.Label(filters,text="Naziv, OIB ili MBS").grid(row=0,column=0,sticky="w")
         entry=ttk.Entry(filters,textvariable=self.query)
         entry.grid(row=1,column=0,sticky="ew",padx=(0,8))
@@ -134,6 +278,15 @@ class Desktop:
         filters.columnconfigure(0,weight=3)
         filters.columnconfigure(2,weight=2)
         ttk.Button(filters,text="Pretraži",style="Accent.TButton",command=self.schedule_search).grid(row=1,column=4)
+        for col,label,var,values in ((0,"Vrsta subjekta",self.kind,list(KINDS)),(1,"Sortiranje",self.sort,list(SORTS))):
+            ttk.Label(filters,text=label).grid(row=2,column=col,sticky="w",pady=(8,0))
+            selector=ttk.Combobox(filters,textvariable=var,values=values,state="readonly",width=18)
+            selector.grid(row=3,column=col,sticky="ew",padx=(0,8))
+            selector.bind("<<ComboboxSelected>>",lambda _e:self.schedule_search())
+        def reset():
+            for var,value in ((self.query,""),(self.city,"Svi gradovi"),(self.industry,"Sve djelatnosti"),(self.contact,"Svi zapisi"),(self.kind,"Sve vrste"),(self.sort,"Naziv A–Ž")):var.set(value)
+            self.schedule_search()
+        ttk.Button(filters,text="Poništi filtre",command=reset).grid(row=3,column=4)
         self.query.trace_add("write",lambda *_:self.schedule_search())
         table=ttk.Frame(self.body)
         table.pack(fill="both",expand=True)
@@ -183,7 +336,7 @@ class Desktop:
         self.pending_search=True
         params={"q":self.query.get(),"city":"" if self.city.get()=="Svi gradovi" else self.city.get(),
                 "industry":"" if self.industry.get()=="Sve djelatnosti" else self.industry.get(),
-                "contact":CONTACTS.get(self.contact.get(),""),"page":self.page,"limit":25}
+                "contact":CONTACTS.get(self.contact.get(),""),"entity_kind":KINDS[self.kind.get()],"sort":SORTS[self.sort.get()],"page":self.page,"limit":25}
         self.status.set("Učitavanje…")
         self.previous.configure(state="disabled")
         self.next.configure(state="disabled")
@@ -302,7 +455,8 @@ class Desktop:
                 self.sync_active=False
                 if state=="completed":
                     self.page=1
-                    self.refresh()
+                    if self.current_view=="overview":self.refresh_overview()
+                    else:self.refresh()
                     self.submit(lambda:(self.client.request("/api/cities"),self.client.request("/api/industries")),self.facets)
                 else:self.status.set("Sinkronizacija nije završena.")
         if not self.sync_polling:

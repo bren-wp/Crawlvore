@@ -55,7 +55,7 @@ def fetch(session, url, limit, destination=None, expected_hash=None, exact_size=
     raise ValueError("Previše preusmjeravanja.")
 
 def download(tag,installed,platform,package,edition,staging,session=None):
-    if not TAG.fullmatch(tag) or tag.split("-")[-1]!=("hr" if edition=="HR" else "online"):
+    if not TAG.fullmatch(tag) or (edition=="HR" and tag.split("-")[-1]!="hr") or edition not in ("HR","Online"):
         raise ValueError("Oznaka izdanja ne odgovara instalaciji.")
     if version(tag[1:].split("-")[0])<=version(installed):raise ValueError("Ažuriranje nije novije.")
     staging=Path(staging).absolute()

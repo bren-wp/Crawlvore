@@ -14,3 +14,7 @@ Full packages carry a single lossless XZ/LZMA2 preset 6 SQLite seed. The decoder
 Online packages contain no registry seed. Keep native executable stripping and existing PyInstaller exclusions for browser-development tooling; do not remove runtime dependencies simply to reduce size. Linux DEB uses XZ level 6 and the compatible TAR.GZ archive uses GZIP level 9. Native CI artifacts are already compressed, so upload them without redundant ZIP compression.
 
 Each native build and final release must report actual byte sizes and satisfy initial ceilings of 45 decimal MB per Online package and 750 decimal MB per Full package. These are engineering budgets, not measured final package sizes or a guarantee. Report change versus the published 8.1.6 Online baseline. If a budget fails, investigate and optimize or explicitly review the budget; never delete registry records or disable functional/security checks to meet it. All eight final packages must still pass platform-specific acceptance.
+
+## Complete stable release
+
+A stable release must contain all eight Windows/Linux HR Full and HR Online packages, both updater clients, source archive, registry manifest, size report, signed update manifest and checksums. The Online build is independent but cannot be promoted alone as the complete stable release. Keep the existing distribution/privacy gate for the full catalog. Publication verifies the complete signed asset set locally and compares remote asset digests before marking the draft stable.

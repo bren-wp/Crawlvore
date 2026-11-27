@@ -56,6 +56,11 @@ class ClientTests(unittest.TestCase):
         with self.assertRaises(ValueError):fetch(session,"https://github.com/x",2)
     def test_no_downgrade_or_wrong_edition(self):
         session=Mock()
-        for tag in ("v8.1.7-online","v8.1.8-hr","../v8.1.8-online"):
+        for tag in ("v8.1.7-online","../v8.1.8-online"):
             with self.assertRaises(ValueError):download(tag,"8.1.7","windows","setup","Online",self.root/"stage",session)
+        with self.assertRaises(ValueError):download("v8.1.8-online","8.1.7","windows","setup","HR",self.root/"stage",session)
         session.get.assert_not_called()
+    def test_online_can_use_complete_release_without_switching_edition(self):
+        staging=self.root/"stage"
+        self.assertTrue(download("v8.1.8-hr","8.1.7","windows","setup","Online",staging,self.session())["staged"])
+        self.assertTrue((staging/"Setup-HR-Online.exe").exists())

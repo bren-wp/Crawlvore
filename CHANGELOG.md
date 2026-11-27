@@ -2,6 +2,9 @@
 
 ## 8.1.7
 
+- Port the original dark palette, sidebar, dashboard metrics/charts and additional directory filters into the native candidate.
+- Require the complete Windows/Linux edition matrix in one stable release; allow Online updater selection from the combined signed release.
+
 - Begin WebView-free native migration with real Tcl/Tk directory, filters, profiles, synchronization, and backup creation, authenticated API-only worker mode and independent Windows/Linux build acceptance.
 - Normalize the expected Windows installer path in updater acceptance tests.
 
