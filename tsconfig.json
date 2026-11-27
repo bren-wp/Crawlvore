@@ -15,6 +15,8 @@
     "noEmitOnError": true
   },
   "include": [
-    "frontend/locale.ts"
+    "frontend/locale.ts",
+    "frontend/api-contracts.d.ts",
+    "frontend/dom-contracts.d.ts"
   ]
 }

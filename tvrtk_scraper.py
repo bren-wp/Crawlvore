@@ -6,10 +6,10 @@ import sys
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from http.cookies import SimpleCookie, CookieError
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 from core import Store, Collector
+from local_http_security import token_matches, allowed_host, session_cookie_name, valid_session_cookie, content_length, InvalidFraming
 from sources import NAMES
 from bulk_io import MAX_IMPORT, receive, require_free_space, import_file, export_file, company_registry
 from registry import Registry, RegistryAccess, start_registry
@@ -34,9 +34,6 @@ from urllib.parse import unquote
 
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_hex(32)
-
-def token_matches(value,expected):
-    return isinstance(value,str) and value.isascii() and secrets.compare_digest(value,expected)
 
 def main():
     ap=argparse.ArgumentParser(description='Crawlvora — lokalni poslovni imenik')
@@ -156,17 +153,11 @@ def run_workspace(args,selection,active):
             for k,v in (extra or {}).items(): self.send_header(k,v)
             self.end_headers(); self.wfile.write(data)
         def authorized(self):
-            return self.headers.get('Host') in (f'127.0.0.1:{self.server.server_port}',f'localhost:{self.server.server_port}')
+            return allowed_host(self.headers.get('Host'),self.server.server_port)
         def cookie_name(self):
-            return 'crawlvora_session_'+str(self.server.server_port)
+            return session_cookie_name(self.server.server_port)
         def session_authorized(self):
-            if not args.worker: return True
-            try:
-                cookie=SimpleCookie(self.headers.get('Cookie',''))
-                value=cookie.get(self.cookie_name())
-                return value is not None and token_matches(value.value,TOKEN)
-            except (CookieError,TypeError):
-                return False
+            return not args.worker or valid_session_cookie(self.headers.get('Cookie',''),self.cookie_name(),TOKEN)
         def do_GET(self):
             if not self.authorized(): return self.send_data({'error':'Nedopušten host.'},status=403)
             p=urlsplit(self.path)
@@ -275,11 +266,11 @@ def run_workspace(args,selection,active):
         def do_POST(self):
             if not self.authorized() or not self.session_authorized() or not token_matches(self.headers.get('X-Local-Token',''),TOKEN): return self.send_data({'error':'Nedopušten zahtjev.'},status=403)
             try:
-                lengths=self.headers.get_all('Content-Length',[])
-                if self.headers.get('Transfer-Encoding') is not None or len(lengths)!=1 or not lengths[0].isascii() or not lengths[0].isdigit() or len(lengths[0])>12:
+                try:
+                    n=content_length(self.headers)
+                except InvalidFraming:
                     self.close_connection=True
                     return self.send_data({'error':'Invalid request framing.'},status=400)
-                n=int(lengths[0])
                 if self.path=='/api/recovery/encrypted-restore':
                     password=unquote(self.headers.get('X-Backup-Passphrase',''),errors='strict')
                     if not 16<=len(password)<=1024: raise ValueError('Use a backup passphrase of at least 16 characters.')
