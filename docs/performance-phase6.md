@@ -50,3 +50,17 @@ separate from ordinary short CI and from the production release gate.
 Actual million-record and 14,400-second results, full-export memory,
 national catalog performance and native application measurements remain
 required.
+
+## Verified million-record benchmark
+
+Run 45921653299, commit c67afe57fa9f3b7f2094ca345737d9912b603341,
+Linux, Python 3.12.16 and SQLite 3.46.1: completed successfully.
+Seed 122.503 s. p95 filtered page 1.171 ms, exact MBS 0.628 ms,
+FTS phrase 0.762 ms, equivalent substring phrase 422.919 ms,
+statistics 436.428 ms, rare provider page 9.717 ms. Paired rare-provider
+count p95 417.927 ms before vs 3.761 ms after, equal result 2000.
+Streaming export of 10,000 rows wrote 4,817,777 bytes in 2064.153 ms
+with 1,663,084 peak Python traced allocation bytes. Backup 3199.732 ms;
+restore 16570.016 ms; integrity ok and foreign key check passed.
+Four-hour run 45921653337 remains in progress; this is not full endurance
+acceptance. Keep the existing run intact; no real user data used.

@@ -46,7 +46,7 @@ jobs:
           version="$(tr -d '\r\n' < VERSION)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
-          python -c 'import pathlib,zipfile; root=pathlib.Path("wordpress"); folder=root/"crawlvora-business-directory"; z=zipfile.ZipFile("release/Crawlvora-WordPress.zip","w",zipfile.ZIP_DEFLATED); [z.write(p,p.relative_to(root)) for p in sorted(folder.rglob("*")) if p.is_file()]; z.close()'
+          python tools/package_wordpress.py release/Crawlvora-WordPress.zip --ref "$GITHUB_SHA"
           cd release
           printf '%s\n' '{"registry_bundle_included":false,"complete":false,"snapshot":null,"scope":null,"category_count":null,"subjects":null,"reason":"Public preview; complete registry snapshot not included or verified."}' > REGISTRY-MANIFEST.json
           files=(Portable.exe Setup.exe Portable-Online.exe Setup-Online.exe Crawlvora-Linux-amd64.deb Crawlvora-Linux-x86_64.tar.gz Crawlvora-source.zip REGISTRY-MANIFEST.json Crawlvora-WordPress.zip)
@@ -54,11 +54,15 @@ jobs:
           sha256sum "${files[@]}" > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
       - name: Build separate code-only web package
-        run: python tools/package_web.py web-release/Crawlvora-Web.zip --ref "$GITHUB_SHA"
+        run: |
+          python tools/package_web.py web-release/Crawlvora-Web.zip --ref "$GITHUB_SHA"
+          python tools/package_web.py web-release/Crawlvora-Web-Upgrade.zip --ref "$GITHUB_SHA" --upgrade
+          cd web-release
+          sha256sum Crawlvora-Web.zip Crawlvora-Web-Upgrade.zip > SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: Crawlvora-Web
-          path: web-release/Crawlvora-Web.zip
+          path: web-release/
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

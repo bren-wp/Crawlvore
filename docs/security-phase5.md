@@ -135,3 +135,12 @@ The six RustSec advisory warnings remain documented and are not waived.
 Security verification and the performance work may proceed in parallel;
 complete security acceptance is not claimed while those upstream findings,
 remaining manual review, or latest CI results are unresolved.
+
+## Follow-up CI evidence
+
+Quality/security run 45921658940 on c67afe57fa9f3b7f2094ca345737d9912b603341
+passed both jobs: 181 Python tests, real WordPress integration, Apache
+storage denial acceptance, npm/pip audits and 320 view / 80 dialog cases.
+Native secure vault run 45921658989 passed. Apache acceptance proves the
+test configuration, not the operator hosting configuration. Native package
+CI and upstream Rust warnings remain separate acceptance conditions.

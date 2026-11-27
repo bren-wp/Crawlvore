@@ -66,12 +66,18 @@ jobs:
           python tools/pixel_diff.py --strict
       - run: python tools/performance_check.py --records 100000 > performance.json
       - name: Build verified shared-hosting candidate
-        run: python tools/package_web.py "${{ runner.temp }}/Crawlvora-Web.zip" --ref "$GITHUB_SHA"
+        run: |
+          mkdir -p "${{ runner.temp }}/web-packages"
+          python tools/package_web.py "${{ runner.temp }}/web-packages/Crawlvora-Web.zip" --ref "$GITHUB_SHA"
+          python tools/package_web.py "${{ runner.temp }}/web-packages/Crawlvora-Web-Upgrade.zip" --ref "$GITHUB_SHA" --upgrade
+          python tools/package_wordpress.py "${{ runner.temp }}/web-packages/Crawlvora-WordPress.zip" --ref "$GITHUB_SHA"
+          cd "${{ runner.temp }}/web-packages"
+          sha256sum *.zip > SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: github.event_name == 'pull_request'
         with:
           name: Crawlvora-Web-PR
-          path: ${{ runner.temp }}/Crawlvora-Web.zip
+          path: ${{ runner.temp }}/web-packages/
           if-no-files-found: error
           retention-days: 7
       - name: Record audit evidence in job summary

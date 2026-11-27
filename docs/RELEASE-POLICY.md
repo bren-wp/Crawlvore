@@ -65,3 +65,21 @@ Portable assembly checks free space, writes to an invocation-owned unique stagin
 ## Separate shared-hosting package
 
 The verified candidate workflow also archives Crawlvora-Web.zip separately from the desktop matrix. It is built from the exact committed source, allows only reviewed site paths and empty catalog manifests, and includes the Apache storage deny rule. It never includes local SQLite data, catalog shards or credentials. Extract the archive into a fresh hosting root; preserve existing approved catalogs during upgrades. Actual hosting access controls and operator/legal details still require independent acceptance. The fourteen production release assets remain unchanged.
+
+## Independent deployable web and plugin packages
+
+Build the website and WordPress packages exclusively from an exact Git
+commit, using the allowlisted package tools. ZIP members use fixed metadata,
+sorted paths and validated CRC; publication is exclusive, so a failed build
+cannot replace an existing ZIP. Reproducibility is for the same source and
+compression implementation.
+
+A fresh web ZIP includes only empty catalog manifests. An upgrade ZIP omits
+all catalog files and preserves deployment-specific SEO config and robots
+unless the operator explicitly supplies --base-url. Candidate and production
+workflows archive both web ZIPs and their separate SHA256SUMS.txt outside the
+14-file desktop production release matrix. WordPress uses the same exact
+five-member code-only packaging tool in both workflows.
+
+Private registry distribution, complete verified HR/GB snapshots, strict
+visual acceptance and full native/quality/endurance gates are unchanged.
