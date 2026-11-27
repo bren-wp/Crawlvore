@@ -4,7 +4,7 @@ Only HR Full and HR Online are built, for Windows and Linux. Each has installer 
 
 Windows Setup is built with NSIS, in Croatian, with a per-user installation and optional desktop shortcut. The actual installer must pass isolated install, reinstall, payload checksum and uninstall checks with a preserved data sentinel. The existing private Inno build remains a separate owner-only fallback until migration is verified on real existing installations. No end-user Python installation is required.
 
-Database-free HR Online publication has an independent, audited release job. HR Full remains restricted to private repositories, and a public repository skips the private snapshot build rather than uploading it. No unsigned automatic updater may execute downloaded code.
+Database-free HR Online builds have independent acceptance jobs, but no independent stable publication job. HR Full remains restricted to private repositories, and a public repository skips the private snapshot build rather than uploading it. No unsigned automatic updater may execute downloaded code.
 
 
 ## Compact distribution
@@ -18,3 +18,14 @@ Each native build and final release must report actual byte sizes and satisfy in
 ## Complete stable release
 
 A stable release must contain all eight Windows/Linux HR Full and HR Online packages, both updater clients, source archive, registry manifest, size report, signed update manifest and checksums. The Online build is independent but cannot be promoted alone as the complete stable release. Keep the existing distribution/privacy gate for the full catalog. Publication verifies the complete signed asset set locally and compares remote asset digests before marking the draft stable.
+
+## Mandatory distribution matrix (no exceptions)
+
+| Package | HR Full (s bazom) | HR Online (bez baze) |
+|---|---|---|
+| Windows NSIS Setup | Setup-HR-Full.exe | Setup-HR-Online.exe |
+| Windows Portable | Portable-HR-Full.exe | Portable-HR-Online.exe |
+| Linux installer | Crawlvora-Linux-HR-Full-amd64.deb | Crawlvora-Linux-HR-Online-amd64.deb |
+| Linux portable | Crawlvora-Linux-HR-Full-x86_64.tar.gz | Crawlvora-Linux-HR-Online-x86_64.tar.gz |
+
+All eight packages must be built and tested from the same commit, in one release with both updaters, source ZIP, registry manifest, size report, update manifest, manifest signature and SHA256SUMS (16 files total). Windows and Linux acceptance receipts bind actual tested asset digests and database identity to that commit. Missing, changed or unexpected assets block publication. No separate Online-only stable release. The privacy gate remains mandatory.

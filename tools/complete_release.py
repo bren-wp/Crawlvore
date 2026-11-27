@@ -12,12 +12,28 @@ from update_trust import TRUSTED_KEY_HEX
 
 SUPPORT={"Update.exe","crawlvora-update","Crawlvora-source.zip","REGISTRY-HR-MANIFEST.json",
          "PACKAGE-SIZES.json","UPDATE-MANIFEST.json","UPDATE-MANIFEST.sig","SHA256SUMS.txt"}
-REQUIRED=set(TARGETS.values())|SUPPORT
+# Independent publication contract: changing updater targets cannot silently shrink a release.
+MANDATORY_PACKAGES={
+    ("windows","setup","HR"):"Setup-HR-Full.exe",
+    ("windows","setup","Online"):"Setup-HR-Online.exe",
+    ("windows","portable","HR"):"Portable-HR-Full.exe",
+    ("windows","portable","Online"):"Portable-HR-Online.exe",
+    ("linux","deb","HR"):"Crawlvora-Linux-HR-Full-amd64.deb",
+    ("linux","deb","Online"):"Crawlvora-Linux-HR-Online-amd64.deb",
+    ("linux","portable","HR"):"Crawlvora-Linux-HR-Full-x86_64.tar.gz",
+    ("linux","portable","Online"):"Crawlvora-Linux-HR-Online-x86_64.tar.gz",
+}
+REQUIRED=set(MANDATORY_PACKAGES.values())|SUPPORT
+
+def require_contract():
+    if TARGETS!=MANDATORY_PACKAGES or len(REQUIRED)!=16:
+        raise ValueError("Mandatory 16-file Croatian release contract changed")
 
 def digest(path):
     with path.open("rb") as stream:return hashlib.file_digest(stream,"sha256").hexdigest()
 
 def verify(root,release_version,public_key=None):
+    require_contract()
     root=Path(root)
     if {p.name for p in root.iterdir()}!=REQUIRED:raise ValueError("Incomplete or unexpected release asset set")
     for path in root.iterdir():

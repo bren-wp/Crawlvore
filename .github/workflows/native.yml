@@ -170,6 +170,14 @@ jobs:
           sudo apt-get install -y ./release-assets/Crawlvora-Linux-amd64.deb
           WEBKIT_DISABLE_COMPOSITING_MODE=1 timeout 900 xvfb-run -a /usr/bin/crawlvora --native-smoke
           sudo apt-get remove -y crawlvora
+      - name: Record tested Linux installer and archive identity
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          ACCEPTED_EDITION: ${{ inputs.edition || 'Online' }}
+        run: |
+          set -euo pipefail
+          python tools/edition_acceptance.py release-assets --edition "$ACCEPTED_EDITION" --platform Linux --source "$GITHUB_SHA" --hr "${CRAWLVORA_EXPECTED_REGISTRY_SHA256:-}"
       - name: Build standalone signed-update client
         shell: bash
         run: |

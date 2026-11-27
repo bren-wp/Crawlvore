@@ -43,3 +43,16 @@ class CompleteReleaseTests(unittest.TestCase):
         (self.root/"REGISTRY-HR-MANIFEST.json").write_text(json.dumps({"snapshot":"1371","rows":11831255,"subjects":392785}))
         self.checksums()
         with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public)
+
+    def test_updater_matrix_cannot_remove_mandatory_package(self):
+        with patch.dict(TARGETS,clear=True):
+            with self.assertRaisesRegex(ValueError,"Mandatory 16-file"):
+                verify(self.root,"8.1.7",self.public)
+
+    def test_extra_or_empty_package_rejected(self):
+        extra=self.root/"Unexpected.exe"
+        extra.write_bytes(b"extra")
+        with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public)
+        extra.unlink()
+        (self.root/"Portable-HR-Online.exe").write_bytes(b"")
+        with self.assertRaises(ValueError):verify(self.root,"8.1.7",self.public)

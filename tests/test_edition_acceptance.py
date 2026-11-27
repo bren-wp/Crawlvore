@@ -22,3 +22,30 @@ class EditionAcceptanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError,'Unexpected snapshot'):
                 record(Path(tmp),'Online','a'*40,'b'*64)
+
+    def test_linux_receipts_bind_both_packages_to_same_commit_and_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source='a'*40
+            manifest={'HR':{'database_sha256':'b'*64}}
+            linux=root/'linux'
+            for edition,countries in EDITIONS.items():
+                hr='b'*64 if countries else ''
+                for name in names(edition):(root/name).write_bytes(name.encode())
+                record(root,edition,source,hr)
+                directory=linux/edition;directory.mkdir(parents=True)
+                for name in names(edition,'Linux'):(directory/name).write_bytes((edition+name).encode())
+                record(directory,edition,source,hr,'Linux')
+            verify(root,source,manifest,linux)
+            receipt=linux/'Online'/'acceptance-Linux-Online.json'
+            original=receipt.read_bytes()
+            receipt.unlink()
+            with self.assertRaisesRegex(ValueError,'Missing'):verify(root,source,manifest,linux)
+            receipt.write_bytes(original)
+            package=linux/'HR'/'Crawlvora-Linux-amd64.deb'
+            package.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError,'mismatch'):verify(root,source,manifest,linux)
+
+    def test_linux_online_rejects_bundled_snapshot_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError,'Unexpected snapshot'):
+                record(Path(tmp),'Online','a'*40,'b'*64,'Linux')

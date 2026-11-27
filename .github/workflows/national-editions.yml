@@ -54,6 +54,16 @@ jobs:
           path: registry-bundle/
           retention-days: 7
           if-no-files-found: error
+  release_contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install cryptography==50.0.2
+      - run: python -m unittest discover -s tests -p test_complete_release.py -v
+      - run: python -m unittest discover -s tests -p test_edition_acceptance.py -v
   quality:
     uses: ./.github/workflows/quality.yml
   vault:
@@ -75,7 +85,7 @@ jobs:
       language: hr
       artifact_suffix: '-HR-Online'
   publish:
-    needs: [hr_full, online, quality, vault]
+    needs: [hr_full, online, quality, vault, release_contract]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
@@ -94,6 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir release receipts
+          mkdir -p receipts/linux/HR receipts/linux/Online
           for variant in HR-Full HR-Online; do
             case "$variant" in HR-Full) old=HR;; *) old=Online;; esac
             cp "packages/Crawlvora-native-Windows-$variant/acceptance-$old.json" receipts/
@@ -101,13 +112,15 @@ jobs:
               cp "packages/Crawlvora-native-Windows-$variant/$kind-$old.exe" "receipts/$kind-$old.exe"
               cp "receipts/$kind-$old.exe" "release/$kind-$variant.exe"
             done
+            cp "packages/Crawlvora-native-Linux-$variant/acceptance-Linux-$old.json" "receipts/linux/$old/"
             for ext in deb tar.gz; do
               if [ "$ext" = deb ]; then arch=amd64; else arch=x86_64; fi
-              cp "packages/Crawlvora-native-Linux-$variant/Crawlvora-Linux-$arch.$ext" "release/Crawlvora-Linux-$variant-$arch.$ext"
+              cp "packages/Crawlvora-native-Linux-$variant/Crawlvora-Linux-$arch.$ext" "receipts/linux/$old/"
+              cp "receipts/linux/$old/Crawlvora-Linux-$arch.$ext" "release/Crawlvora-Linux-$variant-$arch.$ext"
             done
           done
           python -c 'import json; from pathlib import Path; m=json.load(open("registry/registry-seed.json")); assert m["snapshot"]=="1370" and m["rows"]==11831255 and m["subjects"]==392785; Path("receipts/manifest.json").write_text(json.dumps({"HR":m}))'
-          python tools/edition_acceptance.py receipts --source "$GITHUB_SHA" --manifest receipts/manifest.json
+          python tools/edition_acceptance.py receipts --source "$GITHUB_SHA" --manifest receipts/manifest.json --linux-root receipts/linux
           cp registry/registry-seed.json release/REGISTRY-HR-MANIFEST.json
           git archive --format=zip --prefix=Crawlvora/ -o release/Crawlvora-source.zip "$GITHUB_SHA"
           cp packages/Crawlvora-native-Windows-HR-Online/Update.exe release/Update.exe
@@ -128,14 +141,14 @@ jobs:
           (cd release && rm SHA256SUMS.txt && sha256sum -- * > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - name: Verify complete signed release matrix
         run: python tools/complete_release.py release "$(tr -d '\r\n' < VERSION)"
-      - name: Publish two verified desktop editions
+      - name: Publish one complete 16-file release (no partial editions)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
           tag="v$(tr -d '\r\n' < VERSION)-hr"
-          gh release create "$tag" --draft --prerelease --latest=false --target "$GITHUB_SHA" --title "Tvrtke $tag" --notes 'Croatian desktop editions: HR Full with verified snapshot 1370 and HR Online with no bundled records. Windows Setup and Portable; Linux DEB and TAR.GZ. Private distribution only.' release/*
+          gh release create "$tag" --draft --prerelease --latest=false --target "$GITHUB_SHA" --title "Tvrtke $tag" --notes 'Tvrtke HR Full (s bazom) + HR Online (bez baze): Windows NSIS Setup i Portable EXE; Linux DEB installer i TAR.GZ portable, oba updatera i svih 16 obaveznih datoteka. Privatna distribucija.' release/*
           id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name==\"$tag\" and .draft) | .id")"
           test -n "$id"
           gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate --slurp > remote.json

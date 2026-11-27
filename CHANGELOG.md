@@ -2,6 +2,8 @@
 
 ## 8.1.7
 
+- Enforce an independent mandatory 16-file release contract and verify Linux installer/archive acceptance receipts alongside Windows installer/portable receipts before publication.
+
 - Add procedural native card surfaces, three-panel analytics, source filters, job status cards, readable snapshot comparison and original launcher assets; retain the strict zero-difference gate and add the intermediate 30% check.
 
 - Improve native header, navigation spacing, overview metrics and charts; capture matching 1280×700 lossless reference and native screenshots and add a strict RGB comparator with single-channel regression tests. Current native visual acceptance remains failed.
