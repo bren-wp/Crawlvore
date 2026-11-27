@@ -64,3 +64,16 @@ with 1,663,084 peak Python traced allocation bytes. Backup 3199.732 ms;
 restore 16570.016 ms; integrity ok and foreign key check passed.
 Four-hour run 45921653337 remains in progress; this is not full endurance
 acceptance. Keep the existing run intact; no real user data used.
+
+
+## Full export acceptance
+
+100,000 synthetic records, Windows: seed 22.782 s. Full JSON 47,888,896 bytes
+in 2.698 s, baseline process peak RSS 39,002,112 bytes, export peak
+43,286,528 bytes. Full CSV 7,800,284 bytes in 2.093 s, baseline peak
+39,227,392 bytes and export peak 41,402,368 bytes. Separate child process
+for each format, OS lifetime peak working set/RSS, not just Python allocation
+tracking. Every exported row and source verified. SQLite integrity and
+foreign-key checks passed. Full million-record JSON and CSV runs are wired
+into CI; existing four-hour run remains independent. XLSX full-scale and
+native startup/CPU measurements remain outstanding.

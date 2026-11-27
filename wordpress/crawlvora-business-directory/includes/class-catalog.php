@@ -55,7 +55,7 @@ final class Catalog {
             strtolower(strtr($s,['Č'=>'č','Ć'=>'ć','Ž'=>'ž','Š'=>'š','Đ'=>'đ']));
     }
 
-    public static function search(string $root,string $country,string $kind,string $q,int $page): array {
+    public static function search(string $root,string $country,string $kind,string $q,int $page,bool $exact_registration=false): array {
         if (($kind!==''&&!in_array($kind,self::KINDS,true)) || strlen($q)>200 || $page<1 || $page>10000) {
             throw new \RuntimeException('Invalid search.');
         }
@@ -82,7 +82,9 @@ final class Catalog {
                     if ($key==='tax_number' && in_array($match[1],['entrepreneur','unknown'],true)) { $value=''; }
                     $row[$key]=$value;
                 }
-                if ($query!=='') {
+                if ($exact_registration) {
+                    if (self::fold($row['registration_number'])!==$query) { continue; }
+                } elseif ($query!=='') {
                     $found=str_contains(self::fold($row['name']),$query);
                     if ($numeric) {
                         $found=$row['registration_number']===$digits||$row['tax_number']===$digits;
@@ -100,5 +102,15 @@ final class Catalog {
             }
         }
         return ['rows'=>$rows,'next'=>false,'count'=>$m['count']];
+    }
+
+    public static function valid_registration(string $id): bool {
+        return preg_match('/^[A-Za-z0-9][A-Za-z0-9-]{0,39}$/D',$id)===1;
+    }
+
+    public static function profile(string $root,string $country,string $kind,string $id): ?array {
+        if (!self::valid_registration($id)||!in_array($kind,self::KINDS,true)) { return null; }
+        $result=self::search($root,$country,$kind,$id,1,true);
+        return count($result['rows'])===1&&!$result['next']?$result['rows'][0]:null;
     }
 }

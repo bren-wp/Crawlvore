@@ -17,3 +17,24 @@ It does not authorize publication.
 Latest changes deliberately do not restart the existing endurance run:
 only web packaging, web templates, tests, documentation and distribution
 workflows are modified. The new commit requires its own CI evidence.
+
+
+## Follow-up, phases 5 through 8
+
+- Exclusive staged receive and export publication preserves prior destinations
+  and removes incomplete invocation-owned files on ordinary exceptions.
+  Crash/power-loss durability is not claimed. JSON export avoids an unused
+  SQL provenance aggregate and emits each serialized record in one write.
+- Windows full export benchmark on 100,000 synthetic rows verified JSON
+  (47,888,896 bytes, 2.698 seconds, 43,286,528 bytes peak process RSS) and CSV
+  (7,800,284 bytes, 2.093 seconds, 41,402,368 bytes peak process RSS).
+  Every record and provenance entry was checked; SQLite integrity passed.
+  Million-row full-export acceptance is added to the separate performance
+  workflow; existing four-hour run is not cancelled.
+- Public PHP catalog path/record validation strengthened; both website and
+  plugin provide exact-registration profiles, declining ambiguous results.
+  WordPress 1.0.1 source metadata synchronized; not a published plugin release.
+  PHP and real WordPress acceptance for these changes is still required.
+- Release ZIP checks now reject traversal, duplicate case-insensitive paths,
+  nonregular members and unexpected WordPress files. The 14-file release
+  matrix and all private distribution, reference and registry gates remain.

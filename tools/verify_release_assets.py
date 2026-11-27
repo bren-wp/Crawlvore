@@ -39,6 +39,36 @@ def validate_snapshots(hr,gb):
         if not isinstance(identity,str) or not re.fullmatch(r'[0-9a-f]{64}',identity):
             raise ValueError('Missing database identity')
 
+def validate_zip(path, *, wordpress=False):
+    """Reject ambiguous, traversing and nonregular members before promotion."""
+    plugin="crawlvora-business-directory/"
+    required={plugin+name for name in (
+        "crawlvora-business-directory.php","includes/class-catalog.php",
+        "assets/directory.css","readme.txt","uninstall.php")}
+    prefix=plugin if wordpress else "Crawlvora/"
+    names=set()
+    files=set()
+    with zipfile.ZipFile(path) as archive:
+        for info in archive.infolist():
+            name=info.filename
+            parts=name.rstrip("/").split("/")
+            key=name.rstrip("/").casefold()
+            mode=(info.external_attr>>16)&0o170000
+            if (not name.startswith(prefix) or not all(parts)
+                    or any(part in (".","..") for part in parts)
+                    or "\\" in name or ":" in name or key in names
+                    or mode not in ((0,0o040000) if info.is_dir() else (0,0o100000))):
+                raise ValueError("Unsafe ZIP member: "+name)
+            names.add(key)
+            if not info.is_dir(): files.add(name)
+        if not files or archive.testzip() is not None:
+            raise ValueError("Invalid ZIP: "+str(path))
+        if wordpress and files!=required:
+            raise ValueError("Unexpected WordPress package content")
+        if not wordpress and not {"Crawlvora/VERSION","Crawlvora/package.json"}<=files:
+            raise ValueError("Incomplete source archive")
+
+
 def validate(root):
     root=Path(root)
     result={}
@@ -52,9 +82,7 @@ def validate(root):
         if name.endswith('.deb') and prefix!=b'!<arch>\n':raise ValueError('Invalid DEB')
         if name.endswith('.tar.gz') and prefix[:2]!=b'\x1f\x8b':raise ValueError('Invalid TAR.GZ')
         if name.endswith('.zip'):
-            with zipfile.ZipFile(path) as archive:
-                if not archive.namelist() or archive.testzip() is not None:raise ValueError('Invalid ZIP: '+name)
-                if name=='Crawlvora-WordPress.zip' and 'crawlvora-business-directory/crawlvora-business-directory.php' not in archive.namelist():raise ValueError('WordPress plugin missing')
+            validate_zip(path,wordpress=name=='Crawlvora-WordPress.zip')
         result[name]={'size':path.stat().st_size,'digest':'sha256:'+digest(path)}
     manifest=json.loads((root/'REGISTRY-MANIFEST.json').read_text(encoding='utf-8'))
     if manifest.get('windows_editions')!={'Full':['HR','GB'],'HR':['HR'],'GB':['GB'],'Online':[]}:

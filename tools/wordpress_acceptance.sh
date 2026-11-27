@@ -50,6 +50,13 @@ grep -q '&lt;script&gt;alert(1)&lt;/script&gt;' "$tmp/hr.html"
 ! grep -q '<script>alert(1)</script>' "$tmp/hr.html"
 grep -q 'Synthetic UK Ltd' "$tmp/gb.html"
 ! grep -q '000000123' "$tmp/gb.html"
+curl -fsS "$base/?page_id=$page&cv_country=GB&cv_kind=company&cv_profile=AB123456" > "$tmp/profile.html"
+grep -q 'Synthetic UK Ltd' "$tmp/profile.html"
+grep -q 'Back to search' "$tmp/profile.html"
+! grep -q '000000123' "$tmp/profile.html"
+block="$(wp post create --post_type=page --post_status=publish --post_title=BlockDirectory --post_content='<!-- wp:shortcode -->[crawlvora_directory country="GB"]<!-- /wp:shortcode -->' --porcelain)"
+curl -fsS "$base/?page_id=$block&cv_q=AB123456" > "$tmp/block.html"
+grep -q 'Synthetic UK Ltd' "$tmp/block.html"
 wp plugin deactivate crawlvora-business-directory
 wp plugin activate crawlvora-business-directory
 wp plugin uninstall crawlvora-business-directory --deactivate --skip-delete

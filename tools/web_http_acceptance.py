@@ -59,6 +59,16 @@ def run():
                 assert '<script>alert(1)</script>' not in hr
                 gb=get(view='pretraga',country='GB',q='AB123456')
                 assert 'Synthetic British Company' in gb and '000000123' not in gb
+                profile=get(view='profile',country='GB',kind='company',id='AB123456',lang='en')
+                assert 'Synthetic British Company' in profile and 'Company profile' in profile
+                assert 'name="robots" content="noindex,follow"' in profile
+                assert '000000123' not in profile
+                for invalid in ('AB123','../secret'):
+                    try: get(view='profile',country='GB',kind='company',id=invalid)
+                    except HTTPError as error:
+                        assert error.code==404
+                        error.close()
+                    else: raise AssertionError('Invalid profile accepted')
                 assert 'Synthetic British Company' not in get(view='pretraga',country='HR',q='AB123456')
                 assert '000000123' not in get(view='pretraga',country='HR',kind='nonprofit')
                 try:
@@ -82,6 +92,28 @@ def run():
                     assert error.code==503
                     error.close()
                 else: raise AssertionError('Mismatched catalog country accepted')
+                def rejects_catalog():
+                    try:
+                        get(view='pretraga',country='HR')
+                    except HTTPError as error:
+                        assert error.code==503
+                        error.close()
+                    else: raise AssertionError('Malformed catalog accepted')
+                (folder/shard).write_text(json.dumps([dict(record,as_of='invalid')]),encoding='utf-8')
+                rejects_catalog()
+                (folder/'manifest.json').write_text(json.dumps({'country':'HR','count':1,'shards':['GB-company-000001.json']}),encoding='utf-8')
+                rejects_catalog()
+                (folder/'manifest.json').write_text(json.dumps({'country':'HR','count':1,'shards':[shard]}),encoding='utf-8')
+                outside=Path(tmp)/'outside.json'
+                outside.write_text(json.dumps([record]),encoding='utf-8')
+                (folder/shard).unlink()
+                try:
+                    (folder/shard).symlink_to(outside)
+                except (OSError,NotImplementedError):
+                    pass  # Windows without symlink privileges; Linux CI exercises this.
+                else:
+                    rejects_catalog()
+                    (folder/shard).unlink()
                 print(json.dumps({'pages':len(PAGES)*2,'search':'PASS','isolation':'PASS','escaping':'PASS','invalid_route':'PASS','privacy_minimization':'PASS','country_validation':'PASS','scope':'PHP CLI HTTP; Apache access rules not exercised'}))
             finally:
                 server.terminate()

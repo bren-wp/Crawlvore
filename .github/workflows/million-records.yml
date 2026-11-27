@@ -2,7 +2,7 @@ name: Million-record performance
 on:
   push:
     branches: [data-safety-release, product-readme-and-web-packaging]
-    paths: ['.github/workflows/million-records.yml', 'tools/performance_check.py']
+    paths: ['.github/workflows/million-records.yml', 'tools/performance_check.py', 'tools/full_export_check.py', 'bulk_io.py']
   workflow_dispatch:
   workflow_call:
 permissions:
@@ -21,9 +21,12 @@ jobs:
         run: |
           set -euo pipefail
           python tools/performance_check.py --records 1000000 | tee million-records.json
+          python tools/full_export_check.py --records 1000000 | tee full-export.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           retention-days: 1
           name: million-records
-          path: million-records.json
+          path: |
+            million-records.json
+            full-export.json

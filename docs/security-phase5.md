@@ -144,3 +144,17 @@ storage denial acceptance, npm/pip audits and 320 view / 80 dialog cases.
 Native secure vault run 45921658989 passed. Apache acceptance proves the
 test configuration, not the operator hosting configuration. Native package
 CI and upstream Rust warnings remain separate acceptance conditions.
+
+
+## Streaming and release follow-up
+
+Bulk receive and export use invocation-owned staging files, flush completed
+bytes and publish exclusively. Tests reject incomplete input, injected output
+failure and destination collisions without deleting existing files. Abrupt
+process termination can leave an invocation-owned temporary file; this is
+not power-loss certification. Public PHP readers now enforce canonical
+path identity, bounded JSON depth and exact country/type/date validation.
+Profile searches match a unique published registration identifier only.
+The production ZIP verifier rejects traversal, aliases and symlink members
+and requires the complete WordPress allowlist. Latest PHP/WordPress and CI
+checks remain required, as do the six documented upstream Rust warnings.

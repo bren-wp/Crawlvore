@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Crawlvora Business Directory
  * Description: Publish a reviewed Croatian and United Kingdom business directory with privacy-conscious local JSON search.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 6.5
  * Requires PHP: 8.2
  * Author: Crawlvora
@@ -70,7 +70,7 @@ function query_value(string $key,string $default=''): string {
     return is_string($raw)?sanitize_text_field(wp_unslash($raw)):$default;
 }
 function assets(): void {
-    wp_register_style('crawlvora-directory',plugins_url('assets/directory.css',__FILE__),[],'1.0.0');
+    wp_register_style('crawlvora-directory',plugins_url('assets/directory.css',__FILE__),[],'1.0.1');
     if (is_singular()) {
         $post=get_queried_object();
         if ($post instanceof \WP_Post && has_shortcode($post->post_content,'crawlvora_directory')) {
@@ -86,6 +86,7 @@ function directory_shortcode($attributes=[]): string {
     $kind=query_value('cv_kind');
     if (!in_array($kind,Catalog::KINDS,true)) { $kind=''; }
     $q=substr(query_value('cv_q'),0,200);
+    $profile_id=query_value('cv_profile');
     $page=max(1,min(10000,(int)query_value('cv_page','1')));
     $labels=['company'=>__('Companies',DOMAIN),'entrepreneur'=>__('Entrepreneurs',DOMAIN),'institution'=>__('Institutions',DOMAIN),'nonprofit'=>__('Nonprofit organizations',DOMAIN),'unknown'=>__('Unclassified',DOMAIN)];
     $root=Catalog::private_root((string)get_option(OPTION,''));
@@ -119,7 +120,12 @@ function directory_shortcode($attributes=[]): string {
       <?php
       try {
           if ($root===null) { throw new \RuntimeException('Not configured.'); }
-          $result=Catalog::search($root,$country,$kind,$q,$page);
+          if ($profile_id!=='') {
+              $profile=Catalog::profile($root,$country,$kind,$profile_id);
+              $result=['rows'=>$profile===null?[]:[$profile],'next'=>false,'count'=>Catalog::manifest($root,$country)['count']];
+          } else {
+              $result=Catalog::search($root,$country,$kind,$q,$page);
+          }
           ?>
           <p class="cv-meta"><?php echo esc_html(number_format_i18n($result['count']).' '.__('published records in this catalog',DOMAIN)); ?></p>
           <?php if (!$result['rows']): ?><p><?php echo esc_html__('No matching published records. A missing result does not mean the business does not exist.',DOMAIN); ?></p><?php endif; ?>
@@ -127,14 +133,18 @@ function directory_shortcode($attributes=[]): string {
             <article><h3><?php echo esc_html($record['name']); ?></h3><p><?php echo esc_html($labels[$record['kind']]); ?> · <?php echo esc_html($record['city']); ?></p>
             <dl><?php foreach (['registration_number'=>__('Registration number',DOMAIN),'tax_number'=>__('Tax identifier',DOMAIN),'as_of'=>__('Data date',DOMAIN)] as $key=>$label): ?>
               <dt><?php echo esc_html($label); ?></dt><dd><?php echo esc_html($record[$key]!==''?$record[$key]:__('Not published',DOMAIN)); ?></dd>
-            <?php endforeach; ?></dl></article>
+            <?php endforeach; ?></dl>
+            <?php if ($profile_id==='' && Catalog::valid_registration($record['registration_number'])): ?>
+              <a href="<?php echo esc_url(add_query_arg(['cv_country'=>$country,'cv_kind'=>$record['kind'],'cv_profile'=>$record['registration_number']],$url)); ?>"><?php echo esc_html__('Company profile',DOMAIN); ?></a>
+            <?php endif; ?></article>
           <?php endforeach; ?></div>
+          <?php if ($profile_id!==''): ?><a href="<?php echo esc_url(add_query_arg(['cv_country'=>$country],$url)); ?>"><?php echo esc_html__('Back to search',DOMAIN); ?></a><?php else: ?>
           <nav class="cv-pagination" aria-label="<?php echo esc_attr__('Search results pages',DOMAIN); ?>">
           <?php $args=['cv_country'=>$country,'cv_kind'=>$kind,'cv_q'=>$q]; ?>
           <?php if ($page>1): ?><a href="<?php echo esc_url(add_query_arg($args+['cv_page'=>$page-1],$url)); ?>"><?php echo esc_html__('Previous',DOMAIN); ?></a><?php endif; ?>
           <span><?php echo esc_html(sprintf(__('Page %d',DOMAIN),$page)); ?></span>
           <?php if ($result['next']&&$page<10000): ?><a href="<?php echo esc_url(add_query_arg($args+['cv_page'=>$page+1],$url)); ?>"><?php echo esc_html__('Next',DOMAIN); ?></a><?php endif; ?>
-          </nav>
+          </nav><?php endif; ?>
       <?php } catch (\Throwable $e) { ?>
           <p role="status"><?php echo esc_html__('The catalog or search is temporarily unavailable. Try a more specific query or contact the site operator.',DOMAIN); ?></p>
       <?php } ?>
@@ -147,6 +157,11 @@ function directory_shortcode($attributes=[]): string {
     <?php
     return (string)ob_get_clean();
 }
+function profile_robots(array $robots): array {
+    if (query_value('cv_profile')!=='') { $robots['noindex']=true; unset($robots['index']); }
+    return $robots;
+}
+add_filter('wp_robots',__NAMESPACE__.'\\profile_robots');
 add_action('admin_init',__NAMESPACE__.'\\settings');
 add_action('admin_menu',__NAMESPACE__.'\\admin_menu');
 add_action('wp_enqueue_scripts',__NAMESPACE__.'\\assets');

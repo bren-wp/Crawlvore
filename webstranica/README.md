@@ -35,3 +35,5 @@ Search/filter variants and error pages are noindex. Check storage access
 rules independently on your actual Apache or Nginx server.
 
 For subdirectory hosting, merge the generated robots rules and sitemap URL into the domain-root robots.txt; crawlers do not treat a subdirectory robots.txt as authoritative.
+
+Company profiles use the exact published registration identifier, country and entity type. Missing or ambiguous profiles are not synthesized. Profiles are noindex and omit private catalog fields.
