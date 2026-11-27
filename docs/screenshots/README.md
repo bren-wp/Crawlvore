@@ -1,0 +1,3 @@
+# Product captures
+
+Source: `e57684e2fa7343856e3659a4345c909abb560c05` (8.1.4), compiled frontend and actual authenticated loopback worker, Windows, English, 1440 × 900 viewport, 2026-11-27. The catalog contains six fictional demonstration organizations and no user data or registry credentials. These are browser-rendered product captures, not native WebView2 window captures, design concepts, or pixel-perfect certification. UK catalog and live HR authorization are deliberately not provisioned. Reproduce with `python tools/capture_product.py <output-directory>` after installing dependencies and compiling the frontend. The locked visual references remain in branding/.

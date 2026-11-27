@@ -1,4 +1,4 @@
-﻿"""Capture the running English UI against a disposable synthetic workspace."""
+"""Capture the running English UI against a disposable synthetic workspace."""
 import argparse
 import os
 from pathlib import Path
@@ -65,7 +65,7 @@ def capture(output):
                     expect(page.locator("#detail")).to_be_visible()
                     shot("profile-dark")
                     page.locator("#close-detail").click()
-                    page.locator('[data-view="directory"] [data-go="national"]').click()
+                    page.locator('#directory [data-go="national"]').click()
                     expect(page.locator("#national")).to_be_visible()
                     expect(page.locator("#national-status")).to_contain_text("not included")
                     shot("uk-dark")

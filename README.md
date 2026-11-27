@@ -35,25 +35,29 @@ Explore official business registers, discover company information and turn local
 ## Explore the workspace
 
 <!-- PRODUCT_SCREENSHOTS_START -->
-The following interface captures are existing English browser fixture views; they are not native Windows screenshots or evidence of current visual acceptance.
+Actual Crawlvora interface, captured from the running 8.1.4 application worker and compiled frontend on Windows using a disposable synthetic catalog.
 
-| Overview | Business Directory |
+![Crawlvora Overview](docs/screenshots/overview-dark.jpg)
+
+| Business Directory | Company Profile |
 |---|---|
-| ![Overview](branding/en-overview-dark-1440-fixture.png) | ![Business Directory](branding/en-directory-dark-1440-fixture.png) |
+| ![Business Directory](docs/screenshots/directory-dark.jpg) | ![Company Profile](docs/screenshots/profile-dark.jpg) |
 
-| Crawlvora Sync | Tasks & Schedule |
+| Crawlvora Sync | Crawlvora UK |
 |---|---|
-| ![Sync](branding/en-registry-dark-1440-fixture.png) | ![Tasks](branding/en-jobs-dark-1440-fixture.png) |
+| ![Crawlvora Sync](docs/screenshots/registry-dark.jpg) | ![Crawlvora UK](docs/screenshots/uk-dark.jpg) |
 
-| Import & Export | Analytics & Reports |
+| Tasks & Schedule | Import & Export |
 |---|---|
-| ![Import and export](branding/en-data-dark-1440-fixture.png) | ![Analytics](branding/en-analytics-dark-1440-fixture.png) |
+| ![Tasks](docs/screenshots/jobs-dark.jpg) | ![Import and export](docs/screenshots/data-dark.jpg) |
 
-| Settings | Company Profile |
+| Analytics & Reports | Settings |
 |---|---|
-| ![Settings](branding/en-settings-dark-1440-fixture.png) | ![Company profile](branding/en-detail-dark-1440-fixture.png) |
+| ![Analytics](docs/screenshots/analytics-dark.jpg) | ![Settings](docs/screenshots/settings-dark.jpg) |
 
-![Light appearance](branding/en-overview-light-1440-fixture.png)
+### Light appearance
+
+![Light appearance](docs/screenshots/overview-light.jpg)
 <!-- PRODUCT_SCREENSHOTS_END -->
 
 Choose English or Croatian and dark or light appearance. Resize the desktop window to fit your workspace.
