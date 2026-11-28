@@ -95,6 +95,7 @@ def install(root):
     style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT,thickness=8)
 
     install_control_states(root,style,family)
+    return family
 
 def install_control_states(root,style,family):
     """Keep live clam controls and use the product palette in every state."""
