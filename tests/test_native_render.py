@@ -252,3 +252,14 @@ class RoundedSurfaceTests(unittest.TestCase):
                             self.assertEqual(patch.getpixel((x,y)),full.getpixel((ox+x,oy+y)))
                         if outside==16:
                             self.assertEqual(patch.getpixel((x,y)),(8,19,30,255))
+
+    def test_header_fractional_composition_matches_direct_model_at_client_phases(self):
+        for width in (37,320,1048):
+            for phase in ((0,0),(0,7),(3,4)):
+                with self.subTest(width=width,phase=phase):
+                    image=Image.open(io.BytesIO(header_surface("#08131e","#36ebba",width,origin=phase)))
+                    expected=bytes(c for y in range(119) for x in range(width)
+                                   for c in (*reference_header_color("#08131e","#36ebba",width,119,x+.5,y+.5,phase),255))
+                    self.assertEqual(image.tobytes(),expected)
+        with self.assertRaises(ValueError):
+            header_surface("#08131e","#36ebba",320,origin=(8,0))
