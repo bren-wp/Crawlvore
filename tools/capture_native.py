@@ -1,6 +1,8 @@
 """Capture actual native widgets from a disposable fixture, not the user's database."""
 import argparse
 import ctypes
+import hashlib
+import platform
 import os
 import sys
 import tempfile
@@ -48,6 +50,22 @@ def capture(root,path):
     im.save(path)
     return im
 
+def capture_stable(root,path):
+    """Require consecutive identical real RGB frames; do not mask pixels."""
+    previous=None
+    for attempt in range(1,9):
+        until=time.monotonic()+.2
+        while time.monotonic()<until:
+            root.update()
+            time.sleep(.025)
+        im=capture(root,path)
+        digest=hashlib.sha256(im.tobytes()).hexdigest()
+        if digest==previous:
+            return im,{"rgb_sha256":digest,"stable_frames":2,"attempts":attempt}
+        previous=digest
+    raise RuntimeError(f"Unstable native RGB capture: {path.name}")
+
+
 def capture_dialog(root,open_dialog,path):
     before=set(root.winfo_children())
     open_dialog()
@@ -61,10 +79,10 @@ def capture_dialog(root,open_dialog,path):
         while time.monotonic()<until:
             root.update()
             time.sleep(.025)
-        im=capture(dialog,path)
+        im,evidence=capture_stable(dialog,path)
         if im.size!=(dialog.winfo_width(),dialog.winfo_height()):
             raise RuntimeError(f"Native dialog viewport mismatch: {path.name}: {im.size}")
-        return {"dialog":path.stem,"capture":list(im.size)}
+        return {"dialog":path.stem,"capture":list(im.size),**evidence}
     finally:
         dialog.destroy()
         root.update()
@@ -81,7 +99,10 @@ def run(output,width=1280,height=700):
                 store.upsert(conn,{"title":name,"city":("Zagreb","Rijeka","Split")[index%3],
                                     "website":"https://example.invalid","entity_kind":"company","email":"kontakt@example.invalid" if index==0 else ""})
             conn.execute("INSERT INTO meta(key,value) VALUES ('seeded','1')")
-        root=tk.Tk();app=Desktop(root,Path(tmp))
+        root=tk.Tk()
+        original_scaling=float(root.tk.call("tk","scaling"))
+        root.tk.call("tk","scaling",96/72)
+        app=Desktop(root,Path(tmp))
         try:
             w,h=width,height
             if sys.platform=="win32":
@@ -105,10 +126,10 @@ def run(output,width=1280,height=700):
                 wait(root,ready)
                 until=time.monotonic()+.2
                 while time.monotonic()<until:root.update();time.sleep(.02)
-                im=capture(root,output/(key+".png"))
+                im,evidence=capture_stable(root,output/(key+".png"))
                 if im.size!=(width,height):
                     raise RuntimeError(f"Native viewport mismatch: {key}: {im.size} != {(width,height)}")
-                report.append({"view":key,"capture":list(im.size)})
+                report.append({"view":key,"capture":list(im.size),**evidence})
             dialogs=output/"dialogs"
             dialogs.mkdir(exist_ok=True)
             rows=app.client.request("/api/companies",{"limit":1})["rows"]
@@ -131,9 +152,16 @@ def run(output,width=1280,height=700):
                                 and box[3]>=app.content.winfo_reqheight()
                                 and all(b.winfo_ismapped() and b.winfo_height()>15 and b.winfo_y()+b.winfo_height()<=app.sidebar.winfo_height() for b in app.nav.values()))
                     try:wait(root,reachable,timeout=3)
-                    except RuntimeError as error:raise RuntimeError(f"Unreachable content: {key} {w}x{h}") from error
+                    except RuntimeError as error:
+                        raise RuntimeError(
+                            f"Unreachable content: {key} {w}x{h}; "
+                            f"bounds={app.viewport.bbox(app.content_window)}, "
+                            f"requested={(app.content.winfo_reqwidth(),app.content.winfo_reqheight())}, "
+                            f"sidebar={app.sidebar.winfo_height()}, "
+                            f"nav={[(k,b.winfo_ismapped(),b.winfo_y(),b.winfo_height()) for k,b in app.nav.items()]}"
+                        ) from error
                 print(f"All seven views accessible via viewport at {w}x{h}",flush=True)
-            (output/"capture.json").write_text(json.dumps({"captures":report,"dialogs":dialog_report,"platform":sys.platform,"font_family":app.font_family,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
+            (output/"capture.json").write_text(json.dumps({"captures":report,"dialogs":dialog_report,"platform":sys.platform,"os_version":platform.platform(),"tk_version":root.tk.call("info","patchlevel"),"original_scaling":original_scaling,"requested_dpi":96,"font_family":app.font_family,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
             print(json.dumps(report,indent=2),flush=True)
         finally:
             app.smoke=True  # Disposable fixture: never block CI on a close-confirmation dialog.
