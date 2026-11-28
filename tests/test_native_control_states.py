@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 import unittest
 
-from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog, Card, clear_chart, shade_children
+from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog, Card, clear_chart, shade_children, shade_sidebar, decorate, SIDE
 
 
 class NativeControlStatesTests(unittest.TestCase):
@@ -115,3 +115,41 @@ class NativeControlStatesTests(unittest.TestCase):
         self.assertTrue(value.get())
         self.assertEqual(self.style.lookup(check.cget("style"),"indicatorforeground",("selected",)),ACCENT)
         card.destroy()
+
+    def test_sidebar_local_background_keeps_active_and_hover_states(self):
+        self.root.deiconify()
+        self.root.geometry("480x360")
+        sidebar=tk.Frame(self.root,bg=SIDE)
+        sidebar.pack(fill="both",expand=True)
+        surface=decorate(sidebar,SIDE,BG,radius=0)
+        label=tk.Label(sidebar,text="Radni prostor",bg=SIDE)
+        label.pack(side="bottom")
+        button=ttk.Button(sidebar,style="Active.Nav.TButton",text="Pregled")
+        button.pack(side="bottom",fill="x")
+        self.root.update()
+        shade_sidebar(sidebar,surface,SIDE,BG,surface.winfo_width(),surface.winfo_height())
+        self.assertNotEqual(label.cget("background"),SIDE)
+        self.assertEqual(button.cget("style"),"Active.Nav.TButton")
+        name=button._nav_idle_style
+        button.configure(style=name)
+        self.assertEqual(self.style.lookup(name,"background",("active",)),PANEL2)
+        self.assertEqual(self.style.lookup(name,"background",("pressed",)),ACTIVE)
+        self.assertEqual(self.style.lookup(name,"foreground",("disabled",)),MUTED)
+
+    def test_table_background_preserves_selection_and_heading(self):
+        self.root.deiconify()
+        card=Card(self.root,padding=15)
+        card.pack(fill="both",expand=True)
+        table=NativeTable(card,columns=("name",),show="headings",height=3)
+        table.pack(fill="both",expand=True)
+        row=table.insert("","end",values=("Tvrtka",))
+        table.selection_set(row)
+        self.root.update()
+        surface=next(w for w in card.winfo_children() if getattr(w,"_surface_decoration",False))
+        shade_children(card,surface,PANEL,"#0c1a26",surface.winfo_width(),surface.winfo_height())
+        name=table.cget("style")
+        self.assertTrue(name.startswith("Shade"))
+        self.assertEqual(self.style.lookup(name,"background",("selected",)),ACTIVE)
+        self.assertEqual(self.style.lookup(name+".Heading","background",()),PANEL2)
+        self.assertEqual(table.selection(),(row,))
+        self.assertEqual(table.item(row,"values"),("Tvrtka",))
