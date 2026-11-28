@@ -217,6 +217,11 @@ def shade_children(parent,canvas,start,end,width,height):
                 if not hasattr(child,"_surface_original_bg"):
                     child._surface_original_bg=child.cget("background")
                 if child._surface_original_bg==PANEL:
+                    refresh=getattr(canvas,"_schedule_shade",None)
+                    if refresh is not None and not getattr(child,"_chart_shade_bound",False):
+                        child.bind("<Configure>",refresh,add="+")
+                        child.bind("<Map>",refresh,add="+")
+                        child._chart_shade_bound=True
                     if child.cget("background")!=color:child.configure(background=color)
                     valid=(min(x,y)>=0 and min(w,h)>0 and x+w<=width and y+h<=height
                            and min(width,height)>=3 and max(width,height)<=4096 and width*height<=2_000_000)
@@ -284,13 +289,18 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
             shade_children(parent,canvas,start,end,w,h)
         elif isinstance(parent,tk.Frame) and start==SIDE and end==BG:
             shade_sidebar(parent,canvas,start,end,w,h)
+    def schedule_shade(_event=None):
+        nonlocal shade_pending
+        if shade_pending is None:
+            shade_pending=canvas.after(60,shade)
+    canvas._schedule_shade=schedule_shade
+
     def draw():
         nonlocal last,pending,shade_pending
         pending=None
         w,h=canvas.winfo_width(),canvas.winfo_height()
         if min(w,h)<3:return
-        if shade_pending is not None:canvas.after_cancel(shade_pending)
-        shade_pending=canvas.after(60,shade)
+        schedule_shade()
         if (w,h)==last:return
         last=(w,h)
         canvas.delete("surface")
