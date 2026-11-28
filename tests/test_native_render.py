@@ -136,3 +136,15 @@ class RoundedSurfaceTests(unittest.TestCase):
             gradient_surface(*args[:3],w,20)
         self.assertLessEqual(gradient_surface.cache_info().currsize,8)
         with self.assertRaises(ValueError):gradient_surface(*args[:3],4096,4096)
+
+    def test_composited_gradient_region_matches_original_surface(self):
+        for start,end in (("#101f2d","#0c1a26"),("#ff0080","#0080ff"),("#ffffff","#000000")):
+            for border in (None,"#2a4355"):
+                args=(start,end,border,89,57)
+                full=Image.open(io.BytesIO(gradient_surface(*args)))
+                for x,y,w,h in ((0,0,20,20),(9,17,50,32),(88,56,1,1),(0,12,89,7)):
+                    with self.subTest(start=start,end=end,border=border,region=(x,y,w,h)):
+                        actual=Image.open(io.BytesIO(gradient_surface(*args,(x,y,w,h))))
+                        self.assertEqual(actual.tobytes(),full.crop((x,y,x+w,y+h)).tobytes())
+        with self.assertRaises(ValueError):
+            gradient_surface("#101f2d","#0c1a26",None,89,57,(88,56,2,2))
