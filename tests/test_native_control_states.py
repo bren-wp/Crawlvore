@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 import unittest
 
-from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog
+from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog, Card, clear_chart, shade_children
 
 
 class NativeControlStatesTests(unittest.TestCase):
@@ -89,3 +89,29 @@ class NativeControlStatesTests(unittest.TestCase):
         self.assertEqual((dialog.winfo_width(),dialog.winfo_height()),(320,220))
         dialog.destroy()
         self.assertFalse(dialog.winfo_exists())
+
+    def test_chart_compositing_preserves_live_items_and_checkbox(self):
+        self.root.deiconify()
+        self.root.geometry("480x360")
+        card=Card(self.root,padding=15)
+        card.pack(fill="both",expand=True)
+        chart=tk.Canvas(card,width=160,height=80,background=PANEL,highlightthickness=0)
+        chart.pack(fill="x")
+        value=tk.BooleanVar(self.root)
+        check=ttk.Checkbutton(card,text="Odabir",variable=value,style="Panel.TCheckbutton")
+        check.pack(anchor="w")
+        self.root.update()
+        surface=next(w for w in card.winfo_children() if getattr(w,"_surface_decoration",False))
+        line=chart.create_line(0,0,20,20,fill=ACCENT)
+        shade_children(card,surface,PANEL,"#0c1a26",surface.winfo_width(),surface.winfo_height())
+        background=chart._chart_background_item
+        self.assertIsNotNone(background)
+        self.assertEqual(chart.find_all(),(background,line))
+        clear_chart(chart)
+        self.assertEqual(chart.find_all(),(background,))
+        shade_children(card,surface,PANEL,"#0c1a26",surface.winfo_width(),surface.winfo_height())
+        self.assertEqual(chart.find_all(),(background,))
+        check.invoke()
+        self.assertTrue(value.get())
+        self.assertEqual(self.style.lookup(check.cget("style"),"indicatorforeground",("selected",)),ACCENT)
+        card.destroy()
