@@ -1,7 +1,7 @@
 import io
 import unittest
 from PIL import Image
-from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend
+from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner
 
 class RoundedSurfaceTests(unittest.TestCase):
     def test_antialiased_edge_and_opaque_center(self):
@@ -71,3 +71,29 @@ class RoundedSurfaceTests(unittest.TestCase):
                     expected=bytes(c for y in range(119) for x in range(width)
                                    for c in (*reference_header_color(bg,accent,width,119,x+.5,y+.5),255))
                     self.assertEqual(actual,expected)
+
+    def test_antialiased_card_corners_are_opaque_and_bounded(self):
+        card_corner.cache_clear()
+        args=("#102030","#102030","#000000","#405060",320,200,12)
+        corners=[Image.open(io.BytesIO(card_corner(*args,i))) for i in range(4)]
+        self.assertEqual(corners[0].size,(12,12))
+        self.assertEqual(corners[0].getpixel((0,0)),(0,0,0,255))
+        self.assertEqual(corners[0].getpixel((11,11)),(16,32,48,255))
+        self.assertTrue(all(c.getchannel("A").getextrema()==(255,255) for c in corners))
+        self.assertTrue(any(p not in ((0,0,0,255),(16,32,48,255),(64,80,96,255))
+                            for p in corners[0].get_flattened_data()))
+        from PIL import ImageOps
+        self.assertEqual(ImageOps.mirror(corners[0]).tobytes(),corners[1].tobytes())
+        self.assertEqual(ImageOps.flip(corners[0]).tobytes(),corners[3].tobytes())
+        for width in range(100,170):
+            card_corner(*args[:4],width,200,12,0)
+        self.assertLessEqual(card_corner.cache_info().currsize,64)
+        with self.assertRaises(ValueError):card_corner(*args[:4],20,20,12,0)
+        with self.assertRaises(ValueError):card_corner(*args[:4],320,200,33,0)
+
+    def test_card_corner_samples_gradient_at_actual_position(self):
+        args=("#102030","#8090a0","#000000",None,320,200,12)
+        upper=Image.open(io.BytesIO(card_corner(*args,0)))
+        lower=Image.open(io.BytesIO(card_corner(*args,2)))
+        self.assertEqual(upper.getpixel((11,11))[:3],rgb(surface_color(args[0],args[1],320,200,11.5,11.5)))
+        self.assertEqual(lower.getpixel((0,0))[:3],rgb(surface_color(args[0],args[1],320,200,308.5,188.5)))
