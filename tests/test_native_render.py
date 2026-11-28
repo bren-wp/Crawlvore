@@ -1,7 +1,7 @@
 import io
 import unittest
 from PIL import Image
-from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner,gradient_surface
+from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner,gradient_surface,rounded_coverage
 
 class RoundedSurfaceTests(unittest.TestCase):
     def test_antialiased_edge_and_opaque_center(self):
@@ -148,3 +148,52 @@ class RoundedSurfaceTests(unittest.TestCase):
                         self.assertEqual(actual.tobytes(),full.crop((x,y,x+w,y+h)).tobytes())
         with self.assertRaises(ValueError):
             gradient_surface("#101f2d","#0c1a26",None,89,57,(88,56,2,2))
+
+    def test_cached_corner_geometry_matches_original_supersampling(self):
+        import math
+        for radius in (3,7,11,12):
+            for size in (2*radius+1,2*radius+3,64):
+                with self.subTest(radius=radius,size=size):
+                    image=Image.open(io.BytesIO(rounded_surface("#102030","#405060",radius,size)))
+                    expected=bytearray()
+                    for y in range(size):
+                        for x in range(size):
+                            inner=edge=0
+                            for sy in range(4):
+                                for sx in range(4):
+                                    px,py=x+(sx+.5)/4,y+(sy+.5)/4
+                                    cx=max(radius,min(size-radius,px))
+                                    cy=max(radius,min(size-radius,py))
+                                    dist=math.hypot(px-cx,py-cy)
+                                    if dist<=radius:
+                                        if dist>radius-1:edge+=1
+                                        else:inner+=1
+                            total=inner+edge
+                            expected.extend((*blend((16,32,48),(64,80,96),edge/total),round(255*total/16))
+                                            if total else (0,0,0,0))
+                    self.assertEqual(image.tobytes(),bytes(expected))
+        self.assertEqual(rounded_coverage.cache_info().maxsize,16)
+
+    def test_cached_card_corners_match_original_per_pixel(self):
+        import math
+        for border in (None,"#2a4355"):
+            for corner in range(4):
+                width,height,radius=173,91,12
+                ox=width-radius if corner in (1,2) else 0
+                oy=height-radius if corner in (2,3) else 0
+                cx=width-radius if ox else radius
+                cy=height-radius if oy else radius
+                expected=bytearray()
+                for y in range(radius):
+                    for x in range(radius):
+                        fill=rgb(surface_color("#101f2d","#0c1a26",width,height,ox+x+.5,oy+y+.5))
+                        totals=[0,0,0]
+                        for sy in range(4):
+                            for sx in range(4):
+                                dist=(ox+x+(sx+.5)/4-cx)**2+(oy+y+(sy+.5)/4-cy)**2
+                                ink=rgb("#08131e") if dist>radius**2 else (
+                                    rgb(border) if border and dist>(radius-1)**2 else fill)
+                                for i,channel in enumerate(ink):totals[i]+=channel
+                        expected.extend((*[round(v/16) for v in totals],255))
+                actual=Image.open(io.BytesIO(card_corner("#101f2d","#0c1a26","#08131e",border,width,height,radius,corner)))
+                self.assertEqual(actual.tobytes(),bytes(expected))
