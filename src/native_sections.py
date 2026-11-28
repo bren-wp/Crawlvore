@@ -283,25 +283,25 @@ class SecondaryPages:
             if key=="sources":
                 for i,row in enumerate(providers[:6]):
                     y=15+i*29
-                    canvas.create_text(0,y,anchor="w",text=row["label"],fill=TEXT,font=("Segoe UI",-12))
-                    canvas.create_text(width-1,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=TEXT,font=("Segoe UI",-12,"bold"))
+                    canvas.create_text(0,y,anchor="w",text=row["label"],fill=TEXT,font=(self.font_family,-12))
+                    canvas.create_text(width-1,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=TEXT,font=(self.font_family,-12,"bold"))
                     canvas.create_line(0,y+13,width,y+13,fill=PANEL2)
             elif key=="cities":
                 cities=stats["top_cities"][:6]
                 maximum=max(1,max((r["n"] for r in cities),default=1))
                 for i,row in enumerate(cities):
                     y=8+i*23
-                    canvas.create_text(0,y,anchor="w",text=row["city"],fill=TEXT,font=("Segoe UI",-12))
-                    canvas.create_text(width-1,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=TEXT,font=("Segoe UI",-12,"bold"))
+                    canvas.create_text(0,y,anchor="w",text=row["city"],fill=TEXT,font=(self.font_family,-12))
+                    canvas.create_text(width-1,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=TEXT,font=(self.font_family,-12,"bold"))
                     self.chart_bar(canvas,y+13,width,row["n"]/maximum)
             else:
                 for i,(field,label) in enumerate((("phones","Telefonski broj"),("websites","Web stranica"))):
                     y=10+i*65
                     ratio=stats[field]/max(1,stats["total"])
-                    canvas.create_text(0,y,anchor="w",text=label,fill=TEXT,font=("Segoe UI",-12))
-                    canvas.create_text(width-1,y,anchor="e",text=f"{ratio:.0%}",fill=TEXT,font=("Segoe UI",-12,"bold"))
+                    canvas.create_text(0,y,anchor="w",text=label,fill=TEXT,font=(self.font_family,-12))
+                    canvas.create_text(width-1,y,anchor="e",text=f"{ratio:.0%}",fill=TEXT,font=(self.font_family,-12,"bold"))
                     self.chart_bar(canvas,y+16,width,ratio)
-                    canvas.create_text(0,y+34,anchor="w",text=f"{stats[field]:,} / {stats['total']:,}".replace(",","."),fill=MUTED,font=("Segoe UI",-12))
+                    canvas.create_text(0,y+34,anchor="w",text=f"{stats[field]:,} / {stats['total']:,}".replace(",","."),fill=MUTED,font=(self.font_family,-12))
 
     def refresh_analytics(self):
         if not self.client:return
@@ -352,7 +352,7 @@ class SecondaryPages:
         self.registry_progress=tk.StringVar(value="Nema aktivne sinkronizacije")
         ttk.Label(operation,textvariable=self.registry_progress,wraplength=300).pack(anchor="w",pady=8)
         self.registry_bar=ttk.Progressbar(operation,maximum=100);self.registry_bar.pack(fill="x",pady=8)
-        self.registry_log=tk.Text(operation,height=3,wrap="word",background="#08131e",foreground=TEXT,relief="flat",padx=9,pady=8,font=("Segoe UI",-12),state="disabled")
+        self.registry_log=tk.Text(operation,height=3,wrap="word",background="#08131e",foreground=TEXT,relief="flat",padx=9,pady=8,font=(self.font_family,-12),state="disabled")
         self.registry_log.pack(fill="x")
         self.registry_log_signature=None
         self.register_grid(grid,2)
