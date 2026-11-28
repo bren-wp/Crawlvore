@@ -3,8 +3,8 @@ import tkinter as tk
 import math
 import sys
 from pathlib import Path
-from tkinter import ttk
-from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface
+from tkinter import ttk, font as tkfont
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -45,20 +45,23 @@ def brand_surface(root):
 def install(root):
     style=ttk.Style(root)
     style.theme_use("clam")
-    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=("Segoe UI",-13),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
+    available={name.casefold():name for name in tkfont.families(root)}
+    family=next((available[name] for name in ("inter","segoe ui","noto sans","dejavu sans")
+                 if name in available),tkfont.nametofont("TkDefaultFont",root=root).actual("family"))
+    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=(family,-13),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
     for name,fill,fg in (("TButton",PANEL2,TEXT),("Accent.TButton",ACCENT,INK),
                          ("Nav.TButton",SIDE,TEXT),("Active.Nav.TButton",ACTIVE,ACCENT)):
         style.configure(name,background=fill,foreground=fg,padding=(11,9),
-                        anchor="w" if "Nav" in name else "center",font=("Segoe UI",-13 if "Nav" in name else -12,"bold"),borderwidth=1)
+                        anchor="w" if "Nav" in name else "center",font=(family,-13 if "Nav" in name else -12,"bold"),borderwidth=1)
         style.map(name,foreground=[("disabled",MUTED),("active",fg)],background=[("active",fill)])
     style.configure("Upload.TFrame",background=BG,borderwidth=1,relief="solid")
     style.configure("Upload.TLabel",background=BG,foreground=TEXT)
-    style.configure("UploadIcon.TLabel",background=BG,foreground=ACCENT,font=("Segoe UI",-28,"bold"))
+    style.configure("UploadIcon.TLabel",background=BG,foreground=ACCENT,font=(family,-28,"bold"))
     style.configure("Header.TFrame",background=SIDE)
     style.configure("Header.TLabel",background=SIDE,foreground=MUTED)
-    style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=("Segoe UI",10,"bold"))
-    style.configure("Small.TButton",padding=(10,6),font=("Segoe UI",-12,"bold"))
-    style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=("Segoe UI",9))
+    style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=(family,-13,"bold"))
+    style.configure("Small.TButton",padding=(10,6),font=(family,-12,"bold"))
+    style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=(family,-12))
     style.configure("Recent.Treeview",rowheight=36)
     style.configure("Card.TFrame",background=BG,borderwidth=0,relief="flat")
     style.configure("Panel.TFrame",background=PANEL,borderwidth=0,relief="flat")
@@ -69,31 +72,31 @@ def install(root):
     style.configure("TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
     style.configure("TSeparator",background=LINE)
     style.configure("Nav.TButton",borderwidth=0)
-    style.configure("Treeview",font=("Segoe UI",-13))
+    style.configure("Treeview",font=(family,-13))
     style.configure("Panel.TLabel",background=PANEL)
-    style.configure("Metric.TLabel",background=PANEL,font=("Segoe UI",-30,"bold"))
-    style.configure("Title.TLabel",font=("Segoe UI",-30,"bold"))
-    style.configure("Kicker.TLabel",foreground=ACCENT,font=("Segoe UI",-10,"bold"))
-    style.configure("Muted.TLabel",foreground=MUTED,font=("Segoe UI",-12))
-    style.configure("PanelTitle.TLabel",background=PANEL,font=("Segoe UI",-16,"bold"),padding=0)
-    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED,font=("Segoe UI",-12))
+    style.configure("Metric.TLabel",background=PANEL,font=(family,-30,"bold"))
+    style.configure("Title.TLabel",font=(family,-30,"bold"))
+    style.configure("Kicker.TLabel",foreground=ACCENT,font=(family,-10,"bold"))
+    style.configure("Muted.TLabel",foreground=MUTED,font=(family,-12))
+    style.configure("PanelTitle.TLabel",background=PANEL,font=(family,-16,"bold"),padding=0)
+    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED,font=(family,-12))
     style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=43,borderwidth=0)
-    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=("Segoe UI",-10,"bold"),padding=(8,8))
+    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=(family,-10,"bold"),padding=(8,8))
     style.map("Treeview",background=[("selected",ACTIVE)],foreground=[("selected",TEXT)])
     style.configure("TEntry",fieldbackground=BG,padding=(8,8),bordercolor=LINE)
     style.configure("TCombobox",fieldbackground=BG,foreground=TEXT,background=PANEL2,padding=(8,7),arrowsize=14)
     style.map("TCombobox",fieldbackground=[("readonly",BG)],foreground=[("readonly",TEXT)])
     style.configure("TSpinbox",fieldbackground=BG,padding=(8,7))
     style.configure("TLabelframe",background=PANEL,bordercolor=LINE,relief="solid")
-    style.configure("TLabelframe.Label",background=PANEL,foreground=TEXT,font=("Segoe UI",12,"bold"))
+    style.configure("TLabelframe.Label",background=PANEL,foreground=TEXT,font=(family,-16,"bold"))
     style.configure("TNotebook",background=BG,borderwidth=0)
     style.configure("TNotebook.Tab",background=PANEL2,foreground=TEXT,padding=(12,8))
     style.map("TNotebook.Tab",background=[("selected",ACTIVE)],foreground=[("selected",ACCENT)])
     style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT,thickness=8)
 
-    install_control_states(root,style)
+    install_control_states(root,style,family)
 
-def install_control_states(root,style):
+def install_control_states(root,style,family):
     """Keep live clam controls and use the product palette in every state."""
     style.configure(".",focuscolor=ACCENT,focusthickness=2,focussolid=True)
     for name,fill,fg,hover,pressed in (
@@ -139,7 +142,7 @@ def install_control_states(root,style):
               darkcolor=[("selected",ACTIVE),("!selected",PANEL2)])
     # Tk creates the dropdown as a separate listbox, outside ttk styling.
     for option,value in (("background",BG),("foreground",TEXT),("selectBackground",ACTIVE),
-                         ("selectForeground",TEXT),("highlightColor",ACCENT),("font","{Segoe UI} -13")):
+                         ("selectForeground",TEXT),("highlightColor",ACCENT),("font",(family,-13))):
         root.option_add("*TCombobox*Listbox."+option,value)
 
 
@@ -241,6 +244,12 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
                 canvas.create_polygon(*[v for point in polygon for v in point],fill=color,outline="",tags="surface")
         if border:
             canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
+        canvas.corner_images=[]
+        if type(radius) is int and 1<=radius<=32 and min(w,h)>=2*radius:
+            for corner,(x,y) in enumerate(((0,0),(w-radius,0),(w-radius,h-radius),(0,h-radius))):
+                image=tk.PhotoImage(master=canvas,data=card_corner(start,end,outer,border,w,h,radius,corner))
+                canvas.corner_images.append(image)
+                canvas.create_image(x,y,image=image,anchor="nw",tags="surface")
     def resized(_event):
         nonlocal pending
         if pending is not None:canvas.after_cancel(pending)
