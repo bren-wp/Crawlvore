@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 import unittest
 
-from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED
+from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog
 
 
 class NativeControlStatesTests(unittest.TestCase):
@@ -58,3 +58,34 @@ class NativeControlStatesTests(unittest.TestCase):
         check.state(["disabled"])
         check.invoke()
         self.assertTrue(value.get())
+
+    def test_table_hover_preserves_tags_and_selection(self):
+        from types import SimpleNamespace
+        self.root.deiconify()
+        table=NativeTable(self.root,columns=("name",),show="headings",height=3)
+        table.pack(fill="both",expand=True)
+        a=table.insert("","end",values=("Prvi",),tags=("custom",))
+        b=table.insert("","end",values=("Drugi",))
+        table.selection_set(a)
+        self.root.update()
+        for row in (a,b):
+            x,y,w,h=table.bbox(row,"name")
+            table._pointer(SimpleNamespace(x=x+w//2,y=y+h//2))
+            self.assertIn(table._hover_tag,table.item(row,"tags"))
+        self.assertEqual(table.item(a,"tags"),("custom",))
+        self.assertEqual(table.selection(),(a,))
+        table.delete(b)
+        self.assertEqual(table._hover_row,"")
+        self.assertEqual(table.selection(),(a,))
+
+    def test_shared_dialog_preserves_geometry_and_close(self):
+        self.root.deiconify()
+        self.root.geometry("500x400+40+40")
+        self.root.update()
+        dialog=NativeDialog(self.root)
+        dialog.geometry("320x220")
+        dialog.update()
+        self.assertEqual(dialog.cget("background"),BG)
+        self.assertEqual((dialog.winfo_width(),dialog.winfo_height()),(320,220))
+        dialog.destroy()
+        self.assertFalse(dialog.winfo_exists())
