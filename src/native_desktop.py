@@ -236,7 +236,7 @@ class Desktop(SecondaryPages):
         if vertical and not overlay:width-=vsize
         height-=hsize if horizontal else 0
         target=(max(width,req_w),max(height,req_h))
-        if getattr(self,"content_size",None)!=target:
+        if getattr(self,"content_size",None)!=target or self.viewport.bbox(self.content_window)!=(0,0,*target):
             self.content_size=target
             self.viewport.itemconfigure(self.content_window,width=target[0],height=target[1])
             self.viewport.configure(scrollregion=(0,0,*target))
@@ -253,6 +253,7 @@ class Desktop(SecondaryPages):
         try:
             while True:
                 future,success,failure = self.events.get_nowait()
+                self.resize_content()
                 try:
                     success(future.result())
                 except Exception as exc:
