@@ -4,7 +4,7 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from native_transfer import upload,download
 from native_progress import sync_progress
-from native_theme import Card, PANEL, TEXT, MUTED, ACCENT, PANEL2, NativeTable, NativeDialog
+from native_theme import Card, PANEL, TEXT, MUTED, ACCENT, PANEL2, NativeTable, NativeDialog, clear_chart
 
 FORMATS={"CSV":"csv","JSON":"json","Excel":"xlsx"}
 FIELDS={"title":"Naziv tvrtke","email":"E-pošta","phone":"Telefon","oib":"OIB","mbs":"MBS","website":"Web","city":"Grad","address":"Adresa","postal":"Poštanski broj","country":"Država","industry":"Djelatnost"}
@@ -278,7 +278,7 @@ class SecondaryPages:
         if not self.analytics_data:return
         stats,providers=self.analytics_data
         for key,canvas in self.analytics_canvases.items():
-            canvas.delete("all")
+            clear_chart(canvas)
             width=max(100,canvas.winfo_width())
             if key=="sources":
                 for i,row in enumerate(providers[:6]):
