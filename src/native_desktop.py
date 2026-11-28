@@ -128,7 +128,7 @@ class Desktop(SecondaryPages):
         self.resize_pending=False
         self.reflow_groups=[]
         self.views={key:ttk.Frame(content) for key in ("overview","directory","settings","jobs","data","analytics","registry")}
-        for view in self.views.values():header_glow(view)
+        self.header_surface=header_glow(content)
         self.body=self.views["directory"]
         self.build_directory()
         self.build_overview()
@@ -304,6 +304,7 @@ class Desktop(SecondaryPages):
         self.current_view=key
         self.nav[key].configure(style="Active.Nav.TButton",image=self.nav_icons[key][1])
         self.views[key].pack(fill="both",expand=True)
+        self.header_surface.schedule_composite()
         self.viewport.xview_moveto(0)
         self.viewport.yview_moveto(0)
         self.resize_content()
