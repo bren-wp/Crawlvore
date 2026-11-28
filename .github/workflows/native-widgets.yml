@@ -3,10 +3,18 @@ on:
   pull_request:
     paths:
       - 'src/**'
-      - 'tests/test_native_client.py'
+      - 'tests/test_native*.py'
+      - 'tools/capture_native.py'
+      - 'tools/native_pixel_compare.py'
+      - 'docs/visual-acceptance/reference-1280/**'
       - 'requirements*.txt'
       - '.github/workflows/native-widgets.yml'
   workflow_dispatch:
+    inputs:
+      require_30_percent:
+        description: Require every Windows reference view to meet the 30% milestone
+        type: boolean
+        default: false
 permissions:
   contents: read
 env:
@@ -48,3 +56,49 @@ jobs:
       - name: Packaged native smoke (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a dist/CrawlvoraNativePreview --native-smoke
+
+  visual-evidence:
+    name: Native RGB evidence (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb
+      - run: python -m pip install -r requirements.txt pillow==13.0.0
+      - name: Capture actual Windows client pixels
+        if: runner.os == 'Windows'
+        run: python tools/capture_native.py native-evidence/captures
+      - name: Capture actual Linux client pixels at 96 DPI
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1600x1000x24 -dpi 96" python tools/capture_native.py native-evidence/captures
+      - name: Compare unmodified references and record differences (diagnostic)
+        run: python tools/native_pixel_compare.py docs/visual-acceptance/reference-1280 native-evidence/captures native-evidence/diffs --max-changed-percent 30 --report-only
+      - name: Report measured threshold, not a visual pass
+        shell: bash
+        run: |
+          {
+            echo '### RGB measurements against Windows references'
+            echo 'Linux measurements are cross-platform diagnostics, not acceptance.'
+            echo 'A successful capture job does not mean threshold_passed is true.'
+            echo '~~~json'
+            cat native-evidence/captures/capture.json native-evidence/diffs/report.json
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Enforce requested Windows milestone
+        if: runner.os == 'Windows' && inputs.require_30_percent == true
+        run: python tools/native_pixel_compare.py docs/visual-acceptance/reference-1280 native-evidence/captures native-evidence/diffs --max-changed-percent 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: native-rgb-evidence-${{ runner.os }}
+          path: native-evidence/
+          retention-days: 7
+          if-no-files-found: warn
