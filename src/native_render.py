@@ -178,3 +178,49 @@ def card_corner(start,end,outer,border,width,height,radius,corner):
             row.extend((*[round(value/16) for value in totals],255))
         rows.append(bytes(row))
     return png(radius,radius,rows)
+
+@lru_cache(maxsize=8)
+def gradient_surface(start,end,border,width,height):
+    """Pixel-center sRGB gradient with straight edges; corners are separate.
+    
+    Monotonic rounded channels allow whole runs of identical pixels to be
+    emitted without supersampling the rectangular interior. Bound the raw
+    raster allocation independently of the compressed PNG cache.
+    """
+    if (type(width) is not int or type(height) is not int or
+            not 3<=width<=4096 or not 3<=height<=4096 or width*height>2_000_000):
+        raise ValueError("Invalid gradient surface dimensions")
+    a,b=rgb(start),rgb(end)
+    edge=bytes((*rgb(border),255)) if border else None
+    dx,dy=math.sin(math.radians(145)),-math.cos(math.radians(145))
+    span=max(1,dx*width+dy*height)
+    bands=gradient_bands(start,end)
+    runs=tuple((right,bytes((*rgb(color),255))) for _,right,color in bands)
+    rows=[]
+    for y in range(height):
+        if edge and y in (0,height-1):
+            rows.append(edge*width)
+            continue
+        row=bytearray()
+        previous=0
+        py=y+.5
+        for right,pixel in runs:
+            boundary=(right*span-dy*py)/dx-.5
+            stop=min(width,max(previous,math.ceil(boundary)))
+            row.extend(pixel*(stop-previous))
+            previous=stop
+        if previous<width:
+            row.extend(runs[-1][1]*(width-previous))
+        # At a rounding boundary two channels can round in opposite
+        # directions. Evaluate that pixel exactly, including floating ties.
+        for right,_ in runs[:-1]:
+            boundary=(right*span-dy*py)/dx-.5
+            x=round(boundary)
+            if 0<=x<width and abs(boundary-x)<1e-8:
+                color=blend(a,b,max(0,min(1,(dx*(x+.5)+dy*py)/span)))
+                row[x*4:x*4+4]=bytes((*color,255))
+        if edge:
+            row[:4]=edge
+            row[-4:]=edge
+        rows.append(bytes(row))
+    return png(width,height,rows)
