@@ -19,30 +19,51 @@ def png(width,height,rows):
     return (b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",width,height,8,6,0,0,0))
             +chunk(b"IDAT",zlib.compress(b"".join(b"\0"+row for row in rows),6))+chunk(b"IEND",b""))
 
+@lru_cache(maxsize=16)
+def rounded_coverage(radius):
+    """Reuse the 4x4 coverage of one corner at every size and palette."""
+    if type(radius) is not int or not 1<=radius<=32:
+        raise ValueError("Invalid coverage radius")
+    pixels=[]
+    for y in range(radius):
+        row=[]
+        for x in range(radius):
+            inside=edge=0
+            for sy in range(4):
+                for sx in range(4):
+                    dist=(x+(sx+.5)/4-radius)**2+(y+(sy+.5)/4-radius)**2
+                    if dist<=(radius-1)**2:inside+=1
+                    elif dist<=radius**2:edge+=1
+            row.append((inside,edge,16-inside-edge))
+        pixels.append(tuple(row))
+    return tuple(pixels)
+
+
 @lru_cache(maxsize=32)
 def rounded_surface(fill,border,radius=7,size=None):
-    """Antialiased compact surface. Maximum cached allocation is bounded."""
+    """Antialiased compact surface with cached, palette-independent geometry."""
     if type(radius) is not int or not 3<=radius<=12:
         raise ValueError("Invalid surface radius")
     size=radius*2+3 if size is None else size
-    if type(size) is not int or not radius*2+1<=size<=64:raise ValueError("Invalid surface size")
+    if type(size) is not int or not radius*2+1<=size<=64:
+        raise ValueError("Invalid surface size")
     inside=rgb(fill);edge=rgb(border)
+    coverage=rounded_coverage(radius)
     rows=[]
     for y in range(size):
         row=bytearray()
+        py=min(y,size-1-y)
         for x in range(size):
-            weights=[0,0]
-            for sy in range(4):
-                for sx in range(4):
-                    px=x+(sx+.5)/4;py=y+(sy+.5)/4
-                    cx=max(radius,min(size-radius,px))
-                    cy=max(radius,min(size-radius,py))
-                    dist=math.hypot(px-cx,py-cy)
-                    if dist<=radius:
-                        weights[int(dist>radius-1)]+=1
-            total=sum(weights)
+            px=min(x,size-1-x)
+            if px<radius and py<radius:
+                inner,outline,outside=coverage[py][px]
+            elif px==0 or py==0:
+                inner,outline,outside=0,16,0
+            else:
+                inner,outline,outside=16,0,0
+            total=inner+outline
             if total:
-                row.extend(blend(inside,edge,weights[1]/total))
+                row.extend(blend(inside,edge,outline/total))
                 row.append(round(255*total/16))
             else:row.extend((0,0,0,0))
         rows.append(bytes(row))
@@ -159,23 +180,18 @@ def card_corner(start,end,outer,border,width,height,radius,corner):
     span=max(1,dx*width+dy*height)
     ox=width-radius if corner in (1,2) else 0
     oy=height-radius if corner in (2,3) else 0
-    cx=width-radius if ox else radius
-    cy=height-radius if oy else radius
+    coverage=rounded_coverage(radius)
     rows=[]
     for y in range(radius):
         row=bytearray()
         for x in range(radius):
             px,py=ox+x+.5,oy+y+.5
             fill=blend(a,b,max(0,min(1,(dx*px+dy*py)/span)))
-            totals=[0,0,0]
-            for sy in range(4):
-                for sx in range(4):
-                    dist=(ox+x+(sx+.5)/4-cx)**2+(oy+y+(sy+.5)/4-cy)**2
-                    color=background if dist>radius**2 else (
-                        edge if edge is not None and dist>(radius-1)**2 else fill)
-                    for i,value in enumerate(color):
-                        totals[i]+=value
-            row.extend((*[round(value/16) for value in totals],255))
+            inner,outline,outside=coverage[radius-1-y if oy else y][radius-1-x if ox else x]
+            if edge is None:inner+=outline;outline=0
+            color=tuple(round((i*inner+e*outline+o*outside)/16)
+                        for i,e,o in zip(fill,edge or fill,background))
+            row.extend((*color,255))
         rows.append(bytes(row))
     return png(radius,radius,rows)
 
