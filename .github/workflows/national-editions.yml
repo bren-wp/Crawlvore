@@ -2,15 +2,14 @@ name: Croatian desktop editions
 on:
   workflow_dispatch:
   push:
-    branches: [main, refactor/hr-only-desktop]
-    paths: ['src/**', 'frontend/**', 'static/**', 'desktop/**', 'windows/**', 'linux/**', 'tools/**', 'tests/**', 'VERSION', '.github/workflows/national-editions.yml']
+    branches: [main]
 permissions:
   contents: read
 env:
   PYTHONPATH: ${{ github.workspace }}/src
 concurrency:
   group: croatian-editions-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   release_contract:
     runs-on: ubuntu-24.04
@@ -39,6 +38,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      release_url: ${{ steps.publish_release.outputs.url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
@@ -74,6 +75,7 @@ jobs:
       - name: Verify complete signed release matrix
         run: python tools/complete_release.py release "$(tr -d '\r\n' < VERSION)" online
       - name: Publish one complete 11-file compact release
+        id: publish_release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -83,5 +85,26 @@ jobs:
           id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name==\"$tag\" and .draft) | .id")"
           test -n "$id"
           gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate --slurp > remote.json
-          python -c 'import json,hashlib,pathlib; a=[x for page in json.load(open("remote.json")) for x in page]; p=pathlib.Path("release"); assert {x["name"] for x in a}=={f.name for f in p.iterdir()}; assert all(x["size"]==(p/x["name"]).stat().st_size and x["digest"]=="sha256:"+hashlib.file_digest((p/x["name"]).open("rb"),"sha256").hexdigest() for x in a)'
-          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -F prerelease=false -f make_latest=true --jq '.html_url'
+          python tools/complete_release.py --remote release remote.json
+          url="$(gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -F prerelease=false -f make_latest=true --jq '.html_url')"
+          test -n "$url"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" --jq '.draft or .prerelease')" = false
+          gh api "repos/$GITHUB_REPOSITORY/releases/$id/assets" --paginate --slurp > remote.json
+          python tools/complete_release.py --remote release remote.json
+          printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
+  release_required:
+    name: Mandatory stable release (all 11 files)
+    needs: [publish]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      RELEASE_URL: ${{ needs.publish.outputs.release_url }}
+    steps:
+      - name: Refuse successful completion without a verified publication
+        run: |
+          set -euo pipefail
+          test "$PUBLISH_RESULT" = success
+          test -n "$RELEASE_URL"
+          printf 'Complete verified release: %s\n' "$RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"

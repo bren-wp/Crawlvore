@@ -15,3 +15,35 @@ Keep the reference renderer until native feature parity and visual acceptance ar
 ## Intermediate milestone
 
 Use --max-changed-percent 30 to check that each of the seven pages has at most 30% differing RGB pixels. This is a separate development milestone; the default gate remains zero. The latest candidate still fails both gates. Procedural card surfaces, native charts, filters, task indicators and the original launcher assets are now integrated. Reference PNGs remain unchanged.
+
+## Layout geometry iteration
+
+Wide windows use an overlay vertical scrollbar in the outer margin, retaining the reference content width. Narrow windows retain reserved scrollbar space and the responsive card layout. Dashboard card dimensions, chart proportions and six-row chart spacing were corrected; shared typography and progress-bar thickness now more closely follow reference CSS. The experimental custom ttk image-button renderer was excluded because its initial smoke run did not complete promptly. The measured candidate still fails the 30% gate; data and analytics show small regressions. Real DPI and cross-platform pixel acceptance remain open. No source reference images were changed.
+
+## Native raster assets
+
+The logo surface and navigation line icons now use bounded, supersampled RGBA PNG generation in the Python standard library. The runtime has no new graphics dependency. Keep the existing ttk button control layout: the experimental nine-slice button element caused invisible labels initially and excessive CPU activity during full-window resize testing even after fixing label stacking. It is not shipped. The accepted icon-only candidate completed the seven-view capture and responsive checks, but the strict 30% and exact RGB thresholds remain unmet. Tiny RGB regressions are recorded, not masked. Reference captures remain unchanged.
+
+## Local gradient sampling
+
+Native card labels, nested panel frames and chart canvases now sample the local gradient color instead of displaying uniform panel-colored rectangles. Styles inherit their existing font, foreground and control semantics. Sampling occurs after layout settles and pending callbacks are cancelled on destruction. The original controls remain interactive; nested card decorations are excluded. All seven views reduced changed pixels at the measured 1280x700 viewport. The 30% gate is still failing; no production readiness or DPI equivalence is inferred. Reference images remain unchanged.
+
+## Gradient intervals and header accent
+
+The card renderer now derives its band boundaries from RGB channel rounding instead of generating 48 fixed polygons. It retains live native controls and bounded caches. The procedural header raster approximates the two layered reference gradients and is cached by viewport width (four entries, maximum width 4096). It does not embed reference images. Local measurement at 1280x700 shows fewer differing pixels on all seven views; 30% and exact acceptance remain unmet. Physical DPI and cross-platform pixel equivalence have not been verified. No production data was used.
+
+## Deterministic RGB acceptance and pixel-center raster
+
+The Windows hosted-runner capture failure was corrected without rescaling its output. Run 46087547789 subsequently captured all seven views at 1280 × 700 on both platforms. The later Windows run 46087701940 also captured three native dialogs. Its seven-view changed-pixel percentages were 75.740848, 72.910491, 77.892969, 78.038170, 71.007366, 71.115179 and 78.890179 in comparator order. This does not pass 30%, and differences in renderer configuration prevent treating the previous local Windows evidence as a controlled before/after benchmark. The Linux responsive check in the same run failed for registry at 800 × 540; it is not accepted.
+
+The next candidate renders rectangular gradient interiors at physical pixel centers using runs of identical RGB pixels, retaining the existing supersampled corner patches and live widgets. The eight-entry compressed cache and two-million-pixel allocation limit are explicit; larger surfaces use the previous canvas polygon renderer. A local isolated check of the run-generation algorithm (excluding PNG encoding and GUI) matched direct analytical evaluation in fifteen palette/size cases plus 600,000 pixels at 1000 × 600. Full application performance and visual acceptance still require CI evidence.
+
+Capture tests now request Tk scaling corresponding to 96 DPI, record actual Tk scaling, original scaling, font family, OS and Tk version, and require two consecutive identical RGB frame hashes. This is a controlled test configuration, not physical monitor DPI verification. Window sizes and reference files remain unchanged. The strict acceptance threshold is not relaxed; Linux comparisons against Windows references remain diagnostic. The viewport reconciliation fix and new capture procedure must pass CI before claiming the responsive issue resolved.
+
+## Regional error investigation and visible Windows captures
+
+Run 46090693206 completed the Windows and Linux GUI smoke and RGB evidence jobs. The Linux diagnostic changed-pixel percentages in comparator order were 67.205022, 67.533817, 72.418192, 72.722210, 65.216183, 61.393973 and 71.614397. The Windows job reported 74.372210, 72.912054, 77.587612, 77.790402, 70.386384, 70.432478 and 78.839286. These are historical measurements, not a 30% pass.
+
+In all seven Windows images, the four rightmost regions (x=960 through 1279) had mean maximum channel errors above 217 on a 0–255 scale. This consistent anomaly is compatible with clipped or padded captures from an undersized hosted display; it is not proof of a rendering defect or of clipping. Do not treat those measurements as reliable visual acceptance until fully visible captures are verified. The Windows CI now explicitly selects a supported larger desktop mode, with no registry persistence, and capture rejects any client extending beyond the primary display or mismatching actual client geometry. If the hosted display cannot support the requested mode, the job fails rather than reporting a fabricated score.
+
+The next candidate shades inactive navigation buttons, classic sidebar labels and the brand canvas using their local gradient colors. Native table body backgrounds use the local card color, with the original selected and hover states retained. This is a local color approximation for opaque controls, not true transparency. Table font size and default row height follow the reference CSS values of 12 and 39 pixels. The button renderer remains the standard native implementation; a rounded-image replacement has not been accepted on performance grounds. These changes and their added GUI tests require new CI evidence before a visual improvement can be asserted.

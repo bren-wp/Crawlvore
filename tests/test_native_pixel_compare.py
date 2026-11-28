@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from PIL import Image
-from tools.native_pixel_compare import compare,VIEWS,meets_threshold
+from tools.native_pixel_compare import compare,VIEWS,meets_threshold,region_diagnostics
 
 class NativePixelCompareTests(unittest.TestCase):
     def setUp(self):
@@ -38,3 +38,16 @@ class NativePixelCompareTests(unittest.TestCase):
         self.assertFalse(meets_threshold(results,30))
         self.assertFalse(meets_threshold(results[:1],30))
         with self.assertRaises(ValueError):meets_threshold(results,101)
+
+    def test_diagnostics_partition_every_pixel_without_changing_acceptance(self):
+        delta=Image.new("RGB",(5,7),(0,0,0))
+        for x,y,color in ((0,0,(1,0,0)),(4,6,(0,8,0)),(2,3,(0,0,40))):
+            delta.putpixel((x,y),color)
+        result=region_diagnostics(delta)
+        regions=result["regions"]
+        self.assertEqual(len(regions),16)
+        self.assertEqual(sum(r["total_pixels"] for r in regions),35)
+        self.assertEqual(sum(r["changed_pixels"] for r in regions),3)
+        self.assertEqual(result["max_channel_error_histogram"],
+                         {"0":32,"1_to_2":1,"3_to_8":1,"9_to_32":0,"33_to_255":1})
+        self.assertFalse(meets_threshold([{"changed_pixels":3,"total_pixels":35}]*7,0))

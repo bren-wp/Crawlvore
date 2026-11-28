@@ -14,7 +14,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
 from native_sections import SecondaryPages
-from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon
+from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon, brand_surface, NativeTable, NativeDialog, clear_chart
 
 CONTACTS = {"Svi zapisi": "", "Ima telefon": "phone", "Ima web": "web", "Ima e-poštu": "email", "Bez telefona i weba": "missing"}
 KINDS = {"Sve vrste":"","Trgovačka društva":"company","Poduzetnici i obrti":"entrepreneur","Institucije":"institution","Neprofitne organizacije":"nonprofit","Neklasificirani subjekti":"unknown"}
@@ -53,7 +53,7 @@ class Desktop(SecondaryPages):
         root.minsize(min(640,width),min(420,height))
         root.configure(bg=BG)
         root.protocol("WM_DELETE_WINDOW", self.close)
-        install(root)
+        self.font_family=install(root)
         self.launch_icon=product_icon(root)
         self.status = tk.StringVar(value="Priprema radnog prostora…")
         shell=ttk.Frame(root)
@@ -67,17 +67,18 @@ class Desktop(SecondaryPages):
         brand.pack(fill="x",padx=20,pady=(24,13))
         logo=tk.Canvas(brand,width=38,height=38,bg=SIDE,highlightthickness=0)
         logo.pack(side="left",anchor="n",padx=(0,11))
-        logo.create_polygon(6,0,32,0,38,6,38,32,32,38,6,38,0,32,0,6,fill=ACCENT,outline="",smooth=True)
+        logo.surface=brand_surface(root)
+        logo.create_image(0,0,image=logo.surface,anchor="nw")
         logo.create_polygon(19,6,30,13,30,25,19,32,8,25,8,13,outline=INK,fill="",width=2)
         logo.create_line(8,13,19,19,30,13,19,6,19,19,19,32,fill=INK,width=2)
-        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",-22,"bold")).pack(anchor="w")
-        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=("Segoe UI",-9,"bold")).pack(anchor="w")
+        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=(self.font_family,-22,"bold")).pack(anchor="w")
+        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=(self.font_family,-9,"bold")).pack(anchor="w")
         self.sidebar=sidebar
         self.nav={}
         self.nav_icons={}
         self.nav_labels=[]
         def nav_label(label):
-            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",9,"bold"))
+            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=(self.font_family,-10,"bold"))
             widget.pack(anchor="w",padx=20,pady=(14,5))
             self.nav_labels.append(widget)
         def nav(key,label,command,parent=sidebar):
@@ -118,7 +119,7 @@ class Desktop(SecondaryPages):
         self.hscroll.grid(row=1,column=0,sticky="ew")
         self.vscroll.grid_remove()
         self.hscroll.grid_remove()
-        self.scroll_state=(False,False)
+        self.scroll_state=(False,False,False)
         content=ttk.Frame(self.viewport,padding=(28,14,28,12))
         self.content=content
         self.content_window=self.viewport.create_window(0,0,anchor="nw",window=content)
@@ -164,7 +165,7 @@ class Desktop(SecondaryPages):
                 for label in self.nav_labels:label.pack_configure(pady=(5,2) if short else (14,5))
                 for button in self.nav.values():button.pack_configure(pady=0 if short else 2)
                 style=ttk.Style(self.root)
-                for name in ("Nav.TButton","Active.Nav.TButton"):style.configure(name,padding=(7,3) if short else (11,9))
+                for name in ("Nav.TButton","Active.Nav.TButton"):style.configure(name,padding=(7,3) if short else (11,10))
             self.reflow_layout()
             self.resize_content()
 
@@ -215,20 +216,27 @@ class Desktop(SecondaryPages):
         req_w,req_h=self.content.winfo_reqwidth(),self.content.winfo_reqheight()
         vsize=self.vscroll.winfo_reqwidth()
         hsize=self.hscroll.winfo_reqheight()
+        overlay=self.root.winfo_width()>=1100
         horizontal=req_w>width
         vertical=req_h>height-(hsize if horizontal else 0)
-        horizontal=req_w>width-(vsize if vertical else 0)
+        if not overlay:horizontal=req_w>width-(vsize if vertical else 0)
         vertical=req_h>height-(hsize if horizontal else 0)
-        state=(horizontal,vertical)
+        state=(horizontal,vertical,overlay)
         if state!=self.scroll_state:
             self.scroll_state=state
-            for scrollbar,needed in ((self.hscroll,horizontal),(self.vscroll,vertical)):
-                if needed:scrollbar.grid()
-                else:scrollbar.grid_remove()
-        width-=vsize if vertical else 0
+            self.vscroll.place_forget()
+            self.hscroll.grid_remove()
+            self.vscroll.grid_remove()
+            if horizontal:self.hscroll.grid()
+            if vertical:
+                if overlay:
+                    self.vscroll.place(relx=1,x=-vsize,y=0,width=vsize,relheight=1,height=-hsize if horizontal else 0)
+                    self.vscroll.lift()
+                else:self.vscroll.grid()
+        if vertical and not overlay:width-=vsize
         height-=hsize if horizontal else 0
         target=(max(width,req_w),max(height,req_h))
-        if getattr(self,"content_size",None)!=target:
+        if getattr(self,"content_size",None)!=target or self.viewport.bbox(self.content_window)!=(0,0,*target):
             self.content_size=target
             self.viewport.itemconfigure(self.content_window,width=target[0],height=target[1])
             self.viewport.configure(scrollregion=(0,0,*target))
@@ -245,6 +253,7 @@ class Desktop(SecondaryPages):
         try:
             while True:
                 future,success,failure = self.events.get_nowait()
+                self.resize_content()
                 try:
                     success(future.result())
                 except Exception as exc:
@@ -286,7 +295,8 @@ class Desktop(SecondaryPages):
     def show_view(self,key):
         if self.current_view:
             self.views[self.current_view].pack_forget()
-            self.nav[self.current_view].configure(style="Nav.TButton",image=self.nav_icons[self.current_view][0])
+            button=self.nav[self.current_view]
+            button.configure(style=getattr(button,"_nav_idle_style","Nav.TButton"),image=self.nav_icons[self.current_view][0])
         self.current_view=key
         self.nav[key].configure(style="Active.Nav.TButton",image=self.nav_icons[key][1])
         self.views[key].pack(fill="both",expand=True)
@@ -376,7 +386,7 @@ class Desktop(SecondaryPages):
     def build_overview(self):
         view=self.views["overview"]
         heading=ttk.Frame(view)
-        heading.pack(fill="x",pady=(0,12))
+        heading.pack(fill="x",pady=(0,6))
         copy=ttk.Frame(heading)
         copy.pack(side="left",fill="x",expand=True)
         ttk.Label(copy,text="WEB POSLOVNI PODACI",style="Kicker.TLabel").pack(anchor="w")
@@ -388,8 +398,8 @@ class Desktop(SecondaryPages):
         self.metric_values={}
         for column,(key,label) in enumerate((("total","Tvrtke u bazi"),("cities","Gradovi"),("phones","S telefonom"),("websites","S web stranicom"))):
             metrics.columnconfigure(column,weight=1,uniform="metric")
-            panel=Card(metrics,padding=15)
-            panel.grid(row=0,column=column,sticky="nsew",padx=(0,10 if column<3 else 0))
+            panel=Card(metrics,padding=(15,12))
+            panel.grid(row=0,column=column,sticky="nsew",padx=(0,12 if column<3 else 0))
             row=ttk.Frame(panel,style="PanelInner.TFrame")
             row.pack(fill="x")
             icon=nav_icon(self.root,{"total":"directory","cities":"registry","phones":"data","websites":"analytics"}[key],ACCENT)
@@ -401,17 +411,17 @@ class Desktop(SecondaryPages):
         self.register_grid(metrics,4)
         charts=ttk.Frame(view)
         charts.pack(fill="x",pady=(0,12))
-        charts.columnconfigure(0,weight=6)
-        charts.columnconfigure(1,weight=5)
+        charts.columnconfigure(0,weight=112,uniform="overview")
+        charts.columnconfigure(1,weight=100,uniform="overview")
         city=Card(charts,padding=15)
-        city.grid(row=0,column=0,sticky="nsew",padx=(0,12))
-        ttk.Label(city,text="Najzastupljeniji gradovi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
+        city.grid(row=0,column=0,sticky="nsew",padx=(0,14))
+        ttk.Label(city,text="Najzastupljeniji gradovi",style="PanelTitle.TLabel").pack(anchor="w")
         ttk.Label(city,text="Broj tvrtki po gradu",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
         self.city_chart=tk.Canvas(city,width=220,height=165,bg=PANEL,highlightthickness=0)
         self.city_chart.pack(fill="x",expand=True,pady=(8,0))
         coverage=Card(charts,padding=15)
         coverage.grid(row=0,column=1,sticky="nsew")
-        ttk.Label(coverage,text="Dostupnost podataka",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(anchor="w")
+        ttk.Label(coverage,text="Dostupnost podataka",style="PanelTitle.TLabel").pack(anchor="w")
         ttk.Label(coverage,text="Kontaktni podaci u imeniku",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
         self.coverage_chart=tk.Canvas(coverage,width=200,height=130,bg=PANEL,highlightthickness=0)
         self.coverage_chart.pack(fill="x",expand=True,pady=(8,0))
@@ -424,10 +434,10 @@ class Desktop(SecondaryPages):
         recent.pack(fill="both",expand=True)
         top=ttk.Frame(recent,style="PanelInner.TFrame")
         top.pack(fill="x")
-        ttk.Label(top,text="Nedavni zapisi",style="Panel.TLabel",font=("Segoe UI",13,"bold")).pack(side="left")
+        ttk.Label(top,text="Nedavni zapisi",style="PanelTitle.TLabel").pack(side="left")
         ttk.Button(top,text="Otvori imenik",command=lambda:self.show_view("directory")).pack(side="right")
         ttk.Label(recent,text="Brz pristup zapisima iz baze",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
-        self.recent=ttk.Treeview(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
+        self.recent=NativeTable(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
         for key,label,width in (("name","TVRTKA",240),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",65)):
             self.recent.heading(key,text=label,anchor="w")
             self.recent.column(key,width=width)
@@ -483,12 +493,12 @@ class Desktop(SecondaryPages):
     def draw_charts(self):
         if not self.overview_data:return
         stats=self.overview_data
-        for canvas in (self.city_chart,self.coverage_chart):canvas.delete("all")
+        for canvas in (self.city_chart,self.coverage_chart):clear_chart(canvas)
         width=max(180,self.city_chart.winfo_width())
         cities=stats["top_cities"]
         largest=max(1,max((row["n"] for row in cities),default=1))
         for index,row in enumerate(cities[:6]):
-            y=8+30*index
+            y=8+28*index
             self.city_chart.create_text(0,y,anchor="w",text=row["city"][:18],fill=TEXT)
             self.chart_bar(self.city_chart,y+12,width,row["n"]/largest)
             self.city_chart.create_text(width-2,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=MUTED)
@@ -499,7 +509,7 @@ class Desktop(SecondaryPages):
             self.coverage_chart.create_text(0,y,anchor="w",text=label,fill=MUTED)
             self.coverage_chart.create_text(width-2,y,anchor="e",text=f"{pct:.0f}%",fill=TEXT)
             self.chart_bar(self.coverage_chart,y+17,width,pct/100)
-            self.coverage_chart.create_text(0,y+35,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=("Segoe UI",9))
+            self.coverage_chart.create_text(0,y+35,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=(self.font_family,-12))
 
     @staticmethod
     def chart_bar(canvas,y,width,fraction):
@@ -553,7 +563,7 @@ class Desktop(SecondaryPages):
         ttk.Button(resultbar,text="Moje tvrtke",command=self.saved_dialog).pack(side="right")
         table=ttk.Frame(results,style="PanelInner.TFrame")
         table.pack(fill="both",expand=True)
-        self.tree=ttk.Treeview(table,columns=("name","city","phone","web","source","action"),show="headings",selectmode="browse",height=7)
+        self.tree=NativeTable(table,columns=("name","city","phone","web","source","action"),show="headings",selectmode="browse",height=7)
         for key,label,width in (("name","TVRTKA",250),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",75)):
             self.tree.heading(key,text=label,anchor="w")
             self.tree.column(key,width=width,minwidth=60,stretch=True)
@@ -647,7 +657,7 @@ class Desktop(SecondaryPages):
         self.submit(lambda:self.client.request(f"/api/company/{identifier}"),self.profile)
 
     def profile(self, company):
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Profil tvrtke")
         dialog.geometry("720x580")
         dialog.minsize(480,380)
@@ -665,7 +675,7 @@ class Desktop(SecondaryPages):
                 col=idx%3;row=(idx//3)*2
                 section.columnconfigure(col,weight=1,uniform="field")
                 ttk.Label(section,text=label,style="Muted.TLabel").grid(row=row,column=col,sticky="w")
-                value=tk.Text(section,height=1,wrap="word",background=PANEL,foreground=TEXT,relief="flat",font=("Segoe UI",10))
+                value=tk.Text(section,height=1,wrap="word",background=PANEL,foreground=TEXT,relief="flat",font=(self.font_family,-13))
                 value.insert("1.0",str(company.get(key) or "—"))
                 value.configure(state="disabled")
                 value.grid(row=row+1,column=col,sticky="ew",padx=(0,8),pady=(0,5))
@@ -755,11 +765,11 @@ class Desktop(SecondaryPages):
 
     def saved_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root);dialog.title("Tvrtke – Moje tvrtke");dialog.geometry("840x540");dialog.configure(bg=BG)
+        dialog=NativeDialog(self.root);dialog.title("Tvrtke – Moje tvrtke");dialog.geometry("840x540");dialog.configure(bg=BG)
         dialog.transient(self.root)
         body=ttk.Frame(dialog,padding=18);body.pack(fill="both",expand=True)
         self.section_header(body,"MOJ ODABIR","Moje tvrtke","Spremljeni poslovni subjekti. Odabir ne mijenja poslovne podatke.")
-        table=ttk.Treeview(body,columns=("name","mbs","city","email"),show="headings",height=7)
+        table=NativeTable(body,columns=("name","mbs","city","email"),show="headings",height=7)
         for key,label,width in (("name","Tvrtka",260),("mbs","MBS",100),("city","Grad",100),("email","E-pošta",180)):
             table.heading(key,text=label,anchor="w");table.column(key,width=width)
         table.pack(fill="both",expand=True)
@@ -795,7 +805,7 @@ class Desktop(SecondaryPages):
 
     def duplicate_dialog(self):
         if not self.client or self.merge_active:return
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Tvrtke – pregled duplikata")
         dialog.geometry("900x650")
         dialog.minsize(720,460)
@@ -806,7 +816,7 @@ class Desktop(SecondaryPages):
         ttk.Label(frame,text="Pregled mogućih duplikata",style="Title.TLabel").pack(anchor="w")
         status=tk.StringVar(value="Provjera podataka…")
         ttk.Label(frame,textvariable=status,wraplength=800).pack(anchor="w",pady=8)
-        table=ttk.Treeview(frame,columns=("name","city","address"),show="headings",selectmode="extended",height=7)
+        table=NativeTable(frame,columns=("name","city","address"),show="headings",selectmode="extended",height=7)
         for key,label,width in (("name","Tvrtka",330),("city","Grad",140),("address","Adresa",280)):
             table.heading(key,text=label)
             table.column(key,width=width)
@@ -870,7 +880,7 @@ class Desktop(SecondaryPages):
 
     def sync_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Tvrtke – sinkronizacija")
         dialog.geometry("550x420")
         dialog.configure(bg=BG)
@@ -939,7 +949,7 @@ class Desktop(SecondaryPages):
 
     def backup_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Tvrtke – sigurnosne kopije")
         dialog.geometry("530x280")
         dialog.configure(bg=BG)

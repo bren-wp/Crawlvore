@@ -3,18 +3,16 @@ import tkinter as tk
 import math
 import sys
 from pathlib import Path
-from tkinter import ttk
+from tkinter import ttk, font as tkfont
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
 
 def nav_icon(root,key,color):
-    image=tk.PhotoImage(master=root,width=20,height=20)
+    segments=[]
     def line(x1,y1,x2,y2):
-        steps=max(abs(x2-x1),abs(y2-y1),1)
-        for i in range(steps+1):
-            x=round(x1+(x2-x1)*i/steps);y=round(y1+(y2-y1)*i/steps)
-            image.put(color,(x,y,min(20,x+2),min(20,y+2)))
+        segments.append((x1+.5,y1+.5,x2+.5,y2+.5))
     def rect(x,y,w,h):
         line(x,y,x+w,y);line(x+w,y,x+w,y+h);line(x+w,y+h,x,y+h);line(x,y+h,x,y)
     if key=="overview":
@@ -38,25 +36,32 @@ def nav_icon(root,key,color):
         points=((8,2),(11,2),(12,5),(15,5),(18,8),(15,11),(15,14),(12,15),(11,18),(8,18),(7,15),(4,15),(2,12),(4,9),(4,6),(7,5),(8,2))
         for start,end in zip(points,points[1:]):line(*start,*end)
         rect(7,7,5,5)
-    return image
+    return tk.PhotoImage(master=root,data=stroke_icon(tuple(segments),color))
+
+def brand_surface(root):
+    return tk.PhotoImage(master=root,data=rounded_surface(ACCENT,ACCENT,11,38))
+
 
 def install(root):
     style=ttk.Style(root)
     style.theme_use("clam")
-    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=("Segoe UI",-13),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
+    available={name.casefold():name for name in tkfont.families(root)}
+    family=next((available[name] for name in ("inter","segoe ui","noto sans","dejavu sans")
+                 if name in available),tkfont.nametofont("TkDefaultFont",root=root).actual("family"))
+    style.configure(".",background=BG,foreground=TEXT,fieldbackground=BG,font=(family,-13),bordercolor=LINE,lightcolor=LINE,darkcolor=LINE)
     for name,fill,fg in (("TButton",PANEL2,TEXT),("Accent.TButton",ACCENT,INK),
                          ("Nav.TButton",SIDE,TEXT),("Active.Nav.TButton",ACTIVE,ACCENT)):
         style.configure(name,background=fill,foreground=fg,padding=(11,9),
-                        anchor="w" if "Nav" in name else "center",font=("Segoe UI",10,"bold"),borderwidth=1)
+                        anchor="w" if "Nav" in name else "center",font=(family,-13 if "Nav" in name else -12,"bold"),borderwidth=1)
         style.map(name,foreground=[("disabled",MUTED),("active",fg)],background=[("active",fill)])
     style.configure("Upload.TFrame",background=BG,borderwidth=1,relief="solid")
     style.configure("Upload.TLabel",background=BG,foreground=TEXT)
-    style.configure("UploadIcon.TLabel",background=BG,foreground=ACCENT,font=("Segoe UI",-28,"bold"))
+    style.configure("UploadIcon.TLabel",background=BG,foreground=ACCENT,font=(family,-28,"bold"))
     style.configure("Header.TFrame",background=SIDE)
     style.configure("Header.TLabel",background=SIDE,foreground=MUTED)
-    style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=("Segoe UI",10,"bold"))
-    style.configure("Small.TButton",padding=(9,5),font=("Segoe UI",9,"bold"))
-    style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=("Segoe UI",9))
+    style.configure("HeaderTitle.TLabel",background=SIDE,foreground=TEXT,font=(family,-13,"bold"))
+    style.configure("Small.TButton",padding=(10,6),font=(family,-12,"bold"))
+    style.configure("Hint.TLabel",background=PANEL2,foreground=MUTED,padding=8,font=(family,-12))
     style.configure("Recent.Treeview",rowheight=36)
     style.configure("Card.TFrame",background=BG,borderwidth=0,relief="flat")
     style.configure("Panel.TFrame",background=PANEL,borderwidth=0,relief="flat")
@@ -67,35 +72,85 @@ def install(root):
     style.configure("TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
     style.configure("TSeparator",background=LINE)
     style.configure("Nav.TButton",borderwidth=0)
-    style.configure("Treeview",font=("Segoe UI",-13))
+    style.configure("Treeview",font=(family,-12))
     style.configure("Panel.TLabel",background=PANEL)
-    style.configure("Metric.TLabel",background=PANEL,font=("Segoe UI",-30,"bold"))
-    style.configure("Title.TLabel",font=("Segoe UI",-28,"bold"))
-    style.configure("Kicker.TLabel",foreground=ACCENT,font=("Segoe UI",9,"bold"))
-    style.configure("Muted.TLabel",foreground=MUTED)
-    style.configure("PanelTitle.TLabel",background=PANEL,font=("Segoe UI",-16,"bold"),padding=0)
-    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED)
-    style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=43,borderwidth=0)
-    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=("Segoe UI",9,"bold"),padding=(8,8))
+    style.configure("Metric.TLabel",background=PANEL,font=(family,-30,"bold"))
+    style.configure("Title.TLabel",font=(family,-30,"bold"))
+    style.configure("Kicker.TLabel",foreground=ACCENT,font=(family,-10,"bold"))
+    style.configure("Muted.TLabel",foreground=MUTED,font=(family,-12))
+    style.configure("PanelTitle.TLabel",background=PANEL,font=(family,-16,"bold"),padding=0)
+    style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED,font=(family,-12))
+    style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=39,borderwidth=0)
+    style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=(family,-10,"bold"),padding=(8,8))
     style.map("Treeview",background=[("selected",ACTIVE)],foreground=[("selected",TEXT)])
     style.configure("TEntry",fieldbackground=BG,padding=(8,8),bordercolor=LINE)
     style.configure("TCombobox",fieldbackground=BG,foreground=TEXT,background=PANEL2,padding=(8,7),arrowsize=14)
     style.map("TCombobox",fieldbackground=[("readonly",BG)],foreground=[("readonly",TEXT)])
     style.configure("TSpinbox",fieldbackground=BG,padding=(8,7))
     style.configure("TLabelframe",background=PANEL,bordercolor=LINE,relief="solid")
-    style.configure("TLabelframe.Label",background=PANEL,foreground=TEXT,font=("Segoe UI",12,"bold"))
+    style.configure("TLabelframe.Label",background=PANEL,foreground=TEXT,font=(family,-16,"bold"))
     style.configure("TNotebook",background=BG,borderwidth=0)
     style.configure("TNotebook.Tab",background=PANEL2,foreground=TEXT,padding=(12,8))
     style.map("TNotebook.Tab",background=[("selected",ACTIVE)],foreground=[("selected",ACCENT)])
-    style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT)
+    style.configure("Horizontal.TProgressbar",background=ACCENT,troughcolor=PANEL2,bordercolor=PANEL2,lightcolor=ACCENT,darkcolor=ACCENT,thickness=8)
+
+    install_control_states(root,style,family)
+    return family
+
+def install_control_states(root,style,family):
+    """Keep live clam controls and use the product palette in every state."""
+    style.configure(".",focuscolor=ACCENT,focusthickness=2,focussolid=True)
+    for name,fill,fg,hover,pressed in (
+        ("TButton",PANEL2,TEXT,"#21394b",ACTIVE),
+        ("Small.TButton",PANEL2,TEXT,"#21394b",ACTIVE),
+        ("Accent.TButton",ACCENT,INK,"#51efc5","#26cda3"),
+        ("Nav.TButton",SIDE,TEXT,PANEL2,ACTIVE),
+        ("Active.Nav.TButton",ACTIVE,ACCENT,ACTIVE,ACTIVE),
+    ):
+        edge=ACCENT if name=="Accent.TButton" else LINE
+        borders=[("disabled",LINE),("focus",ACCENT),("active",ACCENT if name=="Accent.TButton" else LINE)]
+        style.configure(name,background=fill,foreground=fg,bordercolor=edge,
+                        lightcolor=fill,darkcolor=fill,focuscolor=ACCENT if fg!=INK else INK)
+        colors=[("disabled",PANEL),("pressed",pressed),("active",hover)]
+        style.map(name,background=colors,lightcolor=colors,darkcolor=colors,
+                  foreground=[("disabled",MUTED)],bordercolor=borders)
+    for name in ("TEntry","TCombobox","TSpinbox"):
+        style.configure(name,fieldbackground=BG,foreground=TEXT,insertcolor=ACCENT,
+                        selectbackground=ACTIVE,selectforeground=TEXT,arrowcolor=MUTED,
+                        bordercolor=LINE,lightcolor=LINE)
+        style.map(name,fieldbackground=[("disabled",PANEL),("readonly",BG)],
+                  foreground=[("disabled",MUTED),("readonly",TEXT)],
+                  bordercolor=[("disabled",LINE),("focus",ACCENT)],
+                  lightcolor=[("disabled",LINE),("focus",ACCENT)],
+                  background=[("disabled",PANEL),("pressed",ACTIVE),("active",PANEL2),("readonly",PANEL2)],
+                  arrowcolor=[("disabled",MUTED),("active",ACCENT)])
+    for name in ("TCheckbutton","Panel.TCheckbutton","TRadiobutton"):
+        fill=PANEL if name.startswith("Panel.") else BG
+        style.configure(name,background=fill,foreground=TEXT,indicatorbackground=BG,
+                        indicatorforeground=ACCENT,upperbordercolor=LINE,lowerbordercolor=LINE)
+        style.map(name,background=[("active",fill)],foreground=[("disabled",MUTED)],
+                  indicatorbackground=[("disabled",PANEL),("pressed",ACTIVE),("selected",ACTIVE)],
+                  indicatorforeground=[("disabled",MUTED),("selected",ACCENT)],
+                  upperbordercolor=[("focus",ACCENT)],lowerbordercolor=[("focus",ACCENT)])
+    style.map("Treeview",background=[("disabled",PANEL),("selected",ACTIVE)],
+              foreground=[("disabled",MUTED),("selected",TEXT)],
+              bordercolor=[("focus",ACCENT)],lightcolor=[("focus",ACCENT)])
+    style.map("Treeview.Heading",background=[("pressed",ACTIVE),("active",PANEL2)],
+              foreground=[("active",TEXT)],lightcolor=[("active",PANEL2)],darkcolor=[("active",PANEL2)])
+    style.map("TNotebook.Tab",background=[("disabled",PANEL),("selected",ACTIVE),("active",PANEL2)],
+              foreground=[("disabled",MUTED),("selected",ACCENT)],
+              lightcolor=[("selected",ACTIVE),("!selected",PANEL2)],
+              darkcolor=[("selected",ACTIVE),("!selected",PANEL2)])
+    # Tk creates the dropdown as a separate listbox, outside ttk styling.
+    for option,value in (("background",BG),("foreground",TEXT),("selectBackground",ACTIVE),
+                         ("selectForeground",TEXT),("highlightColor",ACCENT),("font",(family,-13))):
+        root.option_add("*TCombobox*Listbox."+option,value)
+
 
 def panel(parent,title=None,padding=15):
     box=ttk.Frame(parent,style="Panel.TFrame",padding=padding)
     if title:ttk.Label(box,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
     return box
-
-def mix(a,b,t):
-    return "#"+"".join(f"{round(int(a[i:i+2],16)*(1-t)+int(b[i:i+2],16)*t):02x}" for i in (1,3,5))
 
 def clip_band(points,projection,bound,keep_above):
     if not points:return []
@@ -122,43 +177,161 @@ def rounded_points(width,height,radius):
             result.append((cx+r*math.cos(a),cy+r*math.sin(a)))
     return result
 
+def clear_chart(canvas):
+    """Clear chart data without removing the composited background."""
+    background=getattr(canvas,"_chart_background_item",None)
+    for item in canvas.find_all():
+        if item!=background:canvas.delete(item)
+
+
+def shade_children(parent,canvas,start,end,width,height):
+    """Compose chart surfaces exactly and shade opaque native widget backgrounds."""
+    style=ttk.Style(parent)
+    px,py=canvas.winfo_rootx(),canvas.winfo_rooty()
+    def visit(widget):
+        for child in widget.winfo_children():
+            if child is canvas or not child.winfo_ismapped():continue
+            if isinstance(child,Card):continue
+            x,y=child.winfo_rootx()-px,child.winfo_rooty()-py
+            w,h=child.winfo_width(),child.winfo_height()
+            color=surface_color(start,end,width,height,x+w/2,y+h/2)
+            if isinstance(child,ttk.Widget):
+                current=child.cget("style")
+                base=getattr(child,"_surface_base",current)
+                if base in ("Panel.TLabel","PanelMuted.TLabel","PanelTitle.TLabel","Metric.TLabel","PanelInner.TFrame","Panel.TCheckbutton"):
+                    name="Shade"+color[1:]+"."+base
+                    if current!=name:
+                        child._surface_base=base
+                        style.configure(name,background=color)
+                        if base=="Panel.TCheckbutton":
+                            style.map(name,background=[("active",color)])
+                        child.configure(style=name)
+                elif isinstance(child,ttk.Treeview) and base in ("","Treeview","Recent.Treeview"):
+                    base=base or "Treeview"
+                    name="Shade"+color[1:]+"."+base
+                    if current!=name:
+                        child._surface_base=base
+                        style.configure(name,background=color,fieldbackground=color)
+                        child.configure(style=name)
+            elif isinstance(child,tk.Canvas) and not getattr(child,"_surface_decoration",False):
+                if not hasattr(child,"_surface_original_bg"):
+                    child._surface_original_bg=child.cget("background")
+                if child._surface_original_bg==PANEL:
+                    if child.cget("background")!=color:child.configure(background=color)
+                    valid=(min(x,y)>=0 and min(w,h)>0 and x+w<=width and y+h<=height
+                           and min(width,height)>=3 and max(width,height)<=4096 and width*height<=2_000_000)
+                    key=(start,end,width,height,x,y,w,h) if valid else None
+                    if key!=getattr(child,"_chart_background_key",None):
+                        child.delete("chart-background")
+                        child._chart_background_item=None
+                        child._chart_background_image=None
+                        if key is not None:
+                            child._chart_background_image=tk.PhotoImage(master=child,data=gradient_surface(start,end,None,width,height,(x,y,w,h)))
+                            child._chart_background_item=child.create_image(0,0,image=child._chart_background_image,anchor="nw",tags="chart-background")
+                            child.tag_lower(child._chart_background_item)
+                        child._chart_background_key=key
+            visit(child)
+    visit(parent)
+
+def shade_sidebar(parent,canvas,start,end,width,height):
+    """Match classic sidebar labels to the underlying procedural surface."""
+    style=ttk.Style(parent)
+    px,py=canvas.winfo_rootx(),canvas.winfo_rooty()
+    def visit(widget):
+        for child in widget.winfo_children():
+            if child is canvas or not child.winfo_ismapped():continue
+            if isinstance(child,(tk.Frame,tk.Label,tk.Canvas)):
+                original=getattr(child,"_sidebar_original_bg",None)
+                if original is None:
+                    original=child.cget("background")
+                    child._sidebar_original_bg=original
+                if original==SIDE:
+                    x=child.winfo_rootx()-px+child.winfo_width()/2
+                    y=child.winfo_rooty()-py+child.winfo_height()/2
+                    color=surface_color(start,end,width,height,x,y)
+                    if child.cget("background")!=color:
+                        child.configure(background=color)
+            elif isinstance(child,ttk.Button):
+                current=child.cget("style")
+                if current=="Active.Nav.TButton" or current=="Nav.TButton" or current.endswith(".Nav.TButton"):
+                    x=child.winfo_rootx()-px+child.winfo_width()/2
+                    y=child.winfo_rooty()-py+child.winfo_height()/2
+                    color=surface_color(start,end,width,height,x,y)
+                    name="Shade"+color[1:]+".Nav.TButton"
+                    if getattr(child,"_nav_idle_style",None)!=name:
+                        style.configure(name,background=color,lightcolor=color,darkcolor=color)
+                        child._nav_idle_style=name
+                    if current!="Active.Nav.TButton" and current!=name:
+                        child.configure(style=name)
+            visit(child)
+    visit(parent)
+
+
 def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
     """Draw only procedural surface geometry behind live native controls."""
     canvas=tk.Canvas(parent,bg=outer,highlightthickness=0,borderwidth=0,takefocus=0)
+    canvas._surface_decoration=True
     canvas.place(x=0,y=0,relwidth=1,relheight=1,bordermode="outside")
     canvas.tk.call("lower",canvas._w)
     last=None
     pending=None
+    shade_pending=None
+    def shade():
+        nonlocal shade_pending
+        shade_pending=None
+        w,h=canvas.winfo_width(),canvas.winfo_height()
+        if isinstance(parent,Card):
+            shade_children(parent,canvas,start,end,w,h)
+        elif isinstance(parent,tk.Frame) and start==SIDE and end==BG:
+            shade_sidebar(parent,canvas,start,end,w,h)
     def draw():
-        nonlocal last,pending
+        nonlocal last,pending,shade_pending
         pending=None
         w,h=canvas.winfo_width(),canvas.winfo_height()
-        if (w,h)==last or min(w,h)<3:return
+        if min(w,h)<3:return
+        if shade_pending is not None:canvas.after_cancel(shade_pending)
+        shade_pending=canvas.after(60,shade)
+        if (w,h)==last:return
         last=(w,h)
         canvas.delete("surface")
-        points=rounded_points(w-1,h-1,radius)
-        angle=math.radians(145)
-        dx,dy=math.sin(angle),-math.cos(angle)
-        span=max(1,dx*(w-1)+dy*(h-1))
-        def projection(point):return (dx*point[0]+dy*point[1])/span
-        bands=24
-        for i in range(bands):
-            polygon=clip_band(points,projection,i/bands,True)
-            polygon=clip_band(polygon,projection,min(1,(i+1)/bands+.002),False)
-            if len(polygon)>=3:
-                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(start,end,(i+.5)/bands),outline="",tags="surface")
-        if border:
-            canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
+        canvas.gradient_image=None
+        if (type(radius) is int and 0<=radius<=32 and min(w,h)>=2*radius
+                and max(w,h)<=4096 and w*h<=2_000_000):
+            canvas.gradient_image=tk.PhotoImage(master=canvas,data=gradient_surface(start,end,border,w,h))
+            canvas.create_image(0,0,image=canvas.gradient_image,anchor="nw",tags="surface")
+        else:
+            points=rounded_points(w-1,h-1,radius)
+            angle=math.radians(145)
+            dx,dy=math.sin(angle),-math.cos(angle)
+            span=max(1,dx*(w-1)+dy*(h-1))
+            def projection(point):return (dx*point[0]+dy*point[1])/span
+            for left,right,color in gradient_bands(start,end):
+                polygon=clip_band(points,projection,left,True)
+                polygon=clip_band(polygon,projection,min(1,right+.001),False)
+                if len(polygon)>=3:
+                    canvas.create_polygon(*[v for point in polygon for v in point],fill=color,outline="",tags="surface")
+            if border:
+                canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
+        canvas.corner_images=[]
+        if type(radius) is int and 1<=radius<=32 and min(w,h)>=2*radius:
+            for corner,(x,y) in enumerate(((0,0),(w-radius,0),(w-radius,h-radius),(0,h-radius))):
+                image=tk.PhotoImage(master=canvas,data=card_corner(start,end,outer,border,w,h,radius,corner))
+                canvas.corner_images.append(image)
+                canvas.create_image(x,y,image=image,anchor="nw",tags="surface")
     def resized(_event):
         nonlocal pending
         if pending is not None:canvas.after_cancel(pending)
         pending=canvas.after(45,draw)
     def destroyed(_event):
-        nonlocal pending
+        nonlocal pending,shade_pending
         if pending is not None:
             canvas.after_cancel(pending)
             pending=None
+        if shade_pending is not None:
+            canvas.after_cancel(shade_pending)
+            shade_pending=None
     canvas.bind("<Configure>",resized)
+    canvas.bind("<Map>",resized,add="+")
     canvas.bind("<Destroy>",destroyed)
     return canvas
 
@@ -169,26 +342,29 @@ class Card(ttk.Frame):
         if title:ttk.Label(self,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
 
 def header_glow(parent):
-    """Native procedural header accent; no screenshot or web rendering."""
+    """Cached procedural raster, not an image of the reference screen."""
     canvas=tk.Canvas(parent,height=119,bg=BG,highlightthickness=0,borderwidth=0,takefocus=0)
     canvas.place(x=0,y=0,relwidth=1)
     canvas.tk.call("lower",canvas._w)
-    def draw(event):
-        w,h=event.width,event.height
-        if w<20:return
+    pending=None
+    last=0
+    def draw():
+        nonlocal pending,last
+        pending=None
+        w=canvas.winfo_width()
+        if not 20<=w<=4096 or w==last:return
+        last=w
+        canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w))
         canvas.delete("glow")
-        # Header surface follows the reference's rising diagonal.
-        points=[(.80*w,0),(w,0),(w,h),(.56*w,h),(.70*w,.43*h)]
-        def projection(point):
-            return point[0]/w-(.80-.24*point[1]/h)
-        for i in range(24):
-            lo=i*.44/24;hi=(i+1)*.44/24
-            polygon=clip_band(points,projection,lo,True)
-            polygon=clip_band(polygon,projection,hi+.001,False)
-            if len(polygon)>=3:
-                alpha=.24*math.exp(-lo*13)
-                canvas.create_polygon(*[v for point in polygon for v in point],fill=mix(BG,ACCENT,alpha),outline="",tags="glow")
-    canvas.bind("<Configure>",draw)
+        canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
+    def resized(_event):
+        nonlocal pending
+        if pending is not None:canvas.after_cancel(pending)
+        pending=canvas.after(60,draw)
+    def destroyed(_event):
+        if pending is not None:canvas.after_cancel(pending)
+    canvas.bind("<Configure>",resized)
+    canvas.bind("<Destroy>",destroyed)
     return canvas
 
 def product_icon(root):
@@ -198,3 +374,56 @@ def product_icon(root):
     icon=tk.PhotoImage(master=root,file=str(path))
     root.iconphoto(True,icon)
     return icon
+
+class NativeTable(ttk.Treeview):
+    """Native table with bounded row-hover rendering; retain real selection."""
+    _hover_tag="tvrtke_pointer_row"
+
+    def __init__(self,parent,**kwargs):
+        super().__init__(parent,**kwargs)
+        self._hover_row=""
+        self.tag_configure(self._hover_tag,background=PANEL2)
+        self.bind("<Motion>",self._pointer,add="+")
+        self.bind("<Leave>",self._clear_pointer,add="+")
+
+    def _pointer(self,event):
+        row=self.identify_row(event.y) if self.identify_region(event.x,event.y) in ("tree","cell") else ""
+        if row==self._hover_row:return
+        self._clear_pointer()
+        if row and self.exists(row):
+            tags=tuple(self.item(row,"tags"))
+            if self._hover_tag not in tags:
+                self.item(row,tags=(*tags,self._hover_tag))
+            self._hover_row=row
+
+    def _clear_pointer(self,_event=None):
+        row,self._hover_row=self._hover_row,""
+        if row and self.exists(row):
+            self.item(row,tags=tuple(tag for tag in self.item(row,"tags") if tag!=self._hover_tag))
+
+    def delete(self,*items):
+        self._clear_pointer()
+        return super().delete(*items)
+
+
+class NativeDialog(tk.Toplevel):
+    """Shared branded window surface; existing commands and modality stay intact."""
+    def __init__(self,parent,**kwargs):
+        super().__init__(parent,**kwargs)
+        self.configure(background=BG)
+        self._dialog_parent=parent
+
+    def geometry(self,newGeometry=None):
+        if newGeometry and "+" not in newGeometry and "-" not in newGeometry:
+            try:
+                width,height=map(int,newGeometry.split("x"))
+            except ValueError:
+                return super().geometry(newGeometry)
+            parent=self._dialog_parent
+            x=max(0,min(parent.winfo_rootx()+(parent.winfo_width()-width)//2,
+                        self.winfo_screenwidth()-width))
+            y=max(0,min(parent.winfo_rooty()+(parent.winfo_height()-height)//2,
+                        self.winfo_screenheight()-height-40))
+            newGeometry=f"{width}x{height}+{x}+{y}"
+        return super().geometry(newGeometry)
+

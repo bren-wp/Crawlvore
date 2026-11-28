@@ -75,5 +75,33 @@ def verify(root,release_version,public_key=None,mode="full"):
         if digest(root/name)!=value:raise ValueError("Checksum mismatch: "+name)
     return len(required)
 
+def verify_remote(root, pages, mode="online"):
+    """Check all remote upload receipts, rejecting duplicates and partial assets."""
+    require_contract()
+    if mode not in ("online","full"):raise ValueError("Invalid release mode")
+    required=COMPACT_REQUIRED if mode=="online" else REQUIRED
+    root=Path(root)
+    if {p.name for p in root.iterdir()}!=required:
+        raise ValueError("Incomplete local release assets")
+    assets={}
+    for page in pages:
+        if not isinstance(page,list):raise ValueError("Invalid remote asset page")
+        for item in page:
+            name=item["name"]
+            if name in assets or name not in required:
+                raise ValueError("Duplicate or unexpected remote asset: "+name)
+            assets[name]=item
+    if set(assets)!=required:raise ValueError("Incomplete remote release")
+    for name,item in assets.items():
+        path=root/name
+        if (item.get("state")!="uploaded" or item.get("size")!=path.stat().st_size
+                or item.get("digest")!="sha256:"+digest(path)):
+            raise ValueError("Remote asset identity mismatch: "+name)
+    return len(assets)
+
+
 if __name__=="__main__":
-    print("Verified complete stable release:",verify(sys.argv[1],sys.argv[2],mode=sys.argv[3] if len(sys.argv)>3 else "full"),"assets")
+    if len(sys.argv)==4 and sys.argv[1]=="--remote":
+        print("Verified remote release:",verify_remote(sys.argv[2],json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))),"assets")
+    else:
+        print("Verified complete stable release:",verify(sys.argv[1],sys.argv[2],mode=sys.argv[3] if len(sys.argv)>3 else "full"),"assets")

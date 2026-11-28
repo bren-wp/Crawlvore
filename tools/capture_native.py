@@ -1,6 +1,8 @@
 """Capture actual native widgets from a disposable fixture, not the user's database."""
 import argparse
 import ctypes
+import hashlib
+import platform
 import os
 import sys
 import tempfile
@@ -23,24 +25,77 @@ def wait(root,predicate,timeout=20):
     raise RuntimeError("Native view did not become ready")
 
 def capture(root,path):
+    root.lift()
     root.update()
-    hwnd=ctypes.windll.user32.GetAncestor(root.winfo_id(),2)
-    if not hwnd:raise RuntimeError("Window handle not available")
-    im=ImageGrab.grab(window=hwnd).convert("RGB")
-    if min(im.size)<200 or max(ImageStat.Stat(im).stddev)<5:raise RuntimeError("Empty window capture")
-    # Keep real client pixels, excluding only the OS title bar and border.
-    from ctypes import wintypes
-    rect=wintypes.RECT()
-    if not ctypes.windll.user32.GetWindowRect(hwnd,ctypes.byref(rect)):raise RuntimeError("Window bounds unavailable")
-    if im.size==(rect.right-rect.left,rect.bottom-rect.top):
-        x,y=root.winfo_rootx()-rect.left,root.winfo_rooty()-rect.top
+    if sys.platform=="win32":
+        # Capture the visible client, not the padded bitmap of an offscreen
+        # window. The CI display is configured before the GUI starts.
+        from ctypes import wintypes
+        user=ctypes.windll.user32
+        hwnd=user.GetAncestor(root.winfo_id(),2)
+        if not hwnd:raise RuntimeError("Window handle not available")
+        rect=wintypes.RECT()
+        origin=wintypes.POINT()
+        if not user.GetClientRect(hwnd,ctypes.byref(rect)) or not user.ClientToScreen(hwnd,ctypes.byref(origin)):
+            raise RuntimeError("Client geometry unavailable")
+        w,h=rect.right-rect.left,rect.bottom-rect.top
+        if (w,h)!=(root.winfo_width(),root.winfo_height()):
+            raise RuntimeError(f"Native Windows client scaling mismatch: {(w,h)}")
+        x,y=origin.x,origin.y
+        if min(x,y)<0 or x+w>user.GetSystemMetrics(0) or y+h>user.GetSystemMetrics(1):
+            raise RuntimeError(f"Windows client is clipped: {(x,y,w,h)}")
+        im=ImageGrab.grab(bbox=(x,y,x+w,y+h)).convert("RGB")
+    elif sys.platform.startswith("linux"):
+        if not root.winfo_viewable() or not os.environ.get("DISPLAY"):
+            raise RuntimeError("Mapped X11 window required for native capture")
+        x,y=root.winfo_rootx(),root.winfo_rooty()
         w,h=root.winfo_width(),root.winfo_height()
-        if x>=0 and y>=0 and x+w<=im.width and y+h<=im.height:im=im.crop((x,y,x+w,y+h))
+        im=ImageGrab.grab(bbox=(x,y,x+w,y+h),xdisplay=os.environ["DISPLAY"]).convert("RGB")
+    else:
+        raise RuntimeError("Unsupported native screenshot platform")
+    if min(im.size)<200 or max(ImageStat.Stat(im).stddev)<5:raise RuntimeError("Empty window capture")
     im.save(path)
     return im
 
+def capture_stable(root,path):
+    """Require consecutive identical real RGB frames; do not mask pixels."""
+    previous=None
+    for attempt in range(1,9):
+        until=time.monotonic()+.2
+        while time.monotonic()<until:
+            root.update()
+            time.sleep(.025)
+        im=capture(root,path)
+        digest=hashlib.sha256(im.tobytes()).hexdigest()
+        if digest==previous:
+            return im,{"rgb_sha256":digest,"stable_frames":2,"attempts":attempt}
+        previous=digest
+    raise RuntimeError(f"Unstable native RGB capture: {path.name}")
+
+
+def capture_dialog(root,open_dialog,path):
+    before=set(root.winfo_children())
+    open_dialog()
+    def visible():
+        return [child for child in root.winfo_children() if child not in before
+                and isinstance(child,tk.Toplevel) and child.winfo_viewable()]
+    wait(root,visible)
+    dialog=visible()[0]
+    try:
+        until=time.monotonic()+.35
+        while time.monotonic()<until:
+            root.update()
+            time.sleep(.025)
+        im,evidence=capture_stable(dialog,path)
+        if im.size!=(dialog.winfo_width(),dialog.winfo_height()):
+            raise RuntimeError(f"Native dialog viewport mismatch: {path.name}: {im.size}")
+        return {"dialog":path.stem,"capture":list(im.size),**evidence}
+    finally:
+        dialog.destroy()
+        root.update()
+
 def run(output,width=1280,height=700):
-    if sys.platform!="win32":raise RuntimeError("This capture uses the Windows window-only screenshot API.")
+    if sys.platform!="win32" and not sys.platform.startswith("linux"):raise RuntimeError("Windows or X11 required.")
     output.mkdir(parents=True,exist_ok=True)
     for name in list(os.environ):
         if name.startswith(("SUDREG_","CRAWLVORA_")):os.environ.pop(name,None)
@@ -51,11 +106,17 @@ def run(output,width=1280,height=700):
                 store.upsert(conn,{"title":name,"city":("Zagreb","Rijeka","Split")[index%3],
                                     "website":"https://example.invalid","entity_kind":"company","email":"kontakt@example.invalid" if index==0 else ""})
             conn.execute("INSERT INTO meta(key,value) VALUES ('seeded','1')")
-        root=tk.Tk();app=Desktop(root,Path(tmp))
+        if sys.platform=="win32":ctypes.windll.user32.SetProcessDPIAware()
+        root=tk.Tk()
+        original_scaling=float(root.tk.call("tk","scaling"))
+        root.tk.call("tk","scaling",96/72)
+        app=Desktop(root,Path(tmp))
         try:
             w,h=width,height
-            if w>root.winfo_screenwidth()-80 or h>root.winfo_screenheight()-100:raise ValueError("Requested viewport exceeds available screen.")
+            if w>root.winfo_screenwidth()-80 or h>root.winfo_screenheight()-100:
+                raise ValueError(f"Requested viewport exceeds available screen: {root.winfo_screenwidth()}x{root.winfo_screenheight()}")
             root.geometry(f"{w}x{h}+30+30")
+            wait(root,lambda:root.winfo_width()==w and root.winfo_height()==h)
             wait(root,lambda:app.metric_values["total"].get()=="6")
             steps=[("overview",lambda:app.metric_values["total"].get()=="6"),("directory",lambda:app.total==6),
                    ("jobs",lambda:app.job_metrics.get()!="—"),("data",lambda:app.import_button.winfo_ismapped()),
@@ -68,13 +129,22 @@ def run(output,width=1280,height=700):
                 wait(root,ready)
                 until=time.monotonic()+.2
                 while time.monotonic()<until:root.update();time.sleep(.02)
-                im=capture(root,output/(key+".png"))
+                im,evidence=capture_stable(root,output/(key+".png"))
                 if im.size!=(width,height):
                     raise RuntimeError(f"Native viewport mismatch: {key}: {im.size} != {(width,height)}")
-                report.append({"view":key,"capture":list(im.size)})
+                report.append({"view":key,"capture":list(im.size),**evidence})
+            dialogs=output/"dialogs"
+            dialogs.mkdir(exist_ok=True)
+            rows=app.client.request("/api/companies",{"limit":1})["rows"]
+            company=app.client.request(f"/api/company/{rows[0]['id']}")
+            dialog_report=[]
+            for key,action in (("profile",lambda:app.profile(company)),
+                               ("backup",app.backup_dialog),("sync",app.sync_dialog)):
+                dialog_report.append(capture_dialog(root,action,dialogs/(key+".png")))
             for w,h in ((960,600),(800,540),(640,420)):
                 if w>root.winfo_screenwidth()-50 or h>root.winfo_screenheight()-80:continue
                 root.geometry(f"{w}x{h}+30+30")
+                wait(root,lambda:root.winfo_width()==w and root.winfo_height()==h)
                 for key,_ in steps:
                     app.show_view(key)
                     until=time.monotonic()+.15
@@ -85,11 +155,20 @@ def run(output,width=1280,height=700):
                                 and box[3]>=app.content.winfo_reqheight()
                                 and all(b.winfo_ismapped() and b.winfo_height()>15 and b.winfo_y()+b.winfo_height()<=app.sidebar.winfo_height() for b in app.nav.values()))
                     try:wait(root,reachable,timeout=3)
-                    except RuntimeError as error:raise RuntimeError(f"Unreachable content: {key} {w}x{h}") from error
+                    except RuntimeError as error:
+                        raise RuntimeError(
+                            f"Unreachable content: {key} {w}x{h}; "
+                            f"bounds={app.viewport.bbox(app.content_window)}, "
+                            f"requested={(app.content.winfo_reqwidth(),app.content.winfo_reqheight())}, "
+                            f"sidebar={app.sidebar.winfo_height()}, "
+                            f"nav={[(k,b.winfo_ismapped(),b.winfo_y(),b.winfo_height()) for k,b in app.nav.items()]}"
+                        ) from error
                 print(f"All seven views accessible via viewport at {w}x{h}",flush=True)
-            (output/"capture.json").write_text(json.dumps({"captures":report,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
+            (output/"capture.json").write_text(json.dumps({"captures":report,"dialogs":dialog_report,"platform":sys.platform,"os_version":platform.platform(),"tk_version":root.tk.call("info","patchlevel"),"original_scaling":original_scaling,"requested_dpi":96,"display_size":[root.winfo_screenwidth(),root.winfo_screenheight()],"capture_method":"visible-client","font_family":app.font_family,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
             print(json.dumps(report,indent=2),flush=True)
-        finally:app.close()
+        finally:
+            app.smoke=True  # Disposable fixture: never block CI on a close-confirmation dialog.
+            app.close()
 
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__);p.add_argument("output",type=Path)

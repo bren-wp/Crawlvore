@@ -67,6 +67,12 @@ jobs:
       - name: Native build dependency vulnerability audit
         run: python -m pip_audit --strict
       - run: python -m unittest discover -s tests -v
+      - name: Native control state acceptance (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python -m unittest discover -s tests -p test_native_control_states.py -v
+      - name: Native control state acceptance (Windows)
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p test_native_control_states.py -v
       - name: Resolve Rust dependency lock
         working-directory: desktop/src-tauri
         shell: bash

@@ -16,7 +16,7 @@ class Handler(BaseHTTPRequestHandler):
 
 class TinyServer(LocalServer):
     max_requests=1
-    idle_timeout=0.35
+    idle_timeout=1.5
 
 class ServerTests(unittest.TestCase):
     def test_only_loopback(self):
@@ -36,13 +36,25 @@ class ServerTests(unittest.TestCase):
                 server.slots.release()
                 time.sleep(.005)
             else: self.fail("idle request did not acquire slot")
-            conn=http.client.HTTPConnection("127.0.0.1",port,timeout=2)
-            try:
-                conn.request("GET","/")
-                with conn.getresponse() as r: self.assertEqual(r.status,503)
-            finally:conn.close()
-            # Idle incomplete headers expire; the worker remains usable.
-            time.sleep(.5)
+            # Admission is decided at accept(), before HTTP parsing. Do not send
+            # unread request bytes into a rejected socket: Windows may reset such
+            # a connection rather than delivering the already queued response.
+            with socket.create_connection(("127.0.0.1",port),timeout=2) as rejected:
+                response=http.client.HTTPResponse(rejected)
+                try:
+                    response.begin()
+                    self.assertEqual(response.status,503)
+                    self.assertEqual(response.read(),b"")
+                finally:response.close()
+            # Wait for the actual idle timeout and semaphore release, not a
+            # fixed delay that is sensitive to scheduling on hosted runners.
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline:
+                if server.slots.acquire(blocking=False):
+                    server.slots.release()
+                    break
+                time.sleep(.02)
+            else:self.fail("idle request did not release its slot")
             conn=http.client.HTTPConnection("127.0.0.1",port,timeout=2)
             try:
                 conn.request("GET","/")
