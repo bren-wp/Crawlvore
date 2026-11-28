@@ -2,8 +2,9 @@
 import tkinter as tk
 from tkinter import ttk
 import unittest
+import time
 
-from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog, Card, clear_chart, shade_children, shade_sidebar, decorate, SIDE
+from native_theme import install, ACCENT, ACTIVE, BG, PANEL, PANEL2, TEXT, MUTED, NativeTable, NativeDialog, Card, clear_chart, shade_children, shade_sidebar, decorate, SIDE, header_glow
 
 
 class NativeControlStatesTests(unittest.TestCase):
@@ -153,3 +154,36 @@ class NativeControlStatesTests(unittest.TestCase):
         self.assertEqual(self.style.lookup(name+".Heading","background",()),PANEL2)
         self.assertEqual(table.selection(),(row,))
         self.assertEqual(table.item(row,"values"),("Tvrtka",))
+
+    def test_header_composites_nested_frames_without_covering_live_controls(self):
+        self.root.deiconify()
+        self.root.geometry("480x360")
+        content=ttk.Frame(self.root,padding=(28,14))
+        content.pack(fill="both",expand=True)
+        surface=header_glow(content)
+        page=ttk.Frame(content)
+        page.pack(fill="both",expand=True)
+        heading=ttk.Frame(page)
+        heading.pack(fill="x")
+        calls=[]
+        button=ttk.Button(heading,text="Sinkronizacija",command=lambda:calls.append(1))
+        button.pack(side="right",pady=12)
+        for _ in range(12):
+            self.root.update()
+            time.sleep(.025)
+        patch=heading._header_glow_patch
+        self.assertTrue(patch.winfo_ismapped())
+        x=patch.winfo_rootx()-surface.winfo_rootx()
+        y=patch.winfo_rooty()-surface.winfo_rooty()
+        self.assertEqual(patch.surface.get(0,0),surface.surface.get(x,y))
+        self.assertEqual(patch.surface.get(patch.surface.width()-1,0),
+                         surface.surface.get(x+patch.surface.width()-1,y))
+        button.invoke()
+        self.assertEqual(calls,[1])
+        old_image=patch.surface
+        surface.schedule_composite()
+        for _ in range(6):
+            self.root.update()
+            time.sleep(.025)
+        self.assertIs(patch.surface,old_image)
+        self.assertTrue(button.winfo_ismapped())
