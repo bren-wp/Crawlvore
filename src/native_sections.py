@@ -4,7 +4,7 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from native_transfer import upload,download
 from native_progress import sync_progress
-from native_theme import Card, PANEL, TEXT, MUTED, ACCENT, PANEL2
+from native_theme import Card, PANEL, TEXT, MUTED, ACCENT, PANEL2, NativeTable, NativeDialog
 
 FORMATS={"CSV":"csv","JSON":"json","Excel":"xlsx"}
 FIELDS={"title":"Naziv tvrtke","email":"E-pošta","phone":"Telefon","oib":"OIB","mbs":"MBS","website":"Web","city":"Grad","address":"Adresa","postal":"Poštanski broj","country":"Država","industry":"Djelatnost"}
@@ -68,7 +68,7 @@ class SecondaryPages:
         ttk.Label(right,text="Aktivno osvježavanje možete zaustaviti u sinkronizaciji.",style="PanelMuted.TLabel",wraplength=320).pack(anchor="w",pady=(8,0))
         self.register_grid(grid,2)
         history=Card(view,"Povijest zadataka",padding=15);history.pack(fill="both",expand=True,pady=(8,0))
-        self.job_table=ttk.Treeview(history,columns=("id","source","state","created","finished","attempts"),show="headings",height=3)
+        self.job_table=NativeTable(history,columns=("id","source","state","created","finished","attempts"),show="headings",height=3)
         for key,label,width in (("id","BR.",40),("source","IZVOR",90),("state","STATUS",110),("created","DODANO (UTC)",140),("finished","ZAVRŠENO (UTC)",140),("attempts","POKUŠAJI",85)):
             self.job_table.heading(key,text=label,anchor="w");self.job_table.column(key,width=width)
         self.job_table.pack(fill="both",expand=True)
@@ -235,7 +235,7 @@ class SecondaryPages:
 
     def snapshot_compare_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root);dialog.title("Tvrtke – usporedba snimki");dialog.geometry("620x420");dialog.configure(bg="#08131e")
+        dialog=NativeDialog(self.root);dialog.title("Tvrtke – usporedba snimki");dialog.geometry("620x420");dialog.configure(bg="#08131e")
         body=ttk.Frame(dialog,padding=16);body.pack(fill="both",expand=True)
         before=tk.StringVar();after=tk.StringVar()
         boxes=[]
@@ -245,7 +245,7 @@ class SecondaryPages:
         result=tk.StringVar(value="Odaberite dvije dovršene snimke.")
         ttk.Label(body,textvariable=result,wraplength=550,justify="left").pack(fill="x",pady=8)
         table_area=ttk.Frame(body);table_area.pack(fill="both",expand=True)
-        table=ttk.Treeview(table_area,columns=("name","added","removed","affected"),show="headings",height=5)
+        table=NativeTable(table_area,columns=("name","added","removed","affected"),show="headings",height=5)
         for key,label,width in (("name","Kategorija",200),("added","Dodano",75),("removed","Uklonjeno",75),("affected","Subjekti",80)):
             table.heading(key,text=label,anchor="w");table.column(key,width=width)
         scroll=ttk.Scrollbar(table_area,orient="vertical",command=table.yview)
@@ -365,7 +365,7 @@ class SecondaryPages:
         self.registry_filterbox=ttk.Combobox(header,textvariable=self.registry_filter,values=["Sve snimke"],state="readonly",width=13)
         self.registry_filterbox.pack(side="right",padx=(6,0))
         self.registry_filterbox.bind("<<ComboboxSelected>>",lambda _e:self.refresh_registry())
-        self.registry_table=ttk.Treeview(category_panel,columns=("snapshot","category","rows","status"),show="headings",height=6)
+        self.registry_table=NativeTable(category_panel,columns=("snapshot","category","rows","status"),show="headings",height=6)
         for key,label,width in (("snapshot","Snimka",90),("category","Kategorija",250),("rows","Redaka",130),("status","Status",100)):
             self.registry_table.heading(key,text=label.upper(),anchor="w");self.registry_table.column(key,width=width)
         self.registry_table.pack(fill="both",expand=True)
@@ -434,7 +434,7 @@ class SecondaryPages:
     def open_category(self):
         if not self.registry_table.selection():return
         row=self.registry_items[self.registry_table.selection()[0]]
-        dialog=tk.Toplevel(self.root);dialog.title(row["category"].replace("_"," ").capitalize());dialog.geometry("900x600")
+        dialog=NativeDialog(self.root);dialog.title(row["category"].replace("_"," ").capitalize());dialog.geometry("900x600")
         search=tk.StringVar();page=1
         toolbar=ttk.Frame(dialog,padding=8);toolbar.pack(fill="x")
         ttk.Entry(toolbar,textvariable=search).pack(side="left",fill="x",expand=True)
