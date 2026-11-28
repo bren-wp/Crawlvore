@@ -126,44 +126,53 @@ def gradient_bands(start,end):
 HEADER_DX=math.sin(math.radians(161))
 HEADER_DY=-math.cos(math.radians(161))
 
-def reference_header_color(bg,accent,width,height,x,y):
-    """Composite the two reference header gradients at a logical pixel."""
+def header_clip_edge(fraction,top,middle,split,bottom):
+    if fraction<=split:
+        return top+(middle-top)*fraction/split
+    return middle+(bottom-middle)*(fraction-split)/(1-split)
+
+
+def reference_header_color(bg,accent,width,height,x,y,origin=(0,0)):
+    """Composite both CSS layers at fractional precision before quantizing."""
     base,ink=rgb(bg),rgb(accent)
-    # Radial ellipse centered above the header.
     radial=math.hypot((x/width-.83)/.75,(y/height+.8)/1.5)
     opacity=.30*max(0,1-radial/.76)
-    # Clip to the polygon in the reference CSS.
-    if x/width < .80-.24*y/height:opacity=0
-    base=blend(base,ink,opacity)
-    # The second layer is a narrow diagonal highlight on the right 57%.
+    if x/width<header_clip_edge(y/height,.80,.70,.43,.56):opacity=0
+    base=tuple(a+(b-a)*opacity for a,b in zip(base,ink))
     local=x-.43*width
-    if local<0 or y>110:return base
-    w=.57*width
-    if local/w < max(0,.70*(1-y/110)):return base
-    t=(HEADER_DX*local+HEADER_DY*y)/(HEADER_DX*w+HEADER_DY*110)
-    stops=((.45,0),(.46,.55),(.49,.14),(.64,0))
-    if not .45<t<.64:return base
-    for (lo,a),(hi,b) in zip(stops,stops[1:]):
-        if lo<=t<=hi:return blend(base,ink,a+(b-a)*(t-lo)/(hi-lo))
-    return base
+    if local>=0 and y<=110:
+        w=.57*width
+        if local/w>=header_clip_edge(y/110,.70,.45,.42,0):
+            t=(HEADER_DX*local+HEADER_DY*y)/(HEADER_DX*w+HEADER_DY*110)
+            stops=((.45,0),(.46,.55),(.49,.14),(.64,0))
+            if .45<t<.64:
+                for (lo,a),(hi,b) in zip(stops,stops[1:]):
+                    if lo<=t<=hi:
+                        opacity=a+(b-a)*(t-lo)/(hi-lo)
+                        base=tuple(i+(j-i)*opacity for i,j in zip(base,ink))
+                        break
+    q=ordered_threshold(math.floor(x)+origin[0],math.floor(y)+origin[1])
+    return tuple(max(0,min(255,math.floor(v+q))) for v in base)
+
 
 @lru_cache(maxsize=4)
-def header_surface(bg,accent,width,height=119):
+def header_surface(bg,accent,width,height=119,origin=(0,0)):
     if type(width) is not int or not 1<=width<=4096 or height!=119:
         raise ValueError("Invalid header geometry")
+    if len(origin)!=2 or any(type(v) is not int or not 0<=v<8 for v in origin):
+        raise ValueError("Invalid header origin")
     rows=[]
     base_pixel=bytes((*rgb(bg),255))
     rgb(accent)
     for y in range(height):
         py=y+.5
-        # Both clipped layers are transparent before their leftmost edge.
-        # Leave one pixel of margin for floating-point boundary rounding.
-        radial_edge=(.80-.24*py/height)*width
-        highlight_edge=(.43+.57*max(0,.70*(1-py/110)))*width if py<=110 else width
+        # Both clipped layers are transparent before their exact polygon edges.
+        radial_edge=header_clip_edge(py/height,.80,.70,.43,.56)*width
+        highlight_edge=(.43+.57*header_clip_edge(py/110,.70,.45,.42,0))*width if py<=110 else width
         prefix=max(0,int(min(radial_edge,highlight_edge))-1)
         row=bytearray(base_pixel*prefix)
         for x in range(prefix,width):
-            row.extend((*reference_header_color(bg,accent,width,height,x+.5,py),255))
+            row.extend((*reference_header_color(bg,accent,width,height,x+.5,py,origin),255))
         rows.append(bytes(row))
     return png(width,height,rows)
 
