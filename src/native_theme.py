@@ -177,36 +177,52 @@ def rounded_points(width,height,radius):
             result.append((cx+r*math.cos(a),cy+r*math.sin(a)))
     return result
 
+def clear_chart(canvas):
+    """Clear chart data without removing the composited background."""
+    background=getattr(canvas,"_chart_background_item",None)
+    for item in canvas.find_all():
+        if item!=background:canvas.delete(item)
+
+
 def shade_children(parent,canvas,start,end,width,height):
-    """Match opaque native label and chart backgrounds to the local card color.
-    Retain the original ttk geometry, interaction, and custom foreground states.
-    """
+    """Compose chart surfaces exactly and shade opaque native widget backgrounds."""
     style=ttk.Style(parent)
     px,py=canvas.winfo_rootx(),canvas.winfo_rooty()
     def visit(widget):
         for child in widget.winfo_children():
             if child is canvas or not child.winfo_ismapped():continue
             if isinstance(child,Card):continue
+            x,y=child.winfo_rootx()-px,child.winfo_rooty()-py
+            w,h=child.winfo_width(),child.winfo_height()
+            color=surface_color(start,end,width,height,x+w/2,y+h/2)
             if isinstance(child,ttk.Widget):
                 current=child.cget("style")
                 base=getattr(child,"_surface_base",current)
-                if base in ("Panel.TLabel","PanelMuted.TLabel","PanelTitle.TLabel","Metric.TLabel","PanelInner.TFrame"):
-                    x=child.winfo_rootx()-px+child.winfo_width()/2
-                    y=child.winfo_rooty()-py+child.winfo_height()/2
-                    color=surface_color(start,end,width,height,x,y)
+                if base in ("Panel.TLabel","PanelMuted.TLabel","PanelTitle.TLabel","Metric.TLabel","PanelInner.TFrame","Panel.TCheckbutton"):
                     name="Shade"+color[1:]+"."+base
                     if current!=name:
                         child._surface_base=base
                         style.configure(name,background=color)
+                        if base=="Panel.TCheckbutton":
+                            style.map(name,background=[("active",color)])
                         child.configure(style=name)
             elif isinstance(child,tk.Canvas) and not getattr(child,"_surface_decoration",False):
                 if not hasattr(child,"_surface_original_bg"):
                     child._surface_original_bg=child.cget("background")
                 if child._surface_original_bg==PANEL:
-                    x=child.winfo_rootx()-px+child.winfo_width()/2
-                    y=child.winfo_rooty()-py+child.winfo_height()/2
-                    color=surface_color(start,end,width,height,x,y)
                     if child.cget("background")!=color:child.configure(background=color)
+                    valid=(min(x,y)>=0 and min(w,h)>0 and x+w<=width and y+h<=height
+                           and min(width,height)>=3 and max(width,height)<=4096 and width*height<=2_000_000)
+                    key=(start,end,width,height,x,y,w,h) if valid else None
+                    if key!=getattr(child,"_chart_background_key",None):
+                        child.delete("chart-background")
+                        child._chart_background_item=None
+                        child._chart_background_image=None
+                        if key is not None:
+                            child._chart_background_image=tk.PhotoImage(master=child,data=gradient_surface(start,end,None,width,height,(x,y,w,h)))
+                            child._chart_background_item=child.create_image(0,0,image=child._chart_background_image,anchor="nw",tags="chart-background")
+                            child.tag_lower(child._chart_background_item)
+                        child._chart_background_key=key
             visit(child)
     visit(parent)
 
