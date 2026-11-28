@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk, font as tkfont
-from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface, dithered_gradient_surface, mix_rgb, dithered_card_corner
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -184,6 +184,23 @@ def clear_chart(canvas):
         if item!=background:canvas.delete(item)
 
 
+def gradient_origin(canvas):
+    root=canvas.winfo_toplevel()
+    return ((canvas.winfo_rootx()-root.winfo_rootx())%8,
+            (canvas.winfo_rooty()-root.winfo_rooty())%8)
+
+
+def composite_gradient(canvas,start,end,border,width,height,region=None):
+    """Apply ordered quantization to the product's low-contrast CSS gradients."""
+    if (start,end)==(PANEL,"#0c1a26"):
+        endpoint=mix_rgb(PANEL,BG,.45)
+    elif (start,end)==(SIDE,BG):
+        endpoint=BG
+    else:
+        return gradient_surface(start,end,border,width,height,region)
+    return dithered_gradient_surface(start,endpoint,border,width,height,region,gradient_origin(canvas))
+
+
 def shade_children(parent,canvas,start,end,width,height):
     """Compose chart surfaces exactly and shade opaque native widget backgrounds."""
     style=ttk.Style(parent)
@@ -217,16 +234,21 @@ def shade_children(parent,canvas,start,end,width,height):
                 if not hasattr(child,"_surface_original_bg"):
                     child._surface_original_bg=child.cget("background")
                 if child._surface_original_bg==PANEL:
+                    refresh=getattr(canvas,"_schedule_shade",None)
+                    if refresh is not None and not getattr(child,"_chart_shade_bound",False):
+                        child.bind("<Configure>",refresh,add="+")
+                        child.bind("<Map>",refresh,add="+")
+                        child._chart_shade_bound=True
                     if child.cget("background")!=color:child.configure(background=color)
                     valid=(min(x,y)>=0 and min(w,h)>0 and x+w<=width and y+h<=height
                            and min(width,height)>=3 and max(width,height)<=4096 and width*height<=2_000_000)
-                    key=(start,end,width,height,x,y,w,h) if valid else None
+                    key=(start,end,width,height,x,y,w,h,gradient_origin(canvas)) if valid else None
                     if key!=getattr(child,"_chart_background_key",None):
                         child.delete("chart-background")
                         child._chart_background_item=None
                         child._chart_background_image=None
                         if key is not None:
-                            child._chart_background_image=tk.PhotoImage(master=child,data=gradient_surface(start,end,None,width,height,(x,y,w,h)))
+                            child._chart_background_image=tk.PhotoImage(master=child,data=composite_gradient(canvas,start,end,None,width,height,(x,y,w,h)))
                             child._chart_background_item=child.create_image(0,0,image=child._chart_background_image,anchor="nw",tags="chart-background")
                             child.tag_lower(child._chart_background_item)
                         child._chart_background_key=key
@@ -284,20 +306,26 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
             shade_children(parent,canvas,start,end,w,h)
         elif isinstance(parent,tk.Frame) and start==SIDE and end==BG:
             shade_sidebar(parent,canvas,start,end,w,h)
+    def schedule_shade(_event=None):
+        nonlocal shade_pending
+        if shade_pending is None:
+            shade_pending=canvas.after(60,shade)
+    canvas._schedule_shade=schedule_shade
+
     def draw():
         nonlocal last,pending,shade_pending
         pending=None
         w,h=canvas.winfo_width(),canvas.winfo_height()
         if min(w,h)<3:return
-        if shade_pending is not None:canvas.after_cancel(shade_pending)
-        shade_pending=canvas.after(60,shade)
-        if (w,h)==last:return
-        last=(w,h)
+        schedule_shade()
+        geometry=(w,h,gradient_origin(canvas))
+        if geometry==last:return
+        last=geometry
         canvas.delete("surface")
         canvas.gradient_image=None
         if (type(radius) is int and 0<=radius<=32 and min(w,h)>=2*radius
                 and max(w,h)<=4096 and w*h<=2_000_000):
-            canvas.gradient_image=tk.PhotoImage(master=canvas,data=gradient_surface(start,end,border,w,h))
+            canvas.gradient_image=tk.PhotoImage(master=canvas,data=composite_gradient(canvas,start,end,border,w,h))
             canvas.create_image(0,0,image=canvas.gradient_image,anchor="nw",tags="surface")
         else:
             points=rounded_points(w-1,h-1,radius)
@@ -315,7 +343,11 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         canvas.corner_images=[]
         if type(radius) is int and 1<=radius<=32 and min(w,h)>=2*radius:
             for corner,(x,y) in enumerate(((0,0),(w-radius,0),(w-radius,h-radius),(0,h-radius))):
-                image=tk.PhotoImage(master=canvas,data=card_corner(start,end,outer,border,w,h,radius,corner))
+                if (start,end)==(PANEL,"#0c1a26"):
+                    data=dithered_card_corner(start,mix_rgb(PANEL,BG,.45),outer,border,w,h,radius,corner,gradient_origin(canvas))
+                else:
+                    data=card_corner(start,end,outer,border,w,h,radius,corner)
+                image=tk.PhotoImage(master=canvas,data=data)
                 canvas.corner_images.append(image)
                 canvas.create_image(x,y,image=image,anchor="nw",tags="surface")
     def resized(_event):
@@ -342,30 +374,74 @@ class Card(ttk.Frame):
         if title:ttk.Label(self,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
 
 def header_glow(parent):
-    """Cached procedural raster, not an image of the reference screen."""
+    """Composite one procedural header across otherwise opaque native frames."""
     canvas=tk.Canvas(parent,height=119,bg=BG,highlightthickness=0,borderwidth=0,takefocus=0)
-    canvas.place(x=0,y=0,relwidth=1)
+    canvas._surface_decoration=True
+    canvas.place(x=0,y=0,relwidth=1,bordermode="outside")
     canvas.tk.call("lower",canvas._w)
     pending=None
     last=0
+
+    def compose(widget,width):
+        for child in widget.winfo_children():
+            if child is canvas or not child.winfo_ismapped():continue
+            if not isinstance(child,ttk.Frame) or isinstance(child,Card) or child.cget("style"):
+                continue
+            if not getattr(child,"_header_glow_bound",False):
+                child.bind("<Configure>",resized,add="+")
+                child.bind("<Map>",resized,add="+")
+                child._header_glow_bound=True
+            x,y=child.winfo_rootx()-canvas.winfo_rootx(),child.winfo_rooty()-canvas.winfo_rooty()
+            x0,y0=max(0,x),max(0,y)
+            x1,y1=min(width,x+child.winfo_width()),min(119,y+child.winfo_height())
+            patch=getattr(child,"_header_glow_patch",None)
+            if x1<=x0 or y1<=y0:
+                if patch is not None:patch.place_forget()
+                continue
+            key=(last,x0,y0,x1,y1,x,y)
+            if patch is None:
+                patch=tk.Canvas(child,bg=BG,borderwidth=0,highlightthickness=0,takefocus=0)
+                patch._surface_decoration=True
+                child._header_glow_patch=patch
+            if getattr(patch,"_header_key",None)!=key:
+                image=tk.PhotoImage(master=patch,width=x1-x0,height=y1-y0)
+                image.tk.call(str(image),"copy",str(canvas.surface),"-from",x0,y0,x1,y1)
+                patch.delete("glow")
+                patch.create_image(0,0,image=image,anchor="nw",tags="glow")
+                patch.surface=image
+                patch._header_key=key
+            patch.place(x=x0-x,y=y0-y,width=x1-x0,height=y1-y0,bordermode="outside")
+            patch.tk.call("lower",patch._w)
+            compose(child,width)
+
     def draw():
         nonlocal pending,last
         pending=None
         w=canvas.winfo_width()
-        if not 20<=w<=4096 or w==last:return
-        last=w
-        canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w))
-        canvas.delete("glow")
-        canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
-    def resized(_event):
+        if not 20<=w<=4096:return
+        key=(w,gradient_origin(canvas))
+        if key!=last:
+            canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w,origin=key[1]))
+            canvas.delete("glow")
+            canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
+            last=key
+        compose(parent,w)
+
+    def resized(_event=None):
+        nonlocal pending
+        if pending is None and canvas.winfo_exists():
+            pending=canvas.after(60,draw)
+
+    def destroyed(_event):
         nonlocal pending
         if pending is not None:canvas.after_cancel(pending)
-        pending=canvas.after(60,draw)
-    def destroyed(_event):
-        if pending is not None:canvas.after_cancel(pending)
+        pending=None
     canvas.bind("<Configure>",resized)
+    canvas.bind("<Map>",resized,add="+")
     canvas.bind("<Destroy>",destroyed)
+    canvas.schedule_composite=resized
     return canvas
+
 
 def product_icon(root):
     """Reuse the original launch asset in source and packaged native builds."""

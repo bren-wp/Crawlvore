@@ -128,7 +128,7 @@ class Desktop(SecondaryPages):
         self.resize_pending=False
         self.reflow_groups=[]
         self.views={key:ttk.Frame(content) for key in ("overview","directory","settings","jobs","data","analytics","registry")}
-        for view in self.views.values():header_glow(view)
+        self.header_surface=header_glow(content)
         self.body=self.views["directory"]
         self.build_directory()
         self.build_overview()
@@ -166,6 +166,10 @@ class Desktop(SecondaryPages):
                 for button in self.nav.values():button.pack_configure(pady=0 if short else 2)
                 style=ttk.Style(self.root)
                 for name in ("Nav.TButton","Active.Nav.TButton"):style.configure(name,padding=(7,3) if short else (11,10))
+            if hasattr(self,"recent"):
+                rows=5 if event.height>=850 else 3 if event.height>=700 else 2
+                if int(self.recent.cget("height"))!=rows:
+                    self.recent.configure(height=rows)
             self.reflow_layout()
             self.resize_content()
 
@@ -300,6 +304,7 @@ class Desktop(SecondaryPages):
         self.current_view=key
         self.nav[key].configure(style="Active.Nav.TButton",image=self.nav_icons[key][1])
         self.views[key].pack(fill="both",expand=True)
+        self.header_surface.schedule_composite()
         self.viewport.xview_moveto(0)
         self.viewport.yview_moveto(0)
         self.resize_content()
@@ -398,7 +403,7 @@ class Desktop(SecondaryPages):
         self.metric_values={}
         for column,(key,label) in enumerate((("total","Tvrtke u bazi"),("cities","Gradovi"),("phones","S telefonom"),("websites","S web stranicom"))):
             metrics.columnconfigure(column,weight=1,uniform="metric")
-            panel=Card(metrics,padding=(15,12))
+            panel=Card(metrics,padding=(15,9))
             panel.grid(row=0,column=column,sticky="nsew",padx=(0,12 if column<3 else 0))
             row=ttk.Frame(panel,style="PanelInner.TFrame")
             row.pack(fill="x")
@@ -417,13 +422,13 @@ class Desktop(SecondaryPages):
         city.grid(row=0,column=0,sticky="nsew",padx=(0,14))
         ttk.Label(city,text="Najzastupljeniji gradovi",style="PanelTitle.TLabel").pack(anchor="w")
         ttk.Label(city,text="Broj tvrtki po gradu",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
-        self.city_chart=tk.Canvas(city,width=220,height=165,bg=PANEL,highlightthickness=0)
+        self.city_chart=tk.Canvas(city,width=220,height=84,bg=PANEL,highlightthickness=0)
         self.city_chart.pack(fill="x",expand=True,pady=(8,0))
         coverage=Card(charts,padding=15)
         coverage.grid(row=0,column=1,sticky="nsew")
         ttk.Label(coverage,text="Dostupnost podataka",style="PanelTitle.TLabel").pack(anchor="w")
         ttk.Label(coverage,text="Kontaktni podaci u imeniku",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
-        self.coverage_chart=tk.Canvas(coverage,width=200,height=130,bg=PANEL,highlightthickness=0)
+        self.coverage_chart=tk.Canvas(coverage,width=200,height=104,bg=PANEL,highlightthickness=0)
         self.coverage_chart.pack(fill="x",expand=True,pady=(8,0))
         ttk.Label(coverage,text="Udio se izračunava iz stvarnih zapisa u bazi.",style="Hint.TLabel",wraplength=340).pack(fill="x",pady=(6,0))
         self.register_grid(charts,2)
@@ -437,11 +442,16 @@ class Desktop(SecondaryPages):
         ttk.Label(top,text="Nedavni zapisi",style="PanelTitle.TLabel").pack(side="left")
         ttk.Button(top,text="Otvori imenik",command=lambda:self.show_view("directory")).pack(side="right")
         ttk.Label(recent,text="Brz pristup zapisima iz baze",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
-        self.recent=NativeTable(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
+        recent_area=ttk.Frame(recent,style="PanelInner.TFrame")
+        recent_area.pack(fill="both",expand=True,pady=(8,0))
+        self.recent=NativeTable(recent_area,columns=("name","city","phone","web","source","action"),show="headings",height=3,style="Recent.Treeview")
+        recent_scroll=ttk.Scrollbar(recent_area,orient="vertical",command=self.recent.yview)
+        self.recent.configure(yscrollcommand=recent_scroll.set)
+        recent_scroll.pack(side="right",fill="y")
         for key,label,width in (("name","TVRTKA",240),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",65)):
             self.recent.heading(key,text=label,anchor="w")
             self.recent.column(key,width=width)
-        self.recent.pack(fill="both",expand=True,pady=(10,0))
+        self.recent.pack(side="left",fill="both",expand=True)
         def open_recent(_event):
             if self.recent.selection():
                 identifier=int(self.recent.selection()[0])
@@ -495,21 +505,24 @@ class Desktop(SecondaryPages):
         stats=self.overview_data
         for canvas in (self.city_chart,self.coverage_chart):clear_chart(canvas)
         width=max(180,self.city_chart.winfo_width())
-        cities=stats["top_cities"]
+        cities=stats["top_cities"][:6]
+        chart_height=max(28,28*len(cities))
+        if int(self.city_chart.cget("height"))!=chart_height:
+            self.city_chart.configure(height=chart_height)
         largest=max(1,max((row["n"] for row in cities),default=1))
         for index,row in enumerate(cities[:6]):
             y=8+28*index
-            self.city_chart.create_text(0,y,anchor="w",text=row["city"][:18],fill=TEXT)
+            self.city_chart.create_text(0,y,anchor="w",text=row["city"][:18],fill=TEXT,font=(self.font_family,-12))
             self.chart_bar(self.city_chart,y+12,width,row["n"]/largest)
-            self.city_chart.create_text(width-2,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=MUTED)
+            self.city_chart.create_text(width-2,y,anchor="e",text=f"{row['n']:,}".replace(",","."),fill=MUTED,font=(self.font_family,-12))
         width=max(180,self.coverage_chart.winfo_width())
         for index,(key,label) in enumerate((("phones","Telefonski broj"),("websites","Web stranica"))):
-            y=10+59*index
+            y=10+45*index
             pct=100*stats[key]/max(1,stats["total"])
-            self.coverage_chart.create_text(0,y,anchor="w",text=label,fill=MUTED)
-            self.coverage_chart.create_text(width-2,y,anchor="e",text=f"{pct:.0f}%",fill=TEXT)
+            self.coverage_chart.create_text(0,y,anchor="w",text=label,fill=MUTED,font=(self.font_family,-12))
+            self.coverage_chart.create_text(width-2,y,anchor="e",text=f"{pct:.0f}%",fill=TEXT,font=(self.font_family,-12,"bold"))
             self.chart_bar(self.coverage_chart,y+17,width,pct/100)
-            self.coverage_chart.create_text(0,y+35,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=(self.font_family,-12))
+            self.coverage_chart.create_text(0,y+31,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=(self.font_family,-12))
 
     @staticmethod
     def chart_bar(canvas,y,width,fraction):
