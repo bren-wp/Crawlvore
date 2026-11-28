@@ -14,7 +14,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
 from native_sections import SecondaryPages
-from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon, brand_surface
+from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon, brand_surface, NativeTable, NativeDialog
 
 CONTACTS = {"Svi zapisi": "", "Ima telefon": "phone", "Ima web": "web", "Ima e-poštu": "email", "Bez telefona i weba": "missing"}
 KINDS = {"Sve vrste":"","Trgovačka društva":"company","Poduzetnici i obrti":"entrepreneur","Institucije":"institution","Neprofitne organizacije":"nonprofit","Neklasificirani subjekti":"unknown"}
@@ -435,7 +435,7 @@ class Desktop(SecondaryPages):
         ttk.Label(top,text="Nedavni zapisi",style="PanelTitle.TLabel").pack(side="left")
         ttk.Button(top,text="Otvori imenik",command=lambda:self.show_view("directory")).pack(side="right")
         ttk.Label(recent,text="Brz pristup zapisima iz baze",style="PanelMuted.TLabel").pack(anchor="w",pady=(2,0))
-        self.recent=ttk.Treeview(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
+        self.recent=NativeTable(recent,columns=("name","city","phone","web","source","action"),show="headings",height=5,style="Recent.Treeview")
         for key,label,width in (("name","TVRTKA",240),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",65)):
             self.recent.heading(key,text=label,anchor="w")
             self.recent.column(key,width=width)
@@ -561,7 +561,7 @@ class Desktop(SecondaryPages):
         ttk.Button(resultbar,text="Moje tvrtke",command=self.saved_dialog).pack(side="right")
         table=ttk.Frame(results,style="PanelInner.TFrame")
         table.pack(fill="both",expand=True)
-        self.tree=ttk.Treeview(table,columns=("name","city","phone","web","source","action"),show="headings",selectmode="browse",height=7)
+        self.tree=NativeTable(table,columns=("name","city","phone","web","source","action"),show="headings",selectmode="browse",height=7)
         for key,label,width in (("name","TVRTKA",250),("city","GRAD",90),("phone","TELEFON",100),("web","WEB STRANICA",110),("source","IZVORI",100),("action","AKCIJA",75)):
             self.tree.heading(key,text=label,anchor="w")
             self.tree.column(key,width=width,minwidth=60,stretch=True)
@@ -655,7 +655,7 @@ class Desktop(SecondaryPages):
         self.submit(lambda:self.client.request(f"/api/company/{identifier}"),self.profile)
 
     def profile(self, company):
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Profil tvrtke")
         dialog.geometry("720x580")
         dialog.minsize(480,380)
@@ -763,11 +763,11 @@ class Desktop(SecondaryPages):
 
     def saved_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root);dialog.title("Tvrtke – Moje tvrtke");dialog.geometry("840x540");dialog.configure(bg=BG)
+        dialog=NativeDialog(self.root);dialog.title("Tvrtke – Moje tvrtke");dialog.geometry("840x540");dialog.configure(bg=BG)
         dialog.transient(self.root)
         body=ttk.Frame(dialog,padding=18);body.pack(fill="both",expand=True)
         self.section_header(body,"MOJ ODABIR","Moje tvrtke","Spremljeni poslovni subjekti. Odabir ne mijenja poslovne podatke.")
-        table=ttk.Treeview(body,columns=("name","mbs","city","email"),show="headings",height=7)
+        table=NativeTable(body,columns=("name","mbs","city","email"),show="headings",height=7)
         for key,label,width in (("name","Tvrtka",260),("mbs","MBS",100),("city","Grad",100),("email","E-pošta",180)):
             table.heading(key,text=label,anchor="w");table.column(key,width=width)
         table.pack(fill="both",expand=True)
@@ -803,7 +803,7 @@ class Desktop(SecondaryPages):
 
     def duplicate_dialog(self):
         if not self.client or self.merge_active:return
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Tvrtke – pregled duplikata")
         dialog.geometry("900x650")
         dialog.minsize(720,460)
@@ -814,7 +814,7 @@ class Desktop(SecondaryPages):
         ttk.Label(frame,text="Pregled mogućih duplikata",style="Title.TLabel").pack(anchor="w")
         status=tk.StringVar(value="Provjera podataka…")
         ttk.Label(frame,textvariable=status,wraplength=800).pack(anchor="w",pady=8)
-        table=ttk.Treeview(frame,columns=("name","city","address"),show="headings",selectmode="extended",height=7)
+        table=NativeTable(frame,columns=("name","city","address"),show="headings",selectmode="extended",height=7)
         for key,label,width in (("name","Tvrtka",330),("city","Grad",140),("address","Adresa",280)):
             table.heading(key,text=label)
             table.column(key,width=width)
@@ -878,7 +878,7 @@ class Desktop(SecondaryPages):
 
     def sync_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Tvrtke – sinkronizacija")
         dialog.geometry("550x420")
         dialog.configure(bg=BG)
@@ -947,7 +947,7 @@ class Desktop(SecondaryPages):
 
     def backup_dialog(self):
         if not self.client:return
-        dialog=tk.Toplevel(self.root)
+        dialog=NativeDialog(self.root)
         dialog.title("Tvrtke – sigurnosne kopije")
         dialog.geometry("530x280")
         dialog.configure(bg=BG)
