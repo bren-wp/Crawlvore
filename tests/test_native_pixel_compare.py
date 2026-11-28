@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from PIL import Image
-from tools.native_pixel_compare import compare,VIEWS,meets_threshold,region_diagnostics
+from tools.native_pixel_compare import compare,VIEWS,meets_threshold,region_diagnostics,dark_color_diagnostics
 
 class NativePixelCompareTests(unittest.TestCase):
     def setUp(self):
@@ -51,3 +51,13 @@ class NativePixelCompareTests(unittest.TestCase):
         self.assertEqual(result["max_channel_error_histogram"],
                          {"0":32,"1_to_2":1,"3_to_8":1,"9_to_32":0,"33_to_255":1})
         self.assertFalse(meets_threshold([{"changed_pixels":3,"total_pixels":35}]*7,0))
+
+    def test_signed_dark_color_diagnostics_preserve_direction_and_count(self):
+        ref=Image.new("RGB",(5,1))
+        actual=Image.new("RGB",(5,1))
+        ref.putdata([(10,20,30),(10,20,30),(10,20,30),(100,100,100),(10,20,30)])
+        actual.putdata([(11,19,30),(11,19,30),(10,20,30),(101,100,100),(14,20,30)])
+        result=dark_color_diagnostics(ref,actual)
+        self.assertEqual(result["pixels"],2)
+        self.assertEqual(result["signed_candidate_minus_reference"],[{"rgb":[1,-1,0],"pixels":2}])
+        self.assertEqual(result["dominant_color_pairs"],[{"reference":[10,20,30],"candidate":[11,19,30],"pixels":2}])
