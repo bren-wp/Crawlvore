@@ -307,3 +307,56 @@ def product_icon(root):
     icon=tk.PhotoImage(master=root,file=str(path))
     root.iconphoto(True,icon)
     return icon
+
+class NativeTable(ttk.Treeview):
+    """Native table with bounded row-hover rendering; retain real selection."""
+    _hover_tag="tvrtke_pointer_row"
+
+    def __init__(self,parent,**kwargs):
+        super().__init__(parent,**kwargs)
+        self._hover_row=""
+        self.tag_configure(self._hover_tag,background=PANEL2)
+        self.bind("<Motion>",self._pointer,add="+")
+        self.bind("<Leave>",self._clear_pointer,add="+")
+
+    def _pointer(self,event):
+        row=self.identify_row(event.y) if self.identify_region(event.x,event.y) in ("tree","cell") else ""
+        if row==self._hover_row:return
+        self._clear_pointer()
+        if row and self.exists(row):
+            tags=tuple(self.item(row,"tags"))
+            if self._hover_tag not in tags:
+                self.item(row,tags=(*tags,self._hover_tag))
+            self._hover_row=row
+
+    def _clear_pointer(self,_event=None):
+        row,self._hover_row=self._hover_row,""
+        if row and self.exists(row):
+            self.item(row,tags=tuple(tag for tag in self.item(row,"tags") if tag!=self._hover_tag))
+
+    def delete(self,*items):
+        self._clear_pointer()
+        return super().delete(*items)
+
+
+class NativeDialog(tk.Toplevel):
+    """Shared branded window surface; existing commands and modality stay intact."""
+    def __init__(self,parent,**kwargs):
+        super().__init__(parent,**kwargs)
+        self.configure(background=BG)
+        self._dialog_parent=parent
+
+    def geometry(self,newGeometry=None):
+        if newGeometry and "+" not in newGeometry and "-" not in newGeometry:
+            try:
+                width,height=map(int,newGeometry.split("x"))
+            except ValueError:
+                return super().geometry(newGeometry)
+            parent=self._dialog_parent
+            x=max(0,min(parent.winfo_rootx()+(parent.winfo_width()-width)//2,
+                        self.winfo_screenwidth()-width))
+            y=max(0,min(parent.winfo_rooty()+(parent.winfo_height()-height)//2,
+                        self.winfo_screenheight()-height-40))
+            newGeometry=f"{width}x{height}+{x}+{y}"
+        return super().geometry(newGeometry)
+
