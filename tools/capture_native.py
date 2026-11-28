@@ -63,8 +63,15 @@ def run(output,width=1280,height=700):
         root=tk.Tk();app=Desktop(root,Path(tmp))
         try:
             w,h=width,height
-            if w>root.winfo_screenwidth()-80 or h>root.winfo_screenheight()-100:raise ValueError("Requested viewport exceeds available screen.")
+            if sys.platform=="win32":
+                # ImageGrab(window=...) captures the actual window, not the
+                # visible desktop. Allow the client to exceed a hosted
+                # runner's display, while verifying the real client geometry.
+                root.maxsize(max(w,root.winfo_screenwidth()),max(h,root.winfo_screenheight()))
+            elif w>root.winfo_screenwidth()-80 or h>root.winfo_screenheight()-100:
+                raise ValueError("Requested viewport exceeds available screen.")
             root.geometry(f"{w}x{h}+30+30")
+            wait(root,lambda:root.winfo_width()==w and root.winfo_height()==h)
             wait(root,lambda:app.metric_values["total"].get()=="6")
             steps=[("overview",lambda:app.metric_values["total"].get()=="6"),("directory",lambda:app.total==6),
                    ("jobs",lambda:app.job_metrics.get()!="—"),("data",lambda:app.import_button.winfo_ismapped()),
@@ -82,8 +89,9 @@ def run(output,width=1280,height=700):
                     raise RuntimeError(f"Native viewport mismatch: {key}: {im.size} != {(width,height)}")
                 report.append({"view":key,"capture":list(im.size)})
             for w,h in ((960,600),(800,540),(640,420)):
-                if w>root.winfo_screenwidth()-50 or h>root.winfo_screenheight()-80:continue
+                if sys.platform!="win32" and (w>root.winfo_screenwidth()-50 or h>root.winfo_screenheight()-80):continue
                 root.geometry(f"{w}x{h}+30+30")
+                wait(root,lambda:root.winfo_width()==w and root.winfo_height()==h)
                 for key,_ in steps:
                     app.show_view(key)
                     until=time.monotonic()+.15
