@@ -398,7 +398,7 @@ def header_glow(parent):
             if x1<=x0 or y1<=y0:
                 if patch is not None:patch.place_forget()
                 continue
-            key=(width,x0,y0,x1,y1,x,y)
+            key=(last,x0,y0,x1,y1,x,y)
             if patch is None:
                 patch=tk.Canvas(child,bg=BG,borderwidth=0,highlightthickness=0,takefocus=0)
                 patch._surface_decoration=True
@@ -419,11 +419,12 @@ def header_glow(parent):
         pending=None
         w=canvas.winfo_width()
         if not 20<=w<=4096:return
-        if w!=last:
-            canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w))
+        key=(w,gradient_origin(canvas))
+        if key!=last:
+            canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w,origin=key[1]))
             canvas.delete("glow")
             canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
-            last=w
+            last=key
         compose(parent,w)
 
     def resized(_event=None):
