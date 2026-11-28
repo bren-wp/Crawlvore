@@ -48,6 +48,27 @@ def capture(root,path):
     im.save(path)
     return im
 
+def capture_dialog(root,open_dialog,path):
+    before=set(root.winfo_children())
+    open_dialog()
+    def visible():
+        return [child for child in root.winfo_children() if child not in before
+                and isinstance(child,tk.Toplevel) and child.winfo_viewable()]
+    wait(root,visible)
+    dialog=visible()[0]
+    try:
+        until=time.monotonic()+.35
+        while time.monotonic()<until:
+            root.update()
+            time.sleep(.025)
+        im=capture(dialog,path)
+        if im.size!=(dialog.winfo_width(),dialog.winfo_height()):
+            raise RuntimeError(f"Native dialog viewport mismatch: {path.name}: {im.size}")
+        return {"dialog":path.stem,"capture":list(im.size)}
+    finally:
+        dialog.destroy()
+        root.update()
+
 def run(output,width=1280,height=700):
     if sys.platform!="win32" and not sys.platform.startswith("linux"):raise RuntimeError("Windows or X11 required.")
     output.mkdir(parents=True,exist_ok=True)
@@ -88,6 +109,14 @@ def run(output,width=1280,height=700):
                 if im.size!=(width,height):
                     raise RuntimeError(f"Native viewport mismatch: {key}: {im.size} != {(width,height)}")
                 report.append({"view":key,"capture":list(im.size)})
+            dialogs=output/"dialogs"
+            dialogs.mkdir(exist_ok=True)
+            rows=app.client.request("/api/companies",{"limit":1})["rows"]
+            company=app.client.request(f"/api/company/{rows[0]['id']}")
+            dialog_report=[]
+            for key,action in (("profile",lambda:app.profile(company)),
+                               ("backup",app.backup_dialog),("sync",app.sync_dialog)):
+                dialog_report.append(capture_dialog(root,action,dialogs/(key+".png")))
             for w,h in ((960,600),(800,540),(640,420)):
                 if sys.platform!="win32" and (w>root.winfo_screenwidth()-50 or h>root.winfo_screenheight()-80):continue
                 root.geometry(f"{w}x{h}+30+30")
@@ -104,7 +133,7 @@ def run(output,width=1280,height=700):
                     try:wait(root,reachable,timeout=3)
                     except RuntimeError as error:raise RuntimeError(f"Unreachable content: {key} {w}x{h}") from error
                 print(f"All seven views accessible via viewport at {w}x{h}",flush=True)
-            (output/"capture.json").write_text(json.dumps({"captures":report,"platform":sys.platform,"font_family":app.font_family,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
+            (output/"capture.json").write_text(json.dumps({"captures":report,"dialogs":dialog_report,"platform":sys.platform,"font_family":app.font_family,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
             print(json.dumps(report,indent=2),flush=True)
         finally:
             app.smoke=True  # Disposable fixture: never block CI on a close-confirmation dialog.
