@@ -6,6 +6,25 @@ from PIL import Image,ImageChops
 
 VIEWS=("overview","directory","registry","jobs","data","analytics","settings")
 
+def region_diagnostics(delta):
+    """Report where and how much pixels differ; never change the exact gate."""
+    width,height=delta.size
+    combined=ImageChops.lighter(ImageChops.lighter(*delta.split()[:2]),delta.split()[2])
+    grid=[]
+    for row in range(min(4,height)):
+        for col in range(min(4,width)):
+            x0,x1=col*width//min(4,width),(col+1)*width//min(4,width)
+            y0,y1=row*height//min(4,height),(row+1)*height//min(4,height)
+            hist=combined.crop((x0,y0,x1,y1)).histogram()
+            total=(x1-x0)*(y1-y0)
+            grid.append({"bounds":[x0,y0,x1,y1],"changed_pixels":total-hist[0],
+                         "total_pixels":total,"mean_max_channel_error":round(sum(i*n for i,n in enumerate(hist))/total,6)})
+    hist=combined.histogram()
+    return {"max_channel_error_histogram":{"0":hist[0],"1_to_2":sum(hist[1:3]),
+              "3_to_8":sum(hist[3:9]),"9_to_32":sum(hist[9:33]),"33_to_255":sum(hist[33:])},
+            "regions":grid}
+
+
 def compare(reference,candidate,diff_dir):
     diff_dir.mkdir(parents=True,exist_ok=True)
     results=[]
@@ -20,7 +39,7 @@ def compare(reference,candidate,diff_dir):
             changed=total-hist[0]
             delta.save(diff_dir/(view+"-diff.png"))
             results.append({"view":view,"size":list(a.size),"changed_pixels":changed,"total_pixels":total,
-                            "changed_percent":round(100*changed/total,6),"exact":changed==0})
+                            "changed_percent":round(100*changed/total,6),"exact":changed==0,"diagnostics":region_diagnostics(delta)})
     return results
 
 def meets_threshold(results, maximum=0):
