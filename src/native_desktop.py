@@ -295,7 +295,8 @@ class Desktop(SecondaryPages):
     def show_view(self,key):
         if self.current_view:
             self.views[self.current_view].pack_forget()
-            self.nav[self.current_view].configure(style="Nav.TButton",image=self.nav_icons[self.current_view][0])
+            button=self.nav[self.current_view]
+            button.configure(style=getattr(button,"_nav_idle_style","Nav.TButton"),image=self.nav_icons[self.current_view][0])
         self.current_view=key
         self.nav[key].configure(style="Active.Nav.TButton",image=self.nav_icons[key][1])
         self.views[key].pack(fill="both",expand=True)
