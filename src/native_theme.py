@@ -374,30 +374,73 @@ class Card(ttk.Frame):
         if title:ttk.Label(self,text=title,style="PanelTitle.TLabel").pack(anchor="w",pady=(0,12))
 
 def header_glow(parent):
-    """Cached procedural raster, not an image of the reference screen."""
+    """Composite one procedural header across otherwise opaque native frames."""
     canvas=tk.Canvas(parent,height=119,bg=BG,highlightthickness=0,borderwidth=0,takefocus=0)
-    canvas.place(x=0,y=0,relwidth=1)
+    canvas._surface_decoration=True
+    canvas.place(x=0,y=0,relwidth=1,bordermode="outside")
     canvas.tk.call("lower",canvas._w)
     pending=None
     last=0
+
+    def compose(widget,width):
+        for child in widget.winfo_children():
+            if child is canvas or not child.winfo_ismapped():continue
+            if not isinstance(child,ttk.Frame) or isinstance(child,Card) or child.cget("style"):
+                continue
+            if not getattr(child,"_header_glow_bound",False):
+                child.bind("<Configure>",resized,add="+")
+                child.bind("<Map>",resized,add="+")
+                child._header_glow_bound=True
+            x,y=child.winfo_rootx()-canvas.winfo_rootx(),child.winfo_rooty()-canvas.winfo_rooty()
+            x0,y0=max(0,x),max(0,y)
+            x1,y1=min(width,x+child.winfo_width()),min(119,y+child.winfo_height())
+            patch=getattr(child,"_header_glow_patch",None)
+            if x1<=x0 or y1<=y0:
+                if patch is not None:patch.place_forget()
+                continue
+            key=(width,x0,y0,x1,y1,x,y)
+            if patch is None:
+                patch=tk.Canvas(child,bg=BG,borderwidth=0,highlightthickness=0,takefocus=0)
+                patch._surface_decoration=True
+                child._header_glow_patch=patch
+            if getattr(patch,"_header_key",None)!=key:
+                image=tk.PhotoImage(master=patch,width=x1-x0,height=y1-y0)
+                image.tk.call(str(image),"copy",str(canvas.surface),"-from",x0,y0,x1,y1)
+                patch.delete("glow")
+                patch.create_image(0,0,image=image,anchor="nw",tags="glow")
+                patch.surface=image
+                patch._header_key=key
+            patch.place(x=x0-x,y=y0-y,width=x1-x0,height=y1-y0,bordermode="outside")
+            patch.tk.call("lower",patch._w)
+            compose(child,width)
+
     def draw():
         nonlocal pending,last
         pending=None
         w=canvas.winfo_width()
-        if not 20<=w<=4096 or w==last:return
-        last=w
-        canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w))
-        canvas.delete("glow")
-        canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
-    def resized(_event):
+        if not 20<=w<=4096:return
+        if w!=last:
+            canvas.surface=tk.PhotoImage(master=canvas,data=header_surface(BG,ACCENT,w))
+            canvas.delete("glow")
+            canvas.create_image(0,0,image=canvas.surface,anchor="nw",tags="glow")
+            last=w
+        compose(parent,w)
+
+    def resized(_event=None):
+        nonlocal pending
+        if pending is None and canvas.winfo_exists():
+            pending=canvas.after(60,draw)
+
+    def destroyed(_event):
         nonlocal pending
         if pending is not None:canvas.after_cancel(pending)
-        pending=canvas.after(60,draw)
-    def destroyed(_event):
-        if pending is not None:canvas.after_cancel(pending)
+        pending=None
     canvas.bind("<Configure>",resized)
+    canvas.bind("<Map>",resized,add="+")
     canvas.bind("<Destroy>",destroyed)
+    canvas.schedule_composite=resized
     return canvas
+
 
 def product_icon(root):
     """Reuse the original launch asset in source and packaged native builds."""
