@@ -1,7 +1,7 @@
 import io
 import unittest
 from PIL import Image
-from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner,gradient_surface,rounded_coverage,dithered_gradient_surface,ordered_threshold,mix_rgb
+from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner,gradient_surface,rounded_coverage,dithered_gradient_surface,ordered_threshold,mix_rgb,dithered_card_corner
 
 class RoundedSurfaceTests(unittest.TestCase):
     def test_antialiased_edge_and_opaque_center(self):
@@ -235,3 +235,20 @@ class RoundedSurfaceTests(unittest.TestCase):
         self.assertEqual(dithered_gradient_surface.cache_info().maxsize,16)
         with self.assertRaises(ValueError):dithered_gradient_surface(*args,origin=(8,0))
         with self.assertRaises(ValueError):dithered_gradient_surface(*args[:3],4096,4096)
+
+    def test_dithered_card_corner_matches_gradient_interior(self):
+        end=mix_rgb("#101f2d","#08131e",.45)
+        for origin in ((0,0),(3,7),(7,1)):
+            full=Image.open(io.BytesIO(dithered_gradient_surface("#101f2d",end,"#2a4355",97,73,None,origin)))
+            radius=12
+            for corner in range(4):
+                ox=97-radius if corner in (1,2) else 0
+                oy=73-radius if corner in (2,3) else 0
+                patch=Image.open(io.BytesIO(dithered_card_corner("#101f2d",end,"#08131e","#2a4355",97,73,radius,corner,origin)))
+                for y in range(radius):
+                    for x in range(radius):
+                        inner,edge,outside=rounded_coverage(radius)[radius-1-y if oy else y][radius-1-x if ox else x]
+                        if inner==16:
+                            self.assertEqual(patch.getpixel((x,y)),full.getpixel((ox+x,oy+y)))
+                        if outside==16:
+                            self.assertEqual(patch.getpixel((x,y)),(8,19,30,255))
