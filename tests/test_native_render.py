@@ -97,3 +97,16 @@ class RoundedSurfaceTests(unittest.TestCase):
         lower=Image.open(io.BytesIO(card_corner(*args,2)))
         self.assertEqual(upper.getpixel((11,11))[:3],rgb(surface_color(args[0],args[1],320,200,11.5,11.5)))
         self.assertEqual(lower.getpixel((0,0))[:3],rgb(surface_color(args[0],args[1],320,200,308.5,188.5)))
+
+    def test_icon_geometry_scales_instead_of_clipping_or_shrinking(self):
+        for size in (12,20,32,40,60,64):
+            with self.subTest(size=size):
+                image=Image.open(io.BytesIO(stroke_icon(((2,2,18,18),),"#36ebba",size)))
+                self.assertEqual(image.size,(size,size))
+                alpha=image.getchannel("A")
+                left,top,right,bottom=alpha.getbbox()
+                self.assertEqual(left,top)
+                self.assertEqual(right,bottom)
+                self.assertLessEqual(left,size*.15)
+                self.assertGreaterEqual(right,size*.85)
+                self.assertEqual(alpha.getpixel((0,size-1)),0)
