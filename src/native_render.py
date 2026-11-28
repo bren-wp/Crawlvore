@@ -328,3 +328,36 @@ def dithered_gradient_surface(start,end,border,width,height,region=None,origin=(
             if ox+rw==width:row[-4:]=edge
         rows.append(bytes(row))
     return png(rw,rh,rows)
+
+@lru_cache(maxsize=64)
+def dithered_card_corner(start,end,outer,border,width,height,radius,corner,origin=(0,0)):
+    """Quantize after compositing the fractional fill, border and outer colors."""
+    if (type(width) is not int or type(height) is not int or
+            type(radius) is not int or not 1<=radius<=32 or
+            min(width,height)<2*radius or corner not in range(4)):
+        raise ValueError("Invalid card corner geometry")
+    if len(origin)!=2 or any(type(v) is not int or not 0<=v<8 for v in origin):
+        raise ValueError("Invalid dither origin")
+    a,b=rgb(start),rgb(end) if isinstance(end,str) else end
+    if len(b)!=3 or any(not 0<=v<=255 for v in b):raise ValueError("Invalid gradient endpoint")
+    background=rgb(outer)
+    edge=rgb(border) if border else None
+    dx,dy=math.sin(math.radians(145)),-math.cos(math.radians(145))
+    span=max(1,dx*width+dy*height)
+    ox=width-radius if corner in (1,2) else 0
+    oy=height-radius if corner in (2,3) else 0
+    coverage=rounded_coverage(radius)
+    rows=[]
+    for y in range(radius):
+        row=bytearray()
+        for x in range(radius):
+            t=max(0,min(1,(dx*(ox+x+.5)+dy*(oy+y+.5))/span))
+            fill=tuple(i+(j-i)*t for i,j in zip(a,b))
+            inner,outline,outside=coverage[radius-1-y if oy else y][radius-1-x if ox else x]
+            if edge is None:inner+=outline;outline=0
+            q=ordered_threshold(origin[0]+ox+x,origin[1]+oy+y)
+            values=tuple(max(0,min(255,math.floor((i*inner+e*outline+o*outside)/16+q)))
+                         for i,e,o in zip(fill,edge or fill,background))
+            row.extend((*values,255))
+        rows.append(bytes(row))
+    return png(radius,radius,rows)
