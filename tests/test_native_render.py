@@ -1,7 +1,7 @@
 import io
 import unittest
 from PIL import Image
-from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner
+from native_render import rounded_surface,stroke_icon,surface_color,gradient_bands,header_surface,reference_header_color,rgb,blend,card_corner,gradient_surface
 
 class RoundedSurfaceTests(unittest.TestCase):
     def test_antialiased_edge_and_opaque_center(self):
@@ -110,3 +110,29 @@ class RoundedSurfaceTests(unittest.TestCase):
                 self.assertLessEqual(left,size*.15)
                 self.assertGreaterEqual(right,size*.85)
                 self.assertEqual(alpha.getpixel((0,size-1)),0)
+
+    def test_gradient_raster_matches_every_pixel_center(self):
+        for start,end in (("#101f2d","#0c1a26"),("#000000","#ffffff"),
+                          ("#ffffff","#000000"),("#ff0080","#0080ff"),("#112233","#112233")):
+            for w,h in ((3,3),(37,19),(128,71)):
+                with self.subTest(start=start,end=end,width=w,height=h):
+                    image=Image.open(io.BytesIO(gradient_surface(start,end,None,w,h)))
+                    expected=bytes(c for y in range(h) for x in range(w)
+                                   for c in (*rgb(surface_color(start,end,w,h,x+.5,y+.5)),255))
+                    self.assertEqual(image.tobytes(),expected)
+
+    def test_gradient_surface_border_and_resource_bound(self):
+        gradient_surface.cache_clear()
+        args=("#101f2d","#0c1a26","#2a4355",320,200)
+        data=gradient_surface(*args)
+        image=Image.open(io.BytesIO(data))
+        edge=(*rgb(args[2]),255)
+        self.assertEqual(image.getpixel((0,100)),edge)
+        self.assertEqual(image.getpixel((319,100)),edge)
+        self.assertEqual(image.getpixel((160,199)),edge)
+        self.assertEqual(image.getpixel((160,100))[:3],rgb(surface_color(*args[:2],320,200,160.5,100.5)))
+        self.assertIs(data,gradient_surface(*args))
+        for w in range(20,40):
+            gradient_surface(*args[:3],w,20)
+        self.assertLessEqual(gradient_surface.cache_info().currsize,8)
+        with self.assertRaises(ValueError):gradient_surface(*args[:3],4096,4096)
