@@ -14,7 +14,7 @@ from pathlib import Path
 from tkinter import ttk, messagebox
 from native_client import WorkerProcess
 from native_sections import SecondaryPages
-from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon, brand_surface, NativeTable, NativeDialog
+from native_theme import BG, SIDE, PANEL, PANEL2, LINE, TEXT, MUTED, ACCENT, INK, install, nav_icon, Card, decorate, header_glow, product_icon, brand_surface, NativeTable, NativeDialog, clear_chart
 
 CONTACTS = {"Svi zapisi": "", "Ima telefon": "phone", "Ima web": "web", "Ima e-poštu": "email", "Bez telefona i weba": "missing"}
 KINDS = {"Sve vrste":"","Trgovačka društva":"company","Poduzetnici i obrti":"entrepreneur","Institucije":"institution","Neprofitne organizacije":"nonprofit","Neklasificirani subjekti":"unknown"}
@@ -492,7 +492,7 @@ class Desktop(SecondaryPages):
     def draw_charts(self):
         if not self.overview_data:return
         stats=self.overview_data
-        for canvas in (self.city_chart,self.coverage_chart):canvas.delete("all")
+        for canvas in (self.city_chart,self.coverage_chart):clear_chart(canvas)
         width=max(180,self.city_chart.winfo_width())
         cities=stats["top_cities"]
         largest=max(1,max((row["n"] for row in cities),default=1))
