@@ -244,3 +244,87 @@ def gradient_surface(start,end,border,width,height,region=None):
             if ox+rw==width:row[-4:]=edge
         rows.append(bytes(row))
     return png(rw,rh,rows)
+
+def mix_rgb(start,end,fraction):
+    """Preserve fractional sRGB channels until final pixel quantization."""
+    if not 0<=fraction<=1:raise ValueError("Invalid color mix")
+    return tuple(a+(b-a)*fraction for a,b in zip(rgb(start),rgb(end)))
+
+
+def ordered_threshold(x,y):
+    """An 8×8 periodic, device-pixel ordered quantization threshold."""
+    return ((y&1)*32+(x&1)*16+(y&2)*4+(x&2)*2+(y&4)//2+(x&4)//4)/64
+
+
+@lru_cache(maxsize=128)
+def dither_bands(start,end,phase_x,phase_y):
+    threshold=ordered_threshold(phase_x,phase_y)
+    cuts={0.0,1.0}
+    for a,b in zip(start,end):
+        if a!=b:
+            for n in range(math.ceil(min(a,b)),math.floor(max(a,b))+2):
+                t=(n-threshold-a)/(b-a)
+                if 0<t<1:cuts.add(t)
+    bounds=sorted(cuts)
+    return tuple((right,tuple(max(0,min(255,math.floor(a+(b-a)*(left+right)/2+threshold)))
+                              for a,b in zip(start,end)))
+                 for left,right in zip(bounds,bounds[1:]))
+
+
+@lru_cache(maxsize=16)
+def dithered_gradient_surface(start,end,border,width,height,region=None,origin=(0,0)):
+    """Generate an ordered-dither gradient in parent coordinates, without image assets.
+
+    Interleaved eight-pixel runs avoid a Python loop over individual pixels.
+    The origin is the surface position in the client viewport modulo eight.
+    """
+    if (type(width) is not int or type(height) is not int or
+            not 3<=width<=4096 or not 3<=height<=4096 or width*height>2_000_000):
+        raise ValueError("Invalid gradient surface dimensions")
+    ox,oy,rw,rh=(0,0,width,height) if region is None else region
+    if (any(type(v) is not int for v in (ox,oy,rw,rh)) or min(ox,oy)<0 or
+            min(rw,rh)<1 or ox+rw>width or oy+rh>height):
+        raise ValueError("Invalid gradient region")
+    if len(origin)!=2 or any(type(v) is not int or not 0<=v<8 for v in origin):
+        raise ValueError("Invalid dither origin")
+    a=rgb(start)
+    b=rgb(end) if isinstance(end,str) else end
+    if len(b)!=3 or any(not 0<=v<=255 for v in b):raise ValueError("Invalid gradient endpoint")
+    edge=bytes((*rgb(border),255)) if border else None
+    dx,dy=math.sin(math.radians(145)),-math.cos(math.radians(145))
+    span=max(1,dx*width+dy*height)
+    phase_bands=[[dither_bands(a,b,(origin[0]+ox+i)%8,j) for i in range(min(8,rw))]
+                 for j in range(8)]
+    rows=[]
+    for y in range(oy,oy+rh):
+        if edge and y in (0,height-1):
+            rows.append(edge*rw)
+            continue
+        row=bytearray(b"\x00\x00\x00\xff"*rw)
+        py=y+.5
+        phase_y=(origin[1]+y)%8
+        for first,bands in enumerate(phase_bands[phase_y]):
+            count=(rw-1-first)//8+1
+            previous=0
+            channels=[bytearray(),bytearray(),bytearray()]
+            threshold=ordered_threshold(origin[0]+ox+first,phase_y)
+            for right,color in bands:
+                boundary=((right*span-dy*py)/dx-.5-ox-first)/8
+                stop=min(count,max(previous,math.ceil(boundary)))
+                for c in range(3):channels[c].extend(bytes((color[c],))*(stop-previous))
+                previous=stop
+            if previous<count:
+                for c in range(3):channels[c].extend(bytes((bands[-1][1][c],))*(count-previous))
+            for right,_ in bands[:-1]:
+                boundary=((right*span-dy*py)/dx-.5-ox-first)/8
+                i=round(boundary)
+                if 0<=i<count and abs(boundary-i)<1e-8:
+                    t=max(0,min(1,(dx*(ox+first+8*i+.5)+dy*py)/span))
+                    for c in range(3):
+                        channels[c][i]=max(0,min(255,math.floor(a[c]+(b[c]-a[c])*t+threshold)))
+            for c in range(3):row[first*4+c::32]=channels[c]
+        if edge:
+            if ox==0:row[:4]=edge
+            if ox+rw==width:row[-4:]=edge
+        rows.append(bytes(row))
+    return png(rw,rh,rows)
