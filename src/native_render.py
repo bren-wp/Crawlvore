@@ -50,14 +50,16 @@ def rounded_surface(fill,border,radius=7,size=None):
 
 @lru_cache(maxsize=64)
 def stroke_icon(segments,color,size=20):
-    """Antialias native vector line art using bounded subpixel coverage."""
-    if type(size) is not int or not 12<=size<=32 or len(segments)>100:
+    """Antialias 20-unit vector line art at the requested bounded raster size."""
+    if type(size) is not int or not 12<=size<=64 or len(segments)>100:
         raise ValueError("Invalid icon geometry")
     sample=4
     n=size*sample
     coverage=bytearray(n*n)
-    radius=.85
+    scale=size/20
+    radius=.85*scale
     for x1,y1,x2,y2 in segments:
+        x1,y1,x2,y2=(value*scale for value in (x1,y1,x2,y2))
         vx,vy=x2-x1,y2-y1
         length=vx*vx+vy*vy
         left=max(0,math.floor((min(x1,x2)-radius)*sample))
