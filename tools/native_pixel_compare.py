@@ -1,6 +1,7 @@
 """Lossless RGB comparison. No resizing, masking or perceptual threshold."""
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 from PIL import Image,ImageChops
 
@@ -25,6 +26,24 @@ def region_diagnostics(delta):
             "regions":grid}
 
 
+def dark_color_diagnostics(reference,candidate):
+    """Diagnose signed one/two-level dark palette errors without ignoring them."""
+    pairs=Counter()
+    signed=Counter()
+    for expected,actual in zip(reference.get_flattened_data(),candidate.get_flattened_data()):
+        if max(expected)>64 or max(actual)>64 or expected==actual:
+            continue
+        residual=tuple(a-b for a,b in zip(actual,expected))
+        if max(map(abs,residual))<=2:
+            signed[residual]+=1
+            pairs[(expected,actual)]+=1
+    return {"pixels":sum(signed.values()),
+            "signed_candidate_minus_reference":[{"rgb":list(rgb),"pixels":count}
+                                                for rgb,count in signed.most_common()],
+            "dominant_color_pairs":[{"reference":list(ref),"candidate":list(actual),"pixels":count}
+                                    for (ref,actual),count in pairs.most_common(16)]}
+
+
 def compare(reference,candidate,diff_dir):
     diff_dir.mkdir(parents=True,exist_ok=True)
     results=[]
@@ -32,14 +51,15 @@ def compare(reference,candidate,diff_dir):
         with Image.open(reference/(view+"-dark.png")) as a, Image.open(candidate/(view+".png")) as b:
             if a.size!=b.size:
                 raise ValueError(f"{view}: unequal dimensions {a.size} vs {b.size}")
-            delta=ImageChops.difference(a.convert("RGB"),b.convert("RGB"))
+            reference_rgb,candidate_rgb=a.convert("RGB"),b.convert("RGB")
+            delta=ImageChops.difference(reference_rgb,candidate_rgb)
             combined=ImageChops.lighter(ImageChops.lighter(*delta.split()[:2]),delta.split()[2])
             hist=combined.histogram()
             total=a.width*a.height
             changed=total-hist[0]
             delta.save(diff_dir/(view+"-diff.png"))
             results.append({"view":view,"size":list(a.size),"changed_pixels":changed,"total_pixels":total,
-                            "changed_percent":round(100*changed/total,6),"exact":changed==0,"diagnostics":region_diagnostics(delta)})
+                            "changed_percent":round(100*changed/total,6),"exact":changed==0,"diagnostics":{**region_diagnostics(delta),"dark_colors":dark_color_diagnostics(reference_rgb,candidate_rgb)}})
     return results
 
 def meets_threshold(results, maximum=0):
