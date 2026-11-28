@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk, font as tkfont
-from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -233,18 +233,24 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         if (w,h)==last:return
         last=(w,h)
         canvas.delete("surface")
-        points=rounded_points(w-1,h-1,radius)
-        angle=math.radians(145)
-        dx,dy=math.sin(angle),-math.cos(angle)
-        span=max(1,dx*(w-1)+dy*(h-1))
-        def projection(point):return (dx*point[0]+dy*point[1])/span
-        for left,right,color in gradient_bands(start,end):
-            polygon=clip_band(points,projection,left,True)
-            polygon=clip_band(polygon,projection,min(1,right+.001),False)
-            if len(polygon)>=3:
-                canvas.create_polygon(*[v for point in polygon for v in point],fill=color,outline="",tags="surface")
-        if border:
-            canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
+        canvas.gradient_image=None
+        if (type(radius) is int and 0<=radius<=32 and min(w,h)>=2*radius
+                and max(w,h)<=4096 and w*h<=2_000_000):
+            canvas.gradient_image=tk.PhotoImage(master=canvas,data=gradient_surface(start,end,border,w,h))
+            canvas.create_image(0,0,image=canvas.gradient_image,anchor="nw",tags="surface")
+        else:
+            points=rounded_points(w-1,h-1,radius)
+            angle=math.radians(145)
+            dx,dy=math.sin(angle),-math.cos(angle)
+            span=max(1,dx*(w-1)+dy*(h-1))
+            def projection(point):return (dx*point[0]+dy*point[1])/span
+            for left,right,color in gradient_bands(start,end):
+                polygon=clip_band(points,projection,left,True)
+                polygon=clip_band(polygon,projection,min(1,right+.001),False)
+                if len(polygon)>=3:
+                    canvas.create_polygon(*[v for point in polygon for v in point],fill=color,outline="",tags="surface")
+            if border:
+                canvas.create_line(*[v for point in points+[points[0]] for v in point],fill=border,width=1,tags="surface")
         canvas.corner_images=[]
         if type(radius) is int and 1<=radius<=32 and min(w,h)>=2*radius:
             for corner,(x,y) in enumerate(((0,0),(w-radius,0),(w-radius,h-radius),(0,h-radius))):
