@@ -143,3 +143,36 @@ def header_surface(bg,accent,width,height=119):
             row.extend((*reference_header_color(bg,accent,width,height,x+.5,py),255))
         rows.append(bytes(row))
     return png(width,height,rows)
+
+@lru_cache(maxsize=64)
+def card_corner(start,end,outer,border,width,height,radius,corner):
+    """Opaque supersampled corner patch; the interior stays a native canvas."""
+    if (type(width) is not int or type(height) is not int or
+            type(radius) is not int or not 1<=radius<=32 or
+            min(width,height)<2*radius or corner not in range(4)):
+        raise ValueError("Invalid card corner geometry")
+    a,b,background=rgb(start),rgb(end),rgb(outer)
+    edge=rgb(border) if border else None
+    dx,dy=math.sin(math.radians(145)),-math.cos(math.radians(145))
+    span=max(1,dx*width+dy*height)
+    ox=width-radius if corner in (1,2) else 0
+    oy=height-radius if corner in (2,3) else 0
+    cx=width-radius if ox else radius
+    cy=height-radius if oy else radius
+    rows=[]
+    for y in range(radius):
+        row=bytearray()
+        for x in range(radius):
+            px,py=ox+x+.5,oy+y+.5
+            fill=blend(a,b,max(0,min(1,(dx*px+dy*py)/span)))
+            totals=[0,0,0]
+            for sy in range(4):
+                for sx in range(4):
+                    dist=(ox+x+(sx+.5)/4-cx)**2+(oy+y+(sy+.5)/4-cy)**2
+                    color=background if dist>radius**2 else (
+                        edge if edge is not None and dist>(radius-1)**2 else fill)
+                    for i,value in enumerate(color):
+                        totals[i]+=value
+            row.extend((*[round(value/16) for value in totals],255))
+        rows.append(bytes(row))
+    return png(radius,radius,rows)
