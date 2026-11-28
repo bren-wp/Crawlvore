@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk, font as tkfont
-from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface, dithered_gradient_surface, mix_rgb
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -184,6 +184,23 @@ def clear_chart(canvas):
         if item!=background:canvas.delete(item)
 
 
+def gradient_origin(canvas):
+    root=canvas.winfo_toplevel()
+    return ((canvas.winfo_rootx()-root.winfo_rootx())%8,
+            (canvas.winfo_rooty()-root.winfo_rooty())%8)
+
+
+def composite_gradient(canvas,start,end,border,width,height,region=None):
+    """Apply ordered quantization to the product's low-contrast CSS gradients."""
+    if (start,end)==(PANEL,"#0c1a26"):
+        endpoint=mix_rgb(PANEL,BG,.45)
+    elif (start,end)==(SIDE,BG):
+        endpoint=BG
+    else:
+        return gradient_surface(start,end,border,width,height,region)
+    return dithered_gradient_surface(start,endpoint,border,width,height,region,gradient_origin(canvas))
+
+
 def shade_children(parent,canvas,start,end,width,height):
     """Compose chart surfaces exactly and shade opaque native widget backgrounds."""
     style=ttk.Style(parent)
@@ -225,13 +242,13 @@ def shade_children(parent,canvas,start,end,width,height):
                     if child.cget("background")!=color:child.configure(background=color)
                     valid=(min(x,y)>=0 and min(w,h)>0 and x+w<=width and y+h<=height
                            and min(width,height)>=3 and max(width,height)<=4096 and width*height<=2_000_000)
-                    key=(start,end,width,height,x,y,w,h) if valid else None
+                    key=(start,end,width,height,x,y,w,h,gradient_origin(canvas)) if valid else None
                     if key!=getattr(child,"_chart_background_key",None):
                         child.delete("chart-background")
                         child._chart_background_item=None
                         child._chart_background_image=None
                         if key is not None:
-                            child._chart_background_image=tk.PhotoImage(master=child,data=gradient_surface(start,end,None,width,height,(x,y,w,h)))
+                            child._chart_background_image=tk.PhotoImage(master=child,data=composite_gradient(canvas,start,end,None,width,height,(x,y,w,h)))
                             child._chart_background_item=child.create_image(0,0,image=child._chart_background_image,anchor="nw",tags="chart-background")
                             child.tag_lower(child._chart_background_item)
                         child._chart_background_key=key
@@ -301,13 +318,14 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         w,h=canvas.winfo_width(),canvas.winfo_height()
         if min(w,h)<3:return
         schedule_shade()
-        if (w,h)==last:return
-        last=(w,h)
+        geometry=(w,h,gradient_origin(canvas))
+        if geometry==last:return
+        last=geometry
         canvas.delete("surface")
         canvas.gradient_image=None
         if (type(radius) is int and 0<=radius<=32 and min(w,h)>=2*radius
                 and max(w,h)<=4096 and w*h<=2_000_000):
-            canvas.gradient_image=tk.PhotoImage(master=canvas,data=gradient_surface(start,end,border,w,h))
+            canvas.gradient_image=tk.PhotoImage(master=canvas,data=composite_gradient(canvas,start,end,border,w,h))
             canvas.create_image(0,0,image=canvas.gradient_image,anchor="nw",tags="surface")
         else:
             points=rounded_points(w-1,h-1,radius)
