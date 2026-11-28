@@ -53,7 +53,7 @@ class Desktop(SecondaryPages):
         root.minsize(min(640,width),min(420,height))
         root.configure(bg=BG)
         root.protocol("WM_DELETE_WINDOW", self.close)
-        install(root)
+        self.font_family=install(root)
         self.launch_icon=product_icon(root)
         self.status = tk.StringVar(value="Priprema radnog prostora…")
         shell=ttk.Frame(root)
@@ -71,14 +71,14 @@ class Desktop(SecondaryPages):
         logo.create_image(0,0,image=logo.surface,anchor="nw")
         logo.create_polygon(19,6,30,13,30,25,19,32,8,25,8,13,outline=INK,fill="",width=2)
         logo.create_line(8,13,19,19,30,13,19,6,19,19,19,32,fill=INK,width=2)
-        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=("Segoe UI",-22,"bold")).pack(anchor="w")
-        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=("Segoe UI",-9,"bold")).pack(anchor="w")
+        tk.Label(brand,text="Tvrtke",bg=SIDE,fg=TEXT,font=(self.font_family,-22,"bold")).pack(anchor="w")
+        tk.Label(brand,text="POSLOVNI PODACI",bg=SIDE,fg=MUTED,font=(self.font_family,-9,"bold")).pack(anchor="w")
         self.sidebar=sidebar
         self.nav={}
         self.nav_icons={}
         self.nav_labels=[]
         def nav_label(label):
-            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=("Segoe UI",-10,"bold"))
+            widget=tk.Label(sidebar,text=label,bg=SIDE,fg=MUTED,font=(self.font_family,-10,"bold"))
             widget.pack(anchor="w",padx=20,pady=(14,5))
             self.nav_labels.append(widget)
         def nav(key,label,command,parent=sidebar):
@@ -507,7 +507,7 @@ class Desktop(SecondaryPages):
             self.coverage_chart.create_text(0,y,anchor="w",text=label,fill=MUTED)
             self.coverage_chart.create_text(width-2,y,anchor="e",text=f"{pct:.0f}%",fill=TEXT)
             self.chart_bar(self.coverage_chart,y+17,width,pct/100)
-            self.coverage_chart.create_text(0,y+35,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=("Segoe UI",9))
+            self.coverage_chart.create_text(0,y+35,anchor="w",text=f"{stats[key]:,} od {stats['total']:,}".replace(",","."),fill=MUTED,font=(self.font_family,-12))
 
     @staticmethod
     def chart_bar(canvas,y,width,fraction):
@@ -673,7 +673,7 @@ class Desktop(SecondaryPages):
                 col=idx%3;row=(idx//3)*2
                 section.columnconfigure(col,weight=1,uniform="field")
                 ttk.Label(section,text=label,style="Muted.TLabel").grid(row=row,column=col,sticky="w")
-                value=tk.Text(section,height=1,wrap="word",background=PANEL,foreground=TEXT,relief="flat",font=("Segoe UI",10))
+                value=tk.Text(section,height=1,wrap="word",background=PANEL,foreground=TEXT,relief="flat",font=(self.font_family,-13))
                 value.insert("1.0",str(company.get(key) or "—"))
                 value.configure(state="disabled")
                 value.grid(row=row+1,column=col,sticky="ew",padx=(0,8),pady=(0,5))
