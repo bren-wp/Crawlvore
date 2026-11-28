@@ -24,23 +24,32 @@ def wait(root,predicate,timeout=20):
 
 def capture(root,path):
     root.update()
-    hwnd=ctypes.windll.user32.GetAncestor(root.winfo_id(),2)
-    if not hwnd:raise RuntimeError("Window handle not available")
-    im=ImageGrab.grab(window=hwnd).convert("RGB")
-    if min(im.size)<200 or max(ImageStat.Stat(im).stddev)<5:raise RuntimeError("Empty window capture")
-    # Keep real client pixels, excluding only the OS title bar and border.
-    from ctypes import wintypes
-    rect=wintypes.RECT()
-    if not ctypes.windll.user32.GetWindowRect(hwnd,ctypes.byref(rect)):raise RuntimeError("Window bounds unavailable")
-    if im.size==(rect.right-rect.left,rect.bottom-rect.top):
-        x,y=root.winfo_rootx()-rect.left,root.winfo_rooty()-rect.top
+    if sys.platform=="win32":
+        hwnd=ctypes.windll.user32.GetAncestor(root.winfo_id(),2)
+        if not hwnd:raise RuntimeError("Window handle not available")
+        im=ImageGrab.grab(window=hwnd).convert("RGB")
+        # Keep real client pixels, excluding only the OS title bar and border.
+        from ctypes import wintypes
+        rect=wintypes.RECT()
+        if not ctypes.windll.user32.GetWindowRect(hwnd,ctypes.byref(rect)):raise RuntimeError("Window bounds unavailable")
+        if im.size==(rect.right-rect.left,rect.bottom-rect.top):
+            x,y=root.winfo_rootx()-rect.left,root.winfo_rooty()-rect.top
+            w,h=root.winfo_width(),root.winfo_height()
+            if x>=0 and y>=0 and x+w<=im.width and y+h<=im.height:im=im.crop((x,y,x+w,y+h))
+    elif sys.platform.startswith("linux"):
+        if not root.winfo_viewable() or not os.environ.get("DISPLAY"):
+            raise RuntimeError("Mapped X11 window required for native capture")
+        x,y=root.winfo_rootx(),root.winfo_rooty()
         w,h=root.winfo_width(),root.winfo_height()
-        if x>=0 and y>=0 and x+w<=im.width and y+h<=im.height:im=im.crop((x,y,x+w,y+h))
+        im=ImageGrab.grab(bbox=(x,y,x+w,y+h),xdisplay=os.environ["DISPLAY"]).convert("RGB")
+    else:
+        raise RuntimeError("Unsupported native screenshot platform")
+    if min(im.size)<200 or max(ImageStat.Stat(im).stddev)<5:raise RuntimeError("Empty window capture")
     im.save(path)
     return im
 
 def run(output,width=1280,height=700):
-    if sys.platform!="win32":raise RuntimeError("This capture uses the Windows window-only screenshot API.")
+    if sys.platform!="win32" and not sys.platform.startswith("linux"):raise RuntimeError("Windows or X11 required.")
     output.mkdir(parents=True,exist_ok=True)
     for name in list(os.environ):
         if name.startswith(("SUDREG_","CRAWLVORA_")):os.environ.pop(name,None)
@@ -87,9 +96,11 @@ def run(output,width=1280,height=700):
                     try:wait(root,reachable,timeout=3)
                     except RuntimeError as error:raise RuntimeError(f"Unreachable content: {key} {w}x{h}") from error
                 print(f"All seven views accessible via viewport at {w}x{h}",flush=True)
-            (output/"capture.json").write_text(json.dumps({"captures":report,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
+            (output/"capture.json").write_text(json.dumps({"captures":report,"platform":sys.platform,"font_family":app.font_family,"tk_scaling":float(root.tk.call("tk","scaling"))},indent=2),encoding="utf-8")
             print(json.dumps(report,indent=2),flush=True)
-        finally:app.close()
+        finally:
+            app.smoke=True  # Disposable fixture: never block CI on a close-confirmation dialog.
+            app.close()
 
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__);p.add_argument("output",type=Path)
