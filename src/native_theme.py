@@ -226,6 +226,27 @@ def shade_children(parent,canvas,start,end,width,height):
             visit(child)
     visit(parent)
 
+def shade_sidebar(parent,canvas,start,end,width,height):
+    """Match classic sidebar labels to the underlying procedural surface."""
+    px,py=canvas.winfo_rootx(),canvas.winfo_rooty()
+    def visit(widget):
+        for child in widget.winfo_children():
+            if child is canvas or not child.winfo_ismapped():continue
+            if isinstance(child,(tk.Frame,tk.Label,tk.Canvas)):
+                original=getattr(child,"_sidebar_original_bg",None)
+                if original is None:
+                    original=child.cget("background")
+                    child._sidebar_original_bg=original
+                if original==SIDE:
+                    x=child.winfo_rootx()-px+child.winfo_width()/2
+                    y=child.winfo_rooty()-py+child.winfo_height()/2
+                    color=surface_color(start,end,width,height,x,y)
+                    if child.cget("background")!=color:
+                        child.configure(background=color)
+            visit(child)
+    visit(parent)
+
+
 def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
     """Draw only procedural surface geometry behind live native controls."""
     canvas=tk.Canvas(parent,bg=outer,highlightthickness=0,borderwidth=0,takefocus=0)
@@ -238,7 +259,11 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
     def shade():
         nonlocal shade_pending
         shade_pending=None
-        if isinstance(parent,Card):shade_children(parent,canvas,start,end,canvas.winfo_width(),canvas.winfo_height())
+        w,h=canvas.winfo_width(),canvas.winfo_height()
+        if isinstance(parent,Card):
+            shade_children(parent,canvas,start,end,w,h)
+        elif isinstance(parent,tk.Frame) and start==SIDE and end==BG:
+            shade_sidebar(parent,canvas,start,end,w,h)
     def draw():
         nonlocal last,pending,shade_pending
         pending=None
