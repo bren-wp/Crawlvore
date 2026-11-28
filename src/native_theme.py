@@ -4,7 +4,7 @@ import math
 import sys
 from pathlib import Path
 from tkinter import ttk, font as tkfont
-from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface, dithered_gradient_surface, mix_rgb
+from native_render import rounded_surface, stroke_icon, surface_color, gradient_bands, header_surface, card_corner, gradient_surface, dithered_gradient_surface, mix_rgb, dithered_card_corner
 
 BG="#08131e";SIDE="#0b1724";PANEL="#101f2d";PANEL2="#182b3b";LINE="#2a4355"
 TEXT="#edf4fa";MUTED="#a8bacb";ACCENT="#36ebba";INK="#05291f";ACTIVE="#103f39"
@@ -343,7 +343,11 @@ def decorate(parent,start=PANEL,end="#0c1a26",radius=12,outer=BG,border=LINE):
         canvas.corner_images=[]
         if type(radius) is int and 1<=radius<=32 and min(w,h)>=2*radius:
             for corner,(x,y) in enumerate(((0,0),(w-radius,0),(w-radius,h-radius),(0,h-radius))):
-                image=tk.PhotoImage(master=canvas,data=card_corner(start,end,outer,border,w,h,radius,corner))
+                if (start,end)==(PANEL,"#0c1a26"):
+                    data=dithered_card_corner(start,mix_rgb(PANEL,BG,.45),outer,border,w,h,radius,corner,gradient_origin(canvas))
+                else:
+                    data=card_corner(start,end,outer,border,w,h,radius,corner)
+                image=tk.PhotoImage(master=canvas,data=data)
                 canvas.corner_images.append(image)
                 canvas.create_image(x,y,image=image,anchor="nw",tags="surface")
     def resized(_event):
