@@ -72,7 +72,7 @@ def install(root):
     style.configure("TScrollbar",background=PANEL2,troughcolor=BG,arrowcolor=MUTED,bordercolor=BG,lightcolor=PANEL2,darkcolor=PANEL2)
     style.configure("TSeparator",background=LINE)
     style.configure("Nav.TButton",borderwidth=0)
-    style.configure("Treeview",font=(family,-13))
+    style.configure("Treeview",font=(family,-12))
     style.configure("Panel.TLabel",background=PANEL)
     style.configure("Metric.TLabel",background=PANEL,font=(family,-30,"bold"))
     style.configure("Title.TLabel",font=(family,-30,"bold"))
@@ -80,7 +80,7 @@ def install(root):
     style.configure("Muted.TLabel",foreground=MUTED,font=(family,-12))
     style.configure("PanelTitle.TLabel",background=PANEL,font=(family,-16,"bold"),padding=0)
     style.configure("PanelMuted.TLabel",background=PANEL,foreground=MUTED,font=(family,-12))
-    style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=43,borderwidth=0)
+    style.configure("Treeview",background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=39,borderwidth=0)
     style.configure("Treeview.Heading",background=PANEL2,foreground=MUTED,relief="flat",font=(family,-10,"bold"),padding=(8,8))
     style.map("Treeview",background=[("selected",ACTIVE)],foreground=[("selected",TEXT)])
     style.configure("TEntry",fieldbackground=BG,padding=(8,8),bordercolor=LINE)
@@ -206,6 +206,13 @@ def shade_children(parent,canvas,start,end,width,height):
                         if base=="Panel.TCheckbutton":
                             style.map(name,background=[("active",color)])
                         child.configure(style=name)
+                elif isinstance(child,ttk.Treeview) and base in ("","Treeview","Recent.Treeview"):
+                    base=base or "Treeview"
+                    name="Shade"+color[1:]+"."+base
+                    if current!=name:
+                        child._surface_base=base
+                        style.configure(name,background=color,fieldbackground=color)
+                        child.configure(style=name)
             elif isinstance(child,tk.Canvas) and not getattr(child,"_surface_decoration",False):
                 if not hasattr(child,"_surface_original_bg"):
                     child._surface_original_bg=child.cget("background")
@@ -228,6 +235,7 @@ def shade_children(parent,canvas,start,end,width,height):
 
 def shade_sidebar(parent,canvas,start,end,width,height):
     """Match classic sidebar labels to the underlying procedural surface."""
+    style=ttk.Style(parent)
     px,py=canvas.winfo_rootx(),canvas.winfo_rooty()
     def visit(widget):
         for child in widget.winfo_children():
@@ -243,6 +251,18 @@ def shade_sidebar(parent,canvas,start,end,width,height):
                     color=surface_color(start,end,width,height,x,y)
                     if child.cget("background")!=color:
                         child.configure(background=color)
+            elif isinstance(child,ttk.Button):
+                current=child.cget("style")
+                if current=="Active.Nav.TButton" or current=="Nav.TButton" or current.endswith(".Nav.TButton"):
+                    x=child.winfo_rootx()-px+child.winfo_width()/2
+                    y=child.winfo_rooty()-py+child.winfo_height()/2
+                    color=surface_color(start,end,width,height,x,y)
+                    name="Shade"+color[1:]+".Nav.TButton"
+                    if getattr(child,"_nav_idle_style",None)!=name:
+                        style.configure(name,background=color,lightcolor=color,darkcolor=color)
+                        child._nav_idle_style=name
+                    if current!="Active.Nav.TButton" and current!=name:
+                        child.configure(style=name)
             visit(child)
     visit(parent)
 
